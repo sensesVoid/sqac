@@ -1,0 +1,111 @@
+# Logic Reasoning Skills — SQAC cartridge
+# Format: universal skill formatter (sqac/skills.py)
+# Rule: content = pure procedure, ZERO answers. Keys = concrete situation triggers.
+
+- name: direct-proportion
+  domain: logic
+  difficulty: easy
+  pattern: scaling
+  content: |
+    SKILL direct-proportion: If quantity scales by factor k, every proportional
+    amount scales by k. Compute k from the two known quantities, then multiply.
+  keys:
+    - at the same rate, how many minutes or hours to reach a larger amount
+    - filling or pumping at a constant rate, scale up the quantity
+    - same speed same price proportionally how long how much
+    - bottles in minutes, liters in time, distance in speed
+
+- name: work-backwards
+  domain: logic
+  difficulty: medium
+  pattern: reversal
+  content: |
+    SKILL work-backwards: Start from the final value and undo each operation in
+    reverse order, writing the value after each undo. Do not solve forward.
+  keys:
+    - when you know the final state and must find an earlier state
+    - how much did she start with, how much was there originally
+    - "undo operations in reverse — spent then doubled, gave away then"
+    - work backwards from the result
+
+- name: overlap-count
+  domain: logic
+  difficulty: easy
+  pattern: inclusion-exclusion
+  content: |
+    SKILL overlap-count: For conditions A and B: count = n(A) + n(B) - n(A and B).
+    State each of the three counts explicitly before subtracting.
+  keys:
+    - when a question asks how many items satisfy several conditions at once
+    - play both sports, in both clubs, belong to both groups, overlap
+    - how many like neither, how many do not do either activity
+    - union of two groups, inclusion exclusion
+
+- name: state-search
+  domain: logic
+  difficulty: hard
+  pattern: state-space
+  content: |
+    SKILL state-search: list every reachable volume in each jug after one pour.
+    Repeat until the target volume appears. Record each fill-empty-pour step.
+  keys:
+    - when you must measure an exact amount using only two containers of fixed size
+    - jugs of different sizes, measure water, fill and pour
+    - jug problem, fill pour empty, exactly 4 gallons with a 3 and 5
+    - container pouring puzzle with two vessels
+    - two jugs capacity puzzle, measure out specific amount
+
+- name: weighted-index
+  domain: logic
+  difficulty: hard
+  pattern: combinatorial
+  content: |
+    SKILL weighted-index: label items 1..N. Take i coins from item i.
+    The total excess weight tells you which item has the defect.
+  keys:
+    - when exactly one of many items has a hidden property and you can weigh once
+    - one defective batch among many, one weighing to find it
+    - 12 bags of coins, one heavier, one weighing on a scale
+    - find the odd bag with coins weighing more, one digital scale
+    - number the items and take a different count from each to identify
+
+- name: decomposition
+  domain: logic
+  difficulty: easy
+  pattern: decomposition
+  content: |
+    SKILL decompose-sum: Split the quantity into its independent parts, compute
+    each part separately, then add. Name each part before computing.
+  keys:
+    - when the cost or amount is the sum of two independent parts
+    - total cost of several items at given prices, buy multiple of each
+    - combined weight or cost of different things together
+    - separate the components and add them up
+
+- name: binary-search-bug
+  domain: debugging
+  difficulty: medium
+  pattern: elimination
+  content: |
+    SKILL binary-search-bug: Halve the code region. Add a print or assertion
+    at the midpoint. If the bug appears in the first half, discard the second,
+    and vice versa. Repeat until the bug is in a single function.
+  keys:
+    - when you cannot find where the bug is but know it exists
+    - narrowing down a defect, halving the suspect code region
+    - print at midpoint to isolate which half contains the bug
+    - divide the codebase to find where behavior changes
+
+- name: invariant-finding
+  domain: logic
+  difficulty: hard
+  pattern: invariant
+  content: |
+    SKILL invariant-finding: Identify what property stays the same after every
+    allowed operation. Write the invariant. Prove it holds initially and is
+    preserved by each operation. The answer follows from the invariant.
+  keys:
+    - prove something by showing a property that never changes
+    - what stays the same across all operations or steps
+    - find a quantity that is conserved or preserved
+    - invariant proof technique
