@@ -107,6 +107,38 @@ The stored skill contains **zero answers** — so when a frozen model solves the
 
 Skills add value exactly at the model's failure boundary — and the bigger the consumer model, the more it gets out of the same cartridge.
 
+### 🧠 Context offloader — *what you talked about*
+
+Conversations outgrow the window; re-deriving lost context costs thousands of reasoning tokens. The offloader flips the economics: **recall is ~100 tokens of input, re-derivation is thousands of tokens of compute.**
+
+```python
+from sqac.offloader import ContextOffloader
+
+off = ContextOffloader("session.sqac", window=8)
+off.observe("user", "Our CI fails with a 504 on deploy")
+off.observe("assistant", "The 504 is the docker build timing out ...")
+# ... window overflows -> exchanges are distilled & offloaded automatically
+
+off.recall("what was that 504 about?")
+# '[0.76] [turns 0-1] Q: our ci is failing with a 504 ... A: The 504 comes ...'
+```
+
+Design rules that came out of measured failure, not intuition:
+- **Offload exchanges, not turns** — verbatim turn indexing recalls the *user's question* and shadows the answer (2/8 recall). Exchange indexing: 6/8. Denyxised keys: **8/8**.
+- **Denyxis at write time** — "that", "earlier", "you mentioned" appear in *every* back-reference and create ties. Keys carry entity anchors; temporal pointers get resolved, never stored.
+- **Fail safe** — no confident hit returns `""`: the model says "I don't have that in memory" instead of acting on a plausible-but-wrong exchange.
+
+The session bucket is a separate `.sqac` (entries stamped `kind=turn`), so it hot-swaps independently of durable knowledge: drop the bucket at session end, graduate the facts worth keeping.
+
+Bulk mode:
+
+```bash
+python -m sqac.offloader transcript.jsonl -o session.sqac   # JSONL: role/content per line
+python -m sqac.offloader --recall "that flaky test fix" --db session.sqac
+```
+
+The heuristic distiller is zero-dependency and measured at 8/8 top-1 back-reference recall; an LLM-backed distiller drops in via `ContextOffloader(distiller=...)` for harder conversations.
+
 ## The numbers
 
 | Metric | Value |
