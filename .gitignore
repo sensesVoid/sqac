@@ -20,5 +20,5 @@ venv/
 .cache/
 
 # benchmark scratch
-.bench_ckpt.jsonl
-.bench_llm.log
+.bench_*.jsonl
+.bench_*.log
