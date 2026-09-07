@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sqac"
+version = "0.1.0"
+description = "Hot-swappable VSA memory cartridges for LLMs — facts and skills that persist in one portable .sqac file"
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["memory", "vector-symbolic-architecture", "llm", "rag", "in-context-learning"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["numpy"]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.0"]
+
+[project.scripts]
+sqac-mcp = "sqac_mcp:main"
+
+[tool.setuptools.packages.find]
+include = ["sqac*"]
+
+[tool.setuptools]
+py-modules = ["sqac_mcp"]

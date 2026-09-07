@@ -550,16 +550,25 @@ def mem_save() -> str:
         return _err(e)
 
 
-if __name__ == "__main__":
+def main(argv: Optional[list[str]] = None) -> int:
+    """Console entry point (sqac-mcp). Parses CLI flags and runs the stdio
+    server; a fresh SQAC_MEM_DIR is created on first call."""
     import argparse
     import asyncio
 
     ap = argparse.ArgumentParser(prog=SERVER_NAME, description="SQAC memory MCP server")
     ap.add_argument("--dir", help="memory directory (default $SQAC_MEM_DIR or ~/.sqacm)")
     ap.add_argument("--no-semantic", action="store_true", help="disable the semantic tier")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     if args.dir:
         os.environ["SQAC_MEM_DIR"] = args.dir
     if args.no_semantic:
         os.environ["SQAC_SEMANTIC"] = "0"
     asyncio.run(mcp.run_stdio_async())
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+
+    sys.exit(main())

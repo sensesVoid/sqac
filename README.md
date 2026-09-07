@@ -51,6 +51,9 @@ No confident garbage: if nothing matches, SQAC returns empty and the LLM says "I
 ## Quick start
 
 ```bash
+pip install -e .                   # core: numpy only
+pip install -e ".[mcp]"            # + the MCP server
+
 # teach it something
 python -m sqac.cli teach "our deploys are ARM64 only" --key deployment --db team.sqac
 
