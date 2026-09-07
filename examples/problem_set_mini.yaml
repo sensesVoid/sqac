@@ -1,0 +1,164 @@
+# Mini problem set — 25 problems for focused benchmark
+# All hard + representative easy/medium
+
+# ── HARD (7) — where skills should show lift ─────────────────────────────────
+
+- q: "You have a 3-gallon jug and a 5-gallon jug. How do you measure exactly 4 gallons?"
+  skill: state-search
+  check: ["pour", "fill", "empty"]
+  domain: logic
+  difficulty: hard
+
+- q: "You have a 7-gallon jug and a 3-gallon jug. How do you measure exactly 5 gallons?"
+  skill: state-search
+  check: ["pour", "fill", "empty"]
+  domain: logic
+  difficulty: hard
+
+- q: "There are 12 bags of coins. One bag has coins weighing 1.1g each instead of 1.0g. You may weigh ONCE on a digital scale. How do you find the odd bag?"
+  skill: weighted-index
+  check: ["number", "take", "excess"]
+  domain: logic
+  difficulty: hard
+
+- q: "There are 8 bags of marbles. One bag has marbles weighing 1.5g each instead of 1.0g. You may weigh ONCE. How do you identify the heavy bag?"
+  skill: weighted-index
+  check: ["number", "take", "excess"]
+  domain: logic
+  difficulty: hard
+
+- q: "You are testing a sorting function. Instead of testing [3,1,2] -> [1,2,3], you define the property 'output is always a permutation of input, and output[i] <= output[i+1]'. What testing approach is this?"
+  skill: property-based-testing
+  check: ["property", "invariant", "random", "all input", "generate"]
+  domain: testing
+  difficulty: hard
+
+- q: "Your microservice directly calls a payment API on every request. When the payment API is slow, your service hangs. How should you add resilience?"
+  skill: circuit-breaker
+  check: ["state", "open", "close", "fail fast", "cooldown", "threshold"]
+  domain: architecture
+  difficulty: hard
+
+- q: "You flip a fair coin 10 times and get 10 heads. A friend says the coin must be biased. Use the pigeonhole principle to explain why getting 10 of the same in a row is noteworthy even with a fair coin."
+  skill: invariant-finding
+  check: ["probability", "chance", "random", "expected"]
+  domain: logic
+  difficulty: hard
+
+# ── MEDIUM (10) ─────────────────────────────────────────────────────────────
+
+- q: "Maya doubled her savings to 240 dollars, then spent 40 dollars. How much did she start with?"
+  skill: work-backwards
+  check: ["120"]
+  domain: logic
+  difficulty: medium
+
+- q: "After giving away half his marbles and then 5 more, Tom has 10 left. How many did he start with?"
+  skill: work-backwards
+  check: ["30"]
+  domain: logic
+  difficulty: medium
+
+- q: "You have an email system that needs to notify users via email, SMS, and push. The notification method depends on user preference. How should you structure this code?"
+  skill: strategy-pattern
+  check: ["interface", "separate", "implement", "pass", "strategy"]
+  domain: coding
+  difficulty: medium
+
+- q: "A spreadsheet app needs to update multiple charts whenever a cell value changes. The charts are in different parts of the UI. How do you wire this up without the cell knowing about the charts?"
+  skill: observer-pattern
+  check: ["subscribe", "callback", "notify", "register", "listener"]
+  domain: coding
+  difficulty: medium
+
+- q: "Your text editor needs undo/redo. Each action (type, delete, format) must be reversible. The editor needs to store a history of actions. What pattern structures this?"
+  skill: command-pattern
+  check: ["execute", "undo", "queue", "history", "object", "command"]
+  domain: coding
+  difficulty: medium
+
+- q: "A class has methods for user management, email sending, and report generation. It has three reasons to change. How should you refactor it?"
+  skill: single-responsibility
+  check: ["split", "separate", "one job", "one reason", "module", "class"]
+  domain: refactoring
+  difficulty: medium
+
+- q: "Your business logic directly calls SQLAlchemy to query the database. You want to switch to MongoDB next quarter. How should you restructure the data access?"
+  skill: repository-pattern
+  check: ["interface", "abstract", "repository", "decouple", "swap", "persist"]
+  domain: architecture
+  difficulty: medium
+
+- q: "A feature that worked last week is now broken. Multiple developers committed changes. What is the fastest way to find the breaking commit?"
+  skill: diff-based-debugging
+  check: ["bisect", "commit", "diff", "git", "regression", "revert"]
+  domain: debugging
+  difficulty: medium
+
+- q: "Your data pipeline processes records through 8 transformation steps. Step 5 produces wrong output but steps 1-4 seem fine. How do you find exactly where the data goes wrong?"
+  skill: logging-boundaries
+  check: ["log", "print", "trace", "boundary", "input", "output", "stage"]
+  domain: debugging
+  difficulty: medium
+
+- q: "A database query is slow. The query joins 4 tables. You suspect one join is the bottleneck. How do you confirm which join is slow?"
+  skill: binary-search-bug
+  check: ["remove", "comment", "isolate", "each", "subset", "individual"]
+  domain: debugging
+  difficulty: medium
+
+- q: "Your function is 200 lines long and handles parsing, validation, transformation, and database writes. How should you refactor it?"
+  skill: extract-function
+  check: ["separate", "function", "named", "split", "break", "extract"]
+  domain: refactoring
+  difficulty: medium
+
+# ── EASY (8) ────────────────────────────────────────────────────────────────
+
+- q: "A pen costs 8 dollars and a notebook costs 5 dollars. What is the cost of 3 pens and 4 notebooks?"
+  skill: decomposition
+  check: ["44"]
+  domain: logic
+  difficulty: easy
+
+- q: "In a class of 30, 18 play football, 15 play chess, and 8 play both. How many play neither?"
+  skill: overlap-count
+  check: ["5"]
+  domain: logic
+  difficulty: easy
+
+- q: "A user reports that the login works on Chrome but fails on Firefox. You cannot reproduce it locally. What is your first step?"
+  skill: reproduce-then-isolate
+  check: ["reproduce", "browser", "environment", "user", "remote", "logs"]
+  domain: debugging
+  difficulty: easy
+
+- q: "You have been staring at a 50-line function for an hour and cannot find the bug. What should you do next?"
+  skill: rubber-duck
+  check: ["explain", "out loud", "line by line", "articulate", "describe"]
+  domain: debugging
+  difficulty: easy
+
+- q: "The number 86400 appears in three places in your code. Each time it means seconds in a day. How should you handle this?"
+  skill: replace-magic-number
+  check: ["constant", "name", "SECONDS_IN_DAY", "named", "literal"]
+  domain: refactoring
+  difficulty: easy
+
+- q: "Your Python script works with small files but crashes with large files. How do you find the threshold?"
+  skill: binary-search-bug
+  check: ["half", "binary", "size", "subset", "reduce", "narrow"]
+  domain: debugging
+  difficulty: easy
+
+- q: "You want to deploy a new recommendation engine to 5% of users before rolling out fully. How do you deploy it safely?"
+  skill: feature-flag
+  check: ["flag", "toggle", "config", "enable", "rollout", "percent"]
+  domain: architecture
+  difficulty: easy
+
+- q: "Your expensive data processing function is called 10,000 times per minute with only 200 unique input combinations. How do you speed it up?"
+  skill: caching-layer
+  check: ["cache", "memoize", "dictionary", "store", "lookup", "hash"]
+  domain: architecture
+  difficulty: easy

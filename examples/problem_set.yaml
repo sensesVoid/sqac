@@ -1,0 +1,310 @@
+# Problem Set — 50+ questions for skill-store benchmark
+# Format: q (question), skill (expected skill), check (list of keywords any-of)
+# A pass means the answer contains at least one keyword from the check list.
+# For numeric answers, check is ["<number>"].
+
+# ── LOGIC (15 problems) ──────────────────────────────────────────────────────
+
+- q: "A machine fills 90 bottles in 6 minutes. At the same rate, how many minutes to fill 150 bottles?"
+  skill: direct-proportion
+  check: ["10"]
+  domain: logic
+  difficulty: easy
+
+- q: "A pump moves 45 liters in 3 minutes. At the same rate, how many minutes for 105 liters?"
+  skill: direct-proportion
+  check: ["7"]
+  domain: logic
+  difficulty: easy
+
+- q: "A train travels 240 km in 3 hours. At the same speed, how long to travel 400 km?"
+  skill: direct-proportion
+  check: ["5"]
+  domain: logic
+  difficulty: easy
+
+- q: "A pen costs 8 dollars and a notebook costs 5 dollars. What is the cost of 3 pens and 4 notebooks?"
+  skill: decomposition
+  check: ["44"]
+  domain: logic
+  difficulty: easy
+
+- q: "A taxi charges 3 dollars base plus 2 dollars per mile. What is the total for a 7-mile ride?"
+  skill: decomposition
+  check: ["17"]
+  domain: logic
+  difficulty: easy
+
+- q: "Maya doubled her savings to 240 dollars, then spent 40 dollars. How much did she start with?"
+  skill: work-backwards
+  check: ["120"]
+  domain: logic
+  difficulty: medium
+
+- q: "After giving away half his marbles and then 5 more, Tom has 10 left. How many did he start with?"
+  skill: work-backwards
+  check: ["30"]
+  domain: logic
+  difficulty: medium
+
+- q: "A number was tripled, 12 was added, and the result was 33. What was the original number?"
+  skill: work-backwards
+  check: ["7"]
+  domain: logic
+  difficulty: medium
+
+- q: "In a class of 30, 18 play football, 15 play chess, and 8 play both. How many play neither?"
+  skill: overlap-count
+  check: ["5"]
+  domain: logic
+  difficulty: easy
+
+- q: "A survey of 50 people: 30 like tea, 25 like coffee, and 12 like both. How many like neither?"
+  skill: overlap-count
+  check: ["7"]
+  domain: logic
+  difficulty: easy
+
+- q: "You have a 3-gallon jug and a 5-gallon jug. How do you measure exactly 4 gallons?"
+  skill: state-search
+  check: ["pour", "fill", "empty"]
+  domain: logic
+  difficulty: hard
+
+- q: "You have a 7-gallon jug and a 3-gallon jug. How do you measure exactly 5 gallons?"
+  skill: state-search
+  check: ["pour", "fill", "empty"]
+  domain: logic
+  difficulty: hard
+
+- q: "There are 12 bags of coins. One bag has coins weighing 1.1g each instead of 1.0g. You may weigh ONCE on a digital scale. How do you find the odd bag?"
+  skill: weighted-index
+  check: ["number", "take", "excess"]
+  domain: logic
+  difficulty: hard
+
+- q: "There are 8 bags of marbles. One bag has marbles weighing 1.5g each instead of 1.0g. You may weigh ONCE. How do you identify the heavy bag?"
+  skill: weighted-index
+  check: ["number", "take", "excess"]
+  domain: logic
+  difficulty: hard
+
+- q: "You flip a fair coin 10 times and get 10 heads. A friend says the coin must be biased. Use the pigeonhole principle to explain why getting 10 of the same in a row is noteworthy even with a fair coin."
+  skill: invariant-finding
+  check: ["probability", "chance", "random", "expected"]
+  domain: logic
+  difficulty: hard
+
+# ── CODING / DESIGN PATTERNS (20 problems) ──────────────────────────────────
+
+- q: "You have an email system that needs to notify users via email, SMS, and push. The notification method depends on user preference. How should you structure this code?"
+  skill: strategy-pattern
+  check: ["interface", "separate", "implement", "pass", "strategy"]
+  domain: coding
+  difficulty: medium
+
+- q: "You have a pricing engine where discounts are calculated differently for regular, premium, and wholesale customers. The discount type can change at runtime. What pattern solves this?"
+  skill: strategy-pattern
+  check: ["interface", "separate", "algorithm", "swap", "strategy"]
+  domain: coding
+  difficulty: medium
+
+- q: "A spreadsheet app needs to update multiple charts whenever a cell value changes. The charts are in different parts of the UI. How do you wire this up without the cell knowing about the charts?"
+  skill: observer-pattern
+  check: ["subscribe", "callback", "notify", "register", "listener"]
+  domain: coding
+  difficulty: medium
+
+- q: "Your game engine needs to trigger sound effects, particle effects, and score updates when an enemy is defeated. Each effect is in a different module. How do you decouple the event from the reactions?"
+  skill: observer-pattern
+  check: ["subscribe", "event", "notify", "register", "listener", "callback"]
+  domain: coding
+  difficulty: medium
+
+- q: "You need to create different types of documents (PDF, HTML, Markdown) based on a format string from user input. The creation logic is complex with many steps. Where should you put the construction logic?"
+  skill: factory-pattern
+  check: ["factory", "function", "decide", "create", "construct"]
+  domain: coding
+  difficulty: medium
+
+- q: "Your API needs to support multiple authentication methods (JWT, API key, OAuth). The method is determined by a header. How should you structure the auth module?"
+  skill: strategy-pattern
+  check: ["interface", "separate", "implement", "pass", "strategy", "auth"]
+  domain: coding
+  difficulty: medium
+
+- q: "You want to add caching and logging around an existing function without modifying the function itself. What approach lets you stack these concerns independently?"
+  skill: decorator-pattern
+  check: ["wrap", "delegate", "before", "after", "stack", "decorator"]
+  domain: coding
+  difficulty: medium
+
+- q: "Your text editor needs undo/redo. Each action (type, delete, format) must be reversible. The editor needs to store a history of actions. What pattern structures this?"
+  skill: command-pattern
+  check: ["execute", "undo", "queue", "history", "object", "command"]
+  domain: coding
+  difficulty: medium
+
+- q: "A game needs to save and load player actions for replay. Each action should be serializable. The replay system should not know the details of each action type. What pattern fits?"
+  skill: command-pattern
+  check: ["execute", "undo", "serialize", "replay", "object", "command"]
+  domain: coding
+  difficulty: medium
+
+- q: "Your function is 200 lines long and handles parsing, validation, transformation, and database writes. How should you refactor it?"
+  skill: extract-function
+  check: ["separate", "function", "named", "split", "break", "extract"]
+  domain: refactoring
+  difficulty: easy
+
+- q: "A class has methods for user management, email sending, and report generation. It has three reasons to change. How should you refactor it?"
+  skill: single-responsibility
+  check: ["split", "separate", "one job", "one reason", "module", "class"]
+  domain: refactoring
+  difficulty: medium
+
+- q: "This code has 4 levels of nested if-else. How can you make it more readable?\nif user:\n  if user.active:\n    if user.has_permission:\n      if user.role == 'admin':\n        do_admin_stuff()"
+  skill: guard-clause
+  check: ["return", "early", "guard", "top", "flatten", "check"]
+  domain: refactoring
+  difficulty: easy
+
+- q: "The number 86400 appears in three places in your code. Each time it means 'seconds in a day'. How should you handle this?"
+  skill: replace-magic-number
+  check: ["constant", "name", "SECONDS_IN_DAY", "named", "literal"]
+  domain: refactoring
+  difficulty: easy
+
+- q: "A variable is named 'd' and holds the list of active user sessions. Another is named 'tmp' and holds the sorted result. How should you rename these?"
+  skill: clarify-naming
+  check: ["active_sessions", "sorted_result", "descriptive", "readable", "rename"]
+  domain: refactoring
+  difficulty: easy
+
+- q: "Your business logic directly calls SQLAlchemy to query the database. You want to switch to MongoDB next quarter. How should you restructure the data access?"
+  skill: repository-pattern
+  check: ["interface", "abstract", "repository", "decouple", "swap", "persist"]
+  domain: architecture
+  difficulty: medium
+
+- q: "Your microservice directly calls a payment API on every request. When the payment API is slow, your service hangs. How should you add resilience?"
+  skill: circuit-breaker
+  check: ["state", "open", "close", "fail fast", "cooldown", "threshold"]
+  domain: architecture
+  difficulty: hard
+
+- q: "You want to deploy a new recommendation engine to 5% of users before rolling out fully. The engine code is ready but risky. How do you deploy it safely?"
+  skill: feature-flag
+  check: ["flag", "toggle", "config", "enable", "rollout", "percent"]
+  domain: architecture
+  difficulty: medium
+
+- q: "Your expensive data processing function is called 10,000 times per minute with only 200 unique input combinations. How do you speed it up without changing the algorithm?"
+  skill: caching-layer
+  check: ["cache", "memoize", "dictionary", "store", "lookup", "hash"]
+  domain: architecture
+  difficulty: medium
+
+- q: "Your function validates a user object. Tests break every time you rename an internal variable, even though the validation logic hasn't changed. What is wrong with the tests?"
+  skill: test-the-contract
+  check: ["implementation", "internal", "interface", "contract", "black box", "refactor"]
+  domain: testing
+  difficulty: medium
+
+- q: "You are testing a sorting function. Instead of testing [3,1,2] -> [1,2,3], you define the property 'output is always a permutation of input, and output[i] <= output[i+1]'. What testing approach is this?"
+  skill: property-based-testing
+  check: ["property", "invariant", "random", "all input", "generate"]
+  domain: testing
+  difficulty: hard
+
+# ── DEBUGGING (15 problems) ──────────────────────────────────────────────────
+
+- q: "A user reports that the login works on Chrome but fails on Firefox. You cannot reproduce it locally. What is your first step?"
+  skill: reproduce-then-isolate
+  check: ["reproduce", "browser", "environment", "user", "remote", "logs"]
+  domain: debugging
+  difficulty: easy
+
+- q: "A function returns correct results 99% of the time but occasionally returns null. You cannot predict when. What debugging strategy do you use?"
+  skill: reproduce-then-isolate
+  check: ["reproduce", "reliable", "intermittent", "force", "condition", "log"]
+  domain: debugging
+  difficulty: medium
+
+- q: "Your code works on your machine but fails in production. You suspect a configuration difference. How do you confirm?"
+  skill: check-assumptions-first
+  check: ["assert", "config", "environment", "variable", "assume", "check"]
+  domain: debugging
+  difficulty: easy
+
+- q: "A function takes a list and returns a sum, but sometimes returns NaN. The code looks correct on inspection. What should you check first?"
+  skill: check-assumptions-first
+  check: ["assert", "input", "assumption", "null", "type", "check"]
+  domain: debugging
+  difficulty: easy
+
+- q: "You have been staring at a 50-line function for an hour and cannot find the bug. You have tried reading it three times. What should you do next?"
+  skill: rubber-duck
+  check: ["explain", "out loud", "line by line", "articulate", "describe"]
+  domain: debugging
+  difficulty: easy
+
+- q: "A feature that worked last week is now broken. Multiple developers committed changes. What is the fastest way to find the breaking commit?"
+  skill: diff-based-debugging
+  check: ["bisect", "commit", "diff", "git", "regression", "revert"]
+  domain: debugging
+  difficulty: medium
+
+- q: "Your data pipeline processes records through 8 transformation steps. Step 5 produces wrong output but steps 1-4 seem fine. How do you find exactly where the data goes wrong?"
+  skill: logging-boundaries
+  check: ["log", "print", "trace", "boundary", "input", "output", "stage"]
+  domain: debugging
+  difficulty: medium
+
+- q: "An API endpoint sometimes returns a 500 error. The error log shows a NullPointerException, but you cannot tell which field is null. What should you add?"
+  skill: logging-boundaries
+  check: ["log", "print", "trace", "boundary", "field", "value"]
+  domain: debugging
+  difficulty: easy
+
+- q: "You need to find which of 10,000 records is causing a processing error. The error occurs deep in a loop. What approach narrows it down fastest?"
+  skill: binary-search-bug
+  check: ["half", "binary", "midpoint", "subset", "divide", "eliminate"]
+  domain: debugging
+  difficulty: medium
+
+- q: "A test suite has 500 tests. One test fails intermittently. You need to determine if it is a test bug or a real bug. What is your approach?"
+  skill: reproduce-then-isolate
+  check: ["reproduce", "reliable", "deterministic", "isolate", "run alone"]
+  domain: debugging
+  difficulty: medium
+
+- q: "A microservice returns wrong data. It receives data from Service A and sends results to Service B. You need to know if the input was wrong or the processing is wrong. What do you do?"
+  skill: logging-boundaries
+  check: ["log", "input", "output", "boundary", "trace", "verify"]
+  domain: debugging
+  difficulty: easy
+
+- q: "Your Python script works with small files but crashes with large files. The crash happens in a function that processes the whole file. How do you find the threshold?"
+  skill: binary-search-bug
+  check: ["half", "binary", "size", "subset", "reduce", "narrow"]
+  domain: debugging
+  difficulty: medium
+
+- q: "A database query is slow. The query joins 4 tables. You suspect one join is the bottleneck. How do you confirm which join is slow?"
+  skill: binary-search-bug
+  check: ["remove", "comment", "isolate", "each", "subset", "individual"]
+  domain: debugging
+  difficulty: medium
+
+- q: "After deploying a new version, the error rate spiked from 0.1% to 5%. The code change touched 200 lines across 5 files. How do you quickly find which change caused the spike?"
+  skill: diff-based-debugging
+  check: ["revert", "commit", "diff", "git", "rollback", "bisect"]
+  domain: debugging
+  difficulty: medium
+
+- q: "Your application uses a third-party library that sometimes throws a cryptic error. The error message gives no clue about the cause. What is your first debugging step?"
+  skill: check-assumptions-first
+  check: ["input", "assumption", "verify", "state", "check", "document"]
+  domain: debugging
+  difficulty: easy
