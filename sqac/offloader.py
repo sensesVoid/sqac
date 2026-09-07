@@ -220,9 +220,19 @@ class ContextOffloader:
                 (e.get("meta", {}).get("exchange", 0) for e in self._store._entries),
                 default=0,
             )
-            self._turn_count = 2 * self._xid  # approximation for resumed sessions
+            self._turn_count = self._restore_turn_count()
         else:
             self._store = SqacStore(semantic=semantic, fuzzy_threshold=min_confidence)
+
+    def _restore_turn_count(self) -> int:
+        """Restore the exact turn counter written by save() (a stored
+        `turns=` header token). Buckets saved before the counter was kept
+        fall back to the 2-per-exchange approximation."""
+        desc = getattr(self._store, "_description", "") or ""
+        m = re.search(r"\bturns=(\d+)\b", desc)
+        if m:
+            return int(m.group(1))
+        return 2 * self._xid
 
     # ── write path ──────────────────────────────────────────────────────
 
@@ -359,17 +369,21 @@ class ContextOffloader:
 
     def save(self, path: str | Path | None = None) -> Path:
         """Persist the bucket. In-memory buffer is flushed first: nothing
-        stays volatile across save()."""
+        stays volatile across save(). An explicit path is adopted as the
+        configured path, so later save() calls reuse it."""
         self.offload()
         p = Path(path) if path else self.path
         if p is None:
             raise ValueError("no path given and none configured")
+        if self.path is None:
+            self.path = p
         self._store.save(
             p,
             name="session-bucket",
             description=(
                 f"{self._store.stats()['entries']} turn entries, "
-                f"{self._xid} exchanges, window={self.window}"
+                f"{self._xid} exchanges, xid={self._xid} "
+                f"turns={self._turn_count} window={self.window}"
             ),
         )
         return p

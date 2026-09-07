@@ -244,6 +244,35 @@ class TestPersistence(unittest.TestCase):
         with self.assertRaises(ValueError):
             off.save()
 
+    def test_save_adopts_explicit_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = os.path.join(td, "adopted.sqac")
+            off = ContextOffloader(None, window=8)
+            off.observe("user", "the edge cache decision is sqlite")
+            off.observe("assistant", "Sqlite chosen: single-file, zero-ops on devices.")
+            off.save(p)
+            self.assertEqual(str(off.path), p)
+            # later save() with no args reuses the adopted path
+            off.observe("user", "any follow-up on the cache?")
+            off.observe("assistant", "Keep sqlite; revisit only if we need concurrent writers.")
+            off.save()
+            back = ContextOffloader(p)
+            self.assertTrue(back.recall_detailed("why sqlite for the edge cache"))
+
+    def test_resume_restores_turn_counts_from_header(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = os.path.join(td, "resume.sqac")
+            off = ContextOffloader(p, window=8)
+            _seed(off)  # 16 turns -> _turn_count == 16, exchanges offloaded > 0
+            self.assertGreater(off._xid, 0)
+            off.save()
+            back = ContextOffloader(p)
+            self.assertEqual(back._turn_count, off._turn_count)
+            self.assertEqual(back._xid, off._xid)
+            # a resumed session continues its exact counter, not an entry estimate
+            back.observe("user", "resumed session, new topic")
+            self.assertEqual(back._turn_count, off._turn_count + 1)
+
 
 class TestFromTranscript(unittest.TestCase):
     @classmethod

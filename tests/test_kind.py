@@ -174,6 +174,23 @@ class TestGroupedByKind(unittest.TestCase):
         # doc group must not have been absorbed by the skill group
         self.assertEqual(len([h for h in hits if h.meta["kind"] == "skill"]), 1)
 
+    def test_ungrouped_hits_are_kept_not_dropped(self):
+        """Entries lacking the group meta key must survive grouping as their
+        own hits — grouping is a dedupe on top of recall, never a filter."""
+        st = SqacStore()
+        st.add("SKILL weighted-index: label items 1..N, take i coins from item i",
+               key="coins trick", kind="skill",
+               meta={"skill": "weighted-index"})
+        st.add("tagged competitor technique", key="weighted index variant",
+               kind="skill", meta={"skill": "weighted-index"})
+        st.add("untagged fact about the coin trick", kind="fact")
+        hits = st.search_grouped("weighted index coin trick", top_k=3)
+        # tagged hits collapse to the best per skill group...
+        self.assertEqual(len([h for h in hits if h.meta.get("skill") == "weighted-index"]), 1)
+        # ...but the meta-less fact is still present as its own hit
+        kinds = {h.meta["kind"] for h in hits}
+        self.assertIn("fact", kinds)
+
 
 class TestV2BackCompat(unittest.TestCase):
     def test_v2_cartridge_reads_as_generic(self):

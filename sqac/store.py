@@ -321,14 +321,22 @@ class SqacStore:
         Groups are (kind, meta[group_key]) pairs so same-named items of
         different kinds don't merge. kind= optionally restricts the whole
         search to one knowledge kind.
+
+        Qualifying hits WITHOUT the group meta key are not dropped: each
+        one is kept as its own singleton bucket, so grouped recall is a
+        superset of what flat recall surfaces (never silently hides a hit).
         """
         hits = self.search(query, top_k=recall, kind=kind)
         best: dict[tuple[int, str], Hit] = {}
+        orphan = 0
         for h in hits:
             g = h.meta.get(group_key, "")
             if not g:
-                continue
-            gk = (resolve_kind(h.meta.get("kind")), str(g))
+                # meta-less hit: unique bucket per entry so it survives grouping
+                orphan += 1
+                gk = ("__ungrouped__", orphan)
+            else:
+                gk = (resolve_kind(h.meta.get("kind")), str(g))
             if gk not in best or h.confidence > best[gk].confidence:
                 best[gk] = h
         return sorted(best.values(), key=lambda h: -h.confidence)[:top_k]
@@ -384,8 +392,13 @@ class SqacStore:
         write_cartridge(path, header, {}, entries)
 
     @classmethod
-    def load(cls, path: str | Path, fuzzy_threshold: float = 0.70) -> "SqacStore":
-        """Load a cartridge. Refuses incompatible encoder/fingerprint."""
+    def load(cls, path: str | Path, fuzzy_threshold: float = DEFAULT_FUZZY_THRESHOLD) -> "SqacStore":
+        """Load a cartridge. Refuses incompatible encoder/fingerprint.
+
+        fuzzy_threshold defaults to the same value as the constructor
+        (DEFAULT_FUZZY_THRESHOLD) so a cartridge behaves identically
+        before and after a save/load roundtrip.
+        """
         cart = read_cartridge(path)
         h = cart.header
         seed, ngram = _parse_encoder_name(h.encoder_name)
@@ -399,6 +412,7 @@ class SqacStore:
             fuzzy_threshold=fuzzy_threshold,
             semantic="|sem-v1:" in h.encoder_name,
         )
+        store._description = h.description
         if store.semantic:
             store._sem_encoder = _make_sem_encoder(
                 h.encoder_name.split("|sem-v1:", 1)[1].split(":", 1)[0], h.dims
