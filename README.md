@@ -8,14 +8,16 @@ the model never sees a vector.
 
 ```
 sqac/
-├── encoder.py   BSCEncoder (lexical, zero deps) + MiniLMSimHashEncoder (semantic)
-├── format.py    .sqac v1 binary format — header, packed keys, JSON payloads, ext blocks
-├── store.py     SqacStore — 3 tiers: exact O(1) → lexical fuzzy → semantic fuzzy
-├── ingest.py    dataset → cartridge (JSONL/text, field auto-detect, dedup)
-└── cli.py       teach / search / pack / stats
+├── encoder.py         BSCEncoder (lexical, zero deps) + MiniLMSimHashEncoder (torch semantic)
+├── static_encoder.py  StaticSimHashEncoder — semantic tier in pure numpy (int8 potion-base-8M)
+├── format.py          .sqac v1 binary format — header, packed keys, JSON payloads, ext blocks
+├── store.py           SqacStore — 3 tiers: exact O(1) → lexical fuzzy → semantic fuzzy
+├── ingest.py          dataset → cartridge (JSONL/text, field auto-detect, dedup)
+└── cli.py             teach / search / pack / stats
 tests/
 ├── test_sqac.py            12 unit tests (roundtrip, persistence, recall, tamper rejection)
-├── test_semantic_tier.py   4 semantic-tier tests (calibration, synonym recall, fail-safe)
+├── test_semantic_tier.py   4 MiniLM-tier tests (calibration, synonym recall, fail-safe)
+├── test_static_tier.py     9 light-tier tests (calibration, roundtrip, encoder compat)
 ├── test_qwen_integration.py  LLM integration: teach → persist → reload → answer
 ├── test_unlimited_context.py scaling + aggregation + multi-hop + distractors
 └── bench_sqac.py           latency benchmark
@@ -49,12 +51,16 @@ hits = store.search("deployment?")            # -> [{content, confidence, source
 |---|---|---|---|
 | 1. exact | verbatim key | full question → 1.0 | O(1), 5 μs |
 | 2. lexical (BSC trigrams) | typos, shared words | "auth middleware" → 0.72 | O(n), 21ms @ 10K |
-| 3. semantic (MiniLM SimHash, optional) | synonyms, paraphrase | "x86?" → ARM64 rule @ 0.65 | O(n) + embed |
+| 3. semantic (static int8, default) | synonyms, paraphrase | "x86?" → ARM64 rule @ 0.64 | O(n) + 0.1ms embed |
+| 3'. semantic (MiniLM SimHash, opt-in) | finer synonym ranking | "x86?" → ARM64 rule @ 0.65 | O(n) + 10-20ms embed |
 
-All tiers share the ~0.5 noise floor and one confidence scale. Semantic tier is
-SimHash (frozen MiniLM → seeded projection → sign bits): P[bit agrees] = 1 − θ/π,
-measured floor 0.488, paraphrase 0.78. Unrelated queries fail safe (empty result,
-no confident garbage). "db"→"database"-level synonyms remain MiniLM's own ceiling.
+All tiers share the ~0.5 noise floor and one confidence scale. The default
+semantic tier is **SimHash over a pure-numpy int8 static model** (potion-base-8M,
+9.8MB artifact, no torch): P[bit agrees] = 1 − θ/π (Goemans–Williamson),
+unrelated → ~0.50 (fails safe), paraphrase ~0.66, and it *catches* "db"→repository
+at 0.68 where MiniLM missed at 0.56. MiniLM stays available via
+`SqacStore(semantic=True, semantic_model="sentence-transformers/all-MiniLM-L6-v2")`
+for maximum ranking fidelity (~+10% top-3 routing on large packs).
 
 ## Measured results (this machine, CPU-only)
 
@@ -64,6 +70,8 @@ no confident garbage). "db"→"database"-level synonyms remain MiniLM's own ceil
 | Fuzzy scan @ 10K rules | **21 ms** (numpy XOR; was 142 ms pre-fast-path) |
 | Write throughput | ~3.8 ms/fact |
 | Cartridge size @ 10K rules | 5.5 MB |
+| Semantic tier (static int8) | 9.8MB model, ~0.1ms encode, 118MB total process RSS |
+| Skill routing (50-problem bench) | retrieval 50/50 (MiniLM) / 45/50 (static) · application 31/50 vs 23/50 baseline |
 | Qwen2.5-0.5B + memory | 4/4 correct on private facts |
 | Qwen2.5-1.5B + memory | 4/4 correct |
 | Qwen3-1.7B + memory | 3/3 correct — **same cartridge file** |
@@ -99,6 +107,9 @@ no confident garbage). "db"→"database"-level synonyms remain MiniLM's own ceil
 
 ## Known limits (honest)
 
+- The default static tier has a compressed similarity range (~0.50–0.70 vs
+  MiniLM's ~0.49–0.78), which costs ~5/50 top-3 routing margin on large skill
+  packs; MiniLM remains selectable for maximum fidelity.
 - MiniLM-level synonym gaps remain ("db" vs "database" content-side similarity
   ~0.56); the dual key+content scan rescues most such cases via the key side.
 - Fuzzy tiers are O(n): ~21ms @ 10K; Rust engine in `archive/rust/` when

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .encoder import BSCEncoder, MiniLMSimHashEncoder
+from .static_encoder import DEFAULT_STATIC_MODEL, StaticSimHashEncoder
 from .format import (
     Cartridge,
     CartridgeHeader,
@@ -28,6 +29,17 @@ from .format import (
     read_cartridge,
     write_cartridge,
 )
+
+
+def _make_sem_encoder(model_name: str, dims: int):
+    """Build the semantic encoder named in a cartridge header.
+
+    static-potion-*  -> pure-numpy int8 static tier (no torch needed)
+    anything else    -> MiniLM SimHash (torch+transformers)
+    """
+    if model_name.startswith("static-"):
+        return StaticSimHashEncoder(dims=dims)
+    return MiniLMSimHashEncoder(dims=dims, model=model_name)
 
 _WS = re.compile(r"\s+")
 _NONALNUM = re.compile(r"[^\w\s]")
@@ -80,7 +92,7 @@ class SqacStore:
         dims: int = 1024,
         fuzzy_threshold: float = DEFAULT_FUZZY_THRESHOLD,
         semantic: bool = False,
-        semantic_model: str = MiniLMSimHashEncoder.DEFAULT_MODEL,
+        semantic_model: Optional[str] = None,
     ):
         self.encoder = encoder or BSCEncoder(dims=dims)
         self.dims = self.encoder.dims
@@ -89,12 +101,22 @@ class SqacStore:
         self.semantic = False
         self._sem_encoder = None
         if semantic:
-            if not MiniLMSimHashEncoder.available():
-                raise RuntimeError(
-                    "semantic=True requires torch+transformers+numpy"
-                    " (and network for MiniLM weights on first use)"
-                )
-            self._sem_encoder = MiniLMSimHashEncoder(dims=self.dims, model=semantic_model)
+            if semantic_model and semantic_model.startswith("static"):
+                self._sem_encoder = StaticSimHashEncoder(dims=self.dims)
+            elif semantic_model:
+                self._sem_encoder = MiniLMSimHashEncoder(dims=self.dims, model=semantic_model)
+            else:
+                # auto: prefer the light static tier (pure numpy, 8MB),
+                # fall back to the MiniLM tier (torch) when its files are absent
+                if StaticSimHashEncoder.available():
+                    self._sem_encoder = StaticSimHashEncoder(dims=self.dims)
+                elif MiniLMSimHashEncoder.available():
+                    self._sem_encoder = MiniLMSimHashEncoder(dims=self.dims)
+                else:
+                    raise RuntimeError(
+                        "semantic=True needs the static model files (see "
+                        "sqac/static_encoder.py) or torch+transformers for MiniLM"
+                    )
             self.semantic = True
 
         self._entries: list[dict[str, Any]] = []  # live entries
@@ -265,8 +287,8 @@ class SqacStore:
             semantic="|sem-v1:" in h.encoder_name,
         )
         if store.semantic:
-            store._sem_encoder = MiniLMSimHashEncoder(
-                dims=h.dims, model=h.encoder_name.split("|sem-v1:", 1)[1].split(":", 1)[0]
+            store._sem_encoder = _make_sem_encoder(
+                h.encoder_name.split("|sem-v1:", 1)[1].split(":", 1)[0], h.dims
             )
         for e in cart.entries:
             norm = e.payload.get("key_norm", "")
