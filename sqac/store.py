@@ -132,6 +132,7 @@ class Hit:
     source: str
     mode: str  # "exact" | "fuzzy"
     meta: dict[str, Any] = field(default_factory=dict)
+    trust: dict[str, Any] = field(default_factory=dict)  # injection analysis
 
     def as_dict(self) -> dict:
         return {
@@ -140,6 +141,7 @@ class Hit:
             "source": self.source,
             "mode": self.mode,
             "meta": self.meta,
+            "trust": self.trust,
         }
 
 
@@ -255,6 +257,11 @@ class SqacStore:
         key_text = sanitize_key(key) if key is not None else content
         norm = normalize(key_text)
         self._invalidate_cache()
+
+        # Prompt injection analysis
+        from .injection import analyze_content, RiskLevel
+        inj = analyze_content(content)
+
         idx = len(self._entries)
         self._entries.append(
             {
@@ -263,6 +270,7 @@ class SqacStore:
                 "meta": meta or {},
                 "source": source,
                 "kind": resolve_kind(kind),
+                "trust": inj.to_dict(),
             }
         )
         self._keys.append(self.encoder.encode_bits(key_text))
@@ -357,6 +365,7 @@ class SqacStore:
                         "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
                         "latency_ms": _ms(time.perf_counter() - t0),
                     },
+                    trust=e.get("trust", {}),
                 )
             ]
 
@@ -401,6 +410,7 @@ class SqacStore:
                         "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
                         "latency_ms": _ms(time.perf_counter() - t0),
                     },
+                    trust=e.get("trust", {}),
                 )
             )
             if len(out) >= top_k:
