@@ -8,6 +8,7 @@
     python -m sqac.cli init .                           # auto-build cartridge from project
     python -m sqac.cli track . --interval 5             # realtime tracking (Ctrl-C to stop)
     python -m sqac.cli compact --db memory.sqac         # remove tombstoned entries
+    python -m sqac.server --dir ./memory --port 8420    # HTTP API server
 """
 
 from __future__ import annotations
@@ -60,6 +61,14 @@ def main(argv: list[str] | None = None) -> int:
 
     p_compact = sub.add_parser("compact", help="remove tombstoned entries and reclaim space")
     add_db(p_compact)
+
+    p_serve = sub.add_parser("serve", help="start HTTP API server")
+    p_serve.add_argument("--dir", default=".", help="cartridge directory (default: .)")
+    p_serve.add_argument("--port", type=int, default=8420, help="port (default: 8420)")
+    p_serve.add_argument("--host", default="0.0.0.0", help="host (default: 0.0.0.0)")
+    p_serve.add_argument("--api-key", default=None, help="API key (or set SQAC_API_KEY)")
+    p_serve.add_argument("--rack", action="store_true", help="mount all cartridges as a rack")
+    p_serve.add_argument("--session", default=None, help="session bucket for offloader")
 
     p_init = sub.add_parser("init", help="auto-build a project cartridge from a directory")
     p_init.add_argument("root", nargs="?", default=".", help="project root (default: .)")
@@ -174,6 +183,17 @@ def main(argv: list[str] | None = None) -> int:
                   rack_dir=rack_dir, rack_name=rack_name)
         except KeyboardInterrupt:
             pass
+
+    elif args.cmd == "serve":
+        from .server import main as serve_main
+        serve_args = ["--dir", args.dir, "--port", str(args.port), "--host", args.host]
+        if args.api_key:
+            serve_args += ["--api-key", args.api_key]
+        if args.rack:
+            serve_args.append("--rack")
+        if args.session:
+            serve_args += ["--session", args.session]
+        return serve_main(serve_args)
 
     return 0
 

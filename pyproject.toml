@@ -17,9 +17,14 @@ dependencies = ["numpy"]
 
 [project.optional-dependencies]
 mcp = ["mcp>=1.0"]
+server = ["fastapi", "uvicorn"]
+simd = ["sqac-simd"]
+compress = ["lz4"]
+all = ["mcp>=1.0", "fastapi", "uvicorn", "lz4"]
 
 [project.scripts]
 sqac-mcp = "sqac_mcp:main"
+sqac-server = "sqac.server:main"
 
 [tool.setuptools.packages.find]
 include = ["sqac*"]
