@@ -673,12 +673,20 @@ SQAC is a **memory layer** — it gives any LLM access to knowledge it doesn't h
 
 | Use Case | Why it might work | What's missing |
 |---|---|---|
+| **Air-gapped / classified** | One file on USB. No network needed. Perfect for defense, healthcare, finance. | Encryption at rest, FedRAMP compliance |
+| **Agent skill distillation** | Large model extracts skills → small models follow them. Measured: 57% → 95%. | Need the extraction pipeline |
+| **Threat intel sharing** | Store IOCs/TTPs as facts. Query naturally: "Have we seen this?" | IOC format, MISP integration |
+| **Institutional memory** | Key employee teaches SQAC before leaving. New hires query it. | Onboarding UX |
+| **LLM red-teaming** | Store 100+ injection attempts. Measure model resistance. | Benchmark cartridge |
+| **Emergency response** | Offline triage protocols. Query by symptom. | Domain expert validation |
+| **Federated knowledge** | Multiple orgs share cartridges without sharing raw data. | Merge protocol |
+| **Autonomous agent memory** | Robots/vehicles learn from experience locally. | Embedded SDK |
+| **Model evaluation criteria** | Store "what good looks like" for LLM-as-judge. | Judge cartridge format |
 | **Competitive intelligence** | Store competitor info, query naturally | Needs structured extraction pipeline |
 | **Legal contract analysis** | Store contract terms, query for obligations | Semantic tier needs legal vocabulary |
 | **Scientific research memory** | Store paper findings, query relationships | No citation tracking yet |
 | **Educational tutoring** | Store curriculum, generate explanations | Needs generation, not just retrieval |
 | **Skill marketplace** | Share cartridges across teams/orgs | No versioning or distribution mechanism |
-| **Regulatory cross-reference** | "Does this architecture violate SOC2?" | Needs multi-cartridge reasoning |
 | **IoT/Edge AI** | Small model + cartridge on edge devices | Rust SIMD helps, but no ARM wheel yet |
 
 ### What SQAC is NOT (repeated for clarity)
