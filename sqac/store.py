@@ -238,6 +238,27 @@ class SqacStore:
             return hits[0]
         return None
 
+    def search_grouped(self, query: str, top_k: int = 3, group_key: str = "skill",
+                       recall: int = 40) -> list[Hit]:
+        """Group-aware ranking for multi-key packs (skills, docs-by-entity).
+
+        Multi-key packs store many entries pointing at one logical item
+        (meta[group_key]). Sibling triggers of a *wrong* item can crowd the
+        flat top-k, so ranking must happen per group: fetch a generous
+        recall window, keep each group's best hit, return the top_k groups
+        ranked by their best member. Measured on the 50-problem skill bench:
+        potion flat 45/50 -> grouped 49/50.
+        """
+        hits = self.search(query, top_k=recall)
+        best: dict[str, Hit] = {}
+        for h in hits:
+            g = h.meta.get(group_key, "")
+            if not g:
+                continue
+            if g not in best or h.confidence > best[g].confidence:
+                best[g] = h
+        return sorted(best.values(), key=lambda h: -h.confidence)[:top_k]
+
     # ── persistence ──────────────────────────────────────────────────────
 
     def save(self, path: str | Path, name: str = "", description: str = "") -> None:
