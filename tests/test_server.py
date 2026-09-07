@@ -228,6 +228,77 @@ class TestServerDashboard(unittest.TestCase):
         self.assertEqual(resp.status_code, 401)
 
 
+class TestServerGraph(unittest.TestCase):
+    """Test /graph endpoint."""
+
+    def setUp(self):
+        from fastapi.testclient import TestClient
+        self.client = TestClient(app)
+        self.tmpdir = tempfile.mkdtemp()
+        self.d = _reset_server(self.tmpdir)
+        store = SqacStore()
+        store.add("FastAPI is a web framework", key="fastapi")
+        store.add("Redis is a cache", key="redis")
+        store.add("PostgreSQL is a database", key="postgres")
+        store.add("Docker is a container runtime", key="docker")
+        store.save(self.d / "memory.sqac")
+        self.h = {"X-API-Key": "sk-test"}
+
+    def tearDown(self):
+        _state.clear()
+        import shutil
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_graph_api_returns_nodes_and_edges(self):
+        resp = self.client.post("/graph", headers=self.h, json={
+            "threshold": 0.45, "max_edges": 50
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(len(data["nodes"]), 4)
+        self.assertIn("edges", data)
+        self.assertEqual(data["dims"], 1024)
+        self.assertEqual(data["alive_entries"], 4)
+
+    def test_graph_nodes_have_position(self):
+        resp = self.client.post("/graph", headers=self.h, json={"threshold": 0.99})
+        data = resp.json()
+        for node in data["nodes"]:
+            self.assertIn("position", node)
+            self.assertEqual(len(node["position"]), 3)
+            self.assertIn("key", node)
+            self.assertIn("content", node)
+            self.assertIn("kind", node)
+            self.assertIn("color", node)
+
+    def test_graph_edges_have_similarity(self):
+        resp = self.client.post("/graph", headers=self.h, json={
+            "threshold": 0.45, "max_edges": 10
+        })
+        data = resp.json()
+        for edge in data["edges"]:
+            self.assertIn("source", edge)
+            self.assertIn("target", edge)
+            self.assertIn("similarity", edge)
+            self.assertGreater(edge["similarity"], 0.45)
+
+    def test_graph_threshold_filters_edges(self):
+        resp_high = self.client.post("/graph", headers=self.h, json={"threshold": 0.95})
+        resp_low = self.client.post("/graph", headers=self.h, json={"threshold": 0.40})
+        self.assertLessEqual(len(resp_high.json()["edges"]), len(resp_low.json()["edges"]))
+
+    def test_graph_html_view(self):
+        resp = self.client.get("/graph", headers=self.h)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/html", resp.headers["content-type"])
+        self.assertIn("SQAC Hyperdimensional Graph", resp.text)
+        self.assertIn("three", resp.text.lower())
+
+    def test_graph_no_auth(self):
+        resp = self.client.post("/graph", json={"threshold": 0.5})
+        self.assertEqual(resp.status_code, 401)
+
+
 class TestServerRack(unittest.TestCase):
     """Test rack-enabled server endpoints."""
 

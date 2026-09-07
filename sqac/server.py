@@ -18,6 +18,10 @@ from .store import SqacStore, _HAS_SIMD
 from .rack import CartridgeRack
 from .offloader import ContextOffloader
 
+# Load the graph visualization HTML at import time
+_GRAPH_HTML_PATH = Path(__file__).parent / "graph_view.html"
+_GRAPH_HTML = _GRAPH_HTML_PATH.read_text(encoding="utf-8") if _GRAPH_HTML_PATH.exists() else "<h1>graph_view.html not found</h1>"
+
 _api_key = os.environ.get("SQAC_API_KEY", "")
 _security = APIKeyHeader(name="X-API-Key", auto_error=False)
 _start_time = time.time()
@@ -82,6 +86,9 @@ class SessionObserveRequest(BaseModel):
     role: str = "user"; text: str
 class SessionRecallRequest(BaseModel):
     query: str; top_k: int = Field(2, ge=1, le=10)
+class GraphRequest(BaseModel):
+    threshold: float = Field(0.55, ge=0.0, le=1.0)
+    max_edges: int = Field(200, ge=1, le=2000)
 class HitResponse(BaseModel):
     content: str; confidence: float; source: str; mode: str; meta: dict = {}
 
@@ -184,6 +191,145 @@ def session_recall(req: SessionRecallRequest, _=Depends(_verify_key)):
     o = _state.get("offloader")
     if not o: raise HTTPException(400, "no session offloader")
     return {"text": o.recall(req.query, top_k=req.top_k), "hit": bool(o.recall(req.query, top_k=req.top_k))}
+
+@app.post("/graph")
+def graph_endpoint(req: GraphRequest, _=Depends(_verify_key)):
+    """Compute pairwise VSA similarity and return nodes + edges for 3D visualization."""
+    store = _get_store()
+    alive = [i for i, e in enumerate(store._entries) if not e.get("deleted")]
+    if not alive:
+        return {"nodes": [], "edges": [], "dims": store.dims}
+
+    n = len(alive)
+    import numpy as np
+
+    # Get key bit matrices for similarity computation
+    kmat = store._bitmatrix("keys")  # (total, D) uint8
+    cmat = store._bitmatrix("ckeys")
+
+    # Extract alive vectors
+    kvecs = kmat[alive]  # (n, D)
+    cvecs = cmat[alive]
+
+    # --- Derive 3D positions from VSA vectors ---
+    # Take first 24 bytes (192 bits) → 3 groups of 64 bits → 3 floats in [-1, 1]
+    pos = np.zeros((n, 3), dtype=np.float32)
+    for dim in range(3):
+        start = dim * 24
+        end = start + 24
+        chunk = kvecs[:, start:end].view(np.uint64)  # treat 8 bytes as uint64
+        # Normalize to [-1, 1] using bit population count
+        counts = np.unpackbits(chunk.view(np.uint8).reshape(-1, 8), axis=1).sum(axis=1).reshape(n, 3)
+        pos[:, dim] = (counts.mean(axis=1) / 8.0) * 2.0 - 1.0
+
+    # Scale positions for better spacing
+    pos *= 15.0
+
+    # --- Compute pairwise similarity ---
+    # XOR all pairs → hamming distance → similarity
+    # For efficiency: compute key similarity matrix
+    # kvecs is (n, D) as uint8 bits. Use broadcasting.
+    # Actually, let's use a smarter approach: pack into bits and use XOR
+    kbits = np.unpackbits(kvecs, axis=1).astype(np.int8)  # (n, D)
+    cbits = np.unpackbits(cvecs, axis=1).astype(np.int8)
+
+    # Compute similarity matrix: 1 - hamming/dims
+    # (n, 1, D) XOR (1, n, D) → (n, n, D) is too big for large n
+    # Instead: use dot product trick. sim = 1 - (n_different / D)
+    # n_different = D - (kbits[i] == kbits[j]).sum()
+    # = D - (kbits[i] * kbits[j] + (1-kbits[i])*(1-kbits[j])).sum()
+    # For binary {0,1}: (a == b) = a*b + (1-a)*(1-b) = 1 - a - b + 2ab
+    # So: sim = 1 - (D - sum(1 - a - b + 2ab))/D = sum(1 - a - b + 2ab)/D
+    # = (D - sum(a) - sum(b) + 2*sum(ab))/D
+    # For chunks: compute in blocks to avoid O(n^2 * D) memory
+
+    edges = []
+    if n <= 1:
+        pass
+    else:
+        # Compute similarity in blocks to manage memory
+        block_size = min(500, n)
+        sim_threshold = req.threshold
+        all_edges = []
+
+        for i_start in range(0, n, block_size):
+            i_end = min(i_start + block_size, n)
+            ki = kbits[i_start:i_end]  # (bi, D)
+            ci = cbits[i_start:i_end]
+
+            for j_start in range(i_start, n, block_size):
+                j_end = min(j_start + block_size, n)
+                kj = kbits[j_start:j_end]  # (bj, D)
+                cj = cbits[j_start:j_end]
+
+                # Key similarity: 1 - hamming/D
+                # hamming = (ki[:, None, :] != kj[None, :, :]).sum(axis=2)
+                # For binary: XOR then popcount
+                # sim = 1 - (ki @ (1-kj.T) + (1-ki) @ kj.T) / D
+                D = kbits.shape[1]
+                # Key sim
+                sum_ki = ki.sum(axis=1)  # (bi,)
+                sum_kj = kj.sum(axis=1)  # (bj,)
+                dot_kk = ki.astype(np.int32) @ kj.astype(np.int32).T  # (bi, bj)
+                sim_k = (D - sum_ki[:, None] - sum_kj[None, :] + 2 * dot_kk) / D
+
+                # Content sim
+                sum_ci = ci.sum(axis=1)
+                sum_cj = cj.sum(axis=1)
+                dot_cc = ci.astype(np.int32) @ cj.astype(np.int32).T
+                sim_c = (D - sum_ci[:, None] - sum_cj[None, :] + 2 * dot_cc) / D
+
+                # Combined: max of key and content similarity
+                sim = np.maximum(sim_k, sim_c)
+
+                # Extract edges above threshold
+                for li in range(sim.shape[0]):
+                    for lj in range(sim.shape[1]):
+                        gi = i_start + li  # global index in alive array
+                        gj = j_start + lj  # global index in alive array
+                        if gi >= gj:
+                            continue  # skip self and duplicates
+                        s = float(sim[li, lj])
+                        if s >= sim_threshold:
+                            all_edges.append((gi, gj, s))
+
+        # Sort by similarity descending, keep top max_edges
+        all_edges.sort(key=lambda e: -e[2])
+        edges = all_edges[:req.max_edges]
+
+    # --- Build node list ---
+    nodes = []
+    kind_colors = {"fact": "#58a6ff", "skill": "#f0883e", "doc": "#3fb950", "turn": "#bc8cff", "generic": "#8b949e"}
+    for i, idx in enumerate(alive):
+        entry = store._entries[idx]
+        kind = entry.get("kind", "generic")
+        if isinstance(kind, int):
+            from .store import KIND_NAMES
+            kind = KIND_NAMES.get(kind, "generic")
+        nodes.append({
+            "id": i,
+            "key": entry.get("key_norm", entry.get("key", "")),
+            "content": entry["content"][:100],
+            "kind": kind,
+            "source": entry.get("source", ""),
+            "color": kind_colors.get(kind, "#8b949e"),
+            "position": [round(float(pos[i, 0]), 3), round(float(pos[i, 1]), 3), round(float(pos[i, 2]), 3)],
+        })
+
+    return {
+        "nodes": nodes,
+        "edges": [{"source": e[0], "target": e[1], "similarity": round(e[2], 4)} for e in edges],
+        "dims": store.dims,
+        "total_entries": len(store),
+        "alive_entries": n,
+    }
+
+
+@app.get("/graph")
+def graph_view(_=Depends(_verify_key)):
+    """Serve the 3D graph visualization HTML."""
+    return HTMLResponse(_GRAPH_HTML)
+
 
 @app.get("/metrics")
 def metrics(_=Depends(_verify_key)):
@@ -368,6 +514,8 @@ footer{{margin-top:24px;padding-top:12px;border-top:1px solid #21263d;color:#484
 <tr><td>GET</td><td>/cartridges</td><td>List cartridges</td></tr>
 <tr><td>POST</td><td>/rack/search</td><td>Search across rack</td></tr>
 <tr><td>POST</td><td>/rack/write</td><td>Write with routing</td></tr>
+<tr><td>POST</td><td>/graph</td><td>Graph data (JSON)</td></tr>
+<tr><td>GET</td><td>/graph</td><td>3D graph visualization</td></tr>
 </table>
 
 <footer>SQAC v0.1.0 — VSA memory cartridges for LLMs — <a href="/health" style="color:#58a6ff">Health</a> · <a href="/metrics" style="color:#58a6ff">Metrics</a> · <a href="/docs" style="color:#58a6ff">API Docs</a></footer>

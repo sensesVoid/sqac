@@ -85,6 +85,14 @@ def main(argv: list[str] | None = None) -> int:
     p_dashboard.add_argument("--rack", action="store_true", help="mount cartridges as rack")
     p_dashboard.add_argument("--no-browser", action="store_true", help="don't try to open browser")
 
+    p_graph = sub.add_parser("graph", help="open 3D hyperdimensional graph (starts server)")
+    p_graph.add_argument("--dir", default=".", help="cartridge directory (default: .)")
+    p_graph.add_argument("--port", type=int, default=8420, help="port (default: 8420)")
+    p_graph.add_argument("--host", default="0.0.0.0", help="host (default: 0.0.0.0)")
+    p_graph.add_argument("--api-key", default=None, help="API key")
+    p_graph.add_argument("--threshold", type=float, default=0.50, help="min similarity for edges (default: 0.50)")
+    p_graph.add_argument("--no-browser", action="store_true", help="don't try to open browser")
+
     p_track = sub.add_parser("track", help="realtime project tracking (Ctrl-C to stop)")
     p_track.add_argument("root", nargs="?", default=".", help="project root (default: .)")
     p_track.add_argument("-o", "--out-dir", default=DEFAULT_SQAC_DIR,
@@ -212,6 +220,23 @@ def main(argv: list[str] | None = None) -> int:
             serve_args.append("--rack")
         url = f"http://{'localhost' if args.host == '0.0.0.0' else args.host}:{args.port}/dashboard"
         print(f"\n  ⚡ SQAC Dashboard: {url}\n")
+        if not args.no_browser:
+            try:
+                import webbrowser
+                webbrowser.open(url)
+            except Exception:
+                pass
+        return serve_main(serve_args)
+
+    elif args.cmd == "graph":
+        from .server import main as serve_main
+        serve_args = ["--dir", args.dir, "--port", str(args.port), "--host", args.host]
+        if args.api_key:
+            serve_args += ["--api-key", args.api_key]
+        host = "localhost" if args.host == "0.0.0.0" else args.host
+        url = f"http://{host}:{args.port}/graph"
+        print(f"\n  ⚡ SQAC Hyperdimensional Graph: {url}\n")
+        print(f"  Threshold: {args.threshold} · Open in browser for 3D visualization\n")
         if not args.no_browser:
             try:
                 import webbrowser

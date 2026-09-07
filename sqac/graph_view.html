@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SQAC Hyperdimensional Graph</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#c9d1d9;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+canvas{display:block}
+#ui{position:fixed;top:0;left:0;width:100%;pointer-events:none;z-index:10}
+#header{padding:16px 24px;display:flex;align-items:center;gap:16px;pointer-events:auto}
+#header h1{font-size:1.1rem;color:#58a6ff;font-weight:600;white-space:nowrap}
+#header .stat{font-size:.8rem;color:#8b949e;background:#161b2288;border:1px solid #30363d66;border-radius:8px;padding:4px 10px;backdrop-filter:blur(8px)}
+#controls{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:8px;pointer-events:auto;z-index:10}
+#controls button{background:#161b22cc;border:1px solid #30363d;color:#c9d1d9;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:.8rem;backdrop-filter:blur(8px);transition:all .2s}
+#controls button:hover{background:#1f6feb44;border-color:#1f6feb}
+#controls button.active{background:#1f6feb;color:#fff}
+#tooltip{position:fixed;display:none;background:#161b22ee;border:1px solid #30363d;border-radius:8px;padding:10px 14px;max-width:320px;pointer-events:none;z-index:20;backdrop-filter:blur(12px)}
+#tooltip .tt-key{color:#58a6ff;font-weight:600;font-size:.85rem;margin-bottom:4px}
+#tooltip .tt-content{color:#c9d1d9;font-size:.8rem;line-height:1.4}
+#tooltip .tt-meta{color:#8b949e;font-size:.7rem;margin-top:4px}
+#legend{position:fixed;bottom:60px;right:20px;pointer-events:auto;z-index:10}
+#legend div{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:.75rem;color:#8b949e}
+#legend .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+#loading{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#58a6ff;font-size:1rem;z-index:30}
+</style>
+</head>
+<body>
+<div id="loading">⚡ Loading hyperdimensional graph...</div>
+<div id="ui">
+  <div id="header">
+    <h1>⚡ SQAC Graph</h1>
+    <span class="stat" id="node-count">— nodes</span>
+    <span class="stat" id="edge-count">— edges</span>
+    <span class="stat" id="sim-range">—</span>
+  </div>
+</div>
+<div id="controls">
+  <button id="btn-auto" class="active" onclick="toggleAutoRotate()">Auto Rotate</button>
+  <button onclick="resetCamera()">Reset View</button>
+  <button id="btn-force" onclick="toggleForce()">Force Layout</button>
+  <button onclick="exportImage()">📸 Export</button>
+</div>
+<div id="legend">
+  <div><span class="dot" style="background:#58a6ff"></span> fact</div>
+  <div><span class="dot" style="background:#f0883e"></span> skill</div>
+  <div><span class="dot" style="background:#3fb950"></span> doc</div>
+  <div><span class="dot" style="background:#bc8cff"></span> turn</div>
+  <div><span class="dot" style="background:#8b949e"></span> generic</div>
+</div>
+<div id="tooltip"><div class="tt-key"></div><div class="tt-content"></div><div class="tt-meta"></div></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ── Config ──────────────────────────────────────────────────────────
+const NODE_BASE_SIZE = 0.3;
+const NODE_HOVER_SIZE = 0.6;
+const EDGE_BASE_OPACITY = 0.15;
+const EDGE_HIGHLIGHT_OPACITY = 0.6;
+const PARTICLE_SPEED = 0.003;
+const FORCE_STRENGTH = 0.002;
+const FORCE_REPULSION = 2.0;
+const DAMPING = 0.92;
+const BLOOM_STRENGTH = 1.2;
+const BLOOM_RADIUS = 0.6;
+const BLOOM_THRESHOLD = 0.3;
+
+// ── Scene Setup ─────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000000, 0.008);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(0, 8, 25);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.body.appendChild(renderer.domElement);
+
+// ── Post-processing (Bloom) ─────────────────────────────────────────
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD
+);
+composer.addPass(bloomPass);
+
+// ── Controls ────────────────────────────────────────────────────────
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.5;
+controls.maxDistance = 100;
+controls.minDistance = 3;
+
+// ── Lights ──────────────────────────────────────────────────────────
+const ambientLight = new THREE.AmbientLight(0x222244, 0.5);
+scene.add(ambientLight);
+const pointLight1 = new THREE.PointLight(0x58a6ff, 1.5, 60);
+pointLight1.position.set(10, 15, 10);
+scene.add(pointLight1);
+const pointLight2 = new THREE.PointLight(0xf0883e, 1.0, 50);
+pointLight2.position.set(-10, -5, -10);
+scene.add(pointLight2);
+
+// ── Starfield background ────────────────────────────────────────────
+const starGeo = new THREE.BufferGeometry();
+const starPositions = new Float32Array(3000);
+for (let i = 0; i < 3000; i++) starPositions[i] = (Math.random() - 0.5) * 200;
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+const starMat = new THREE.PointsMaterial({ color: 0x444466, size: 0.08, transparent: true, opacity: 0.6 });
+scene.add(new THREE.Points(starGeo, starMat));
+
+// ── Grid (subtle) ───────────────────────────────────────────────────
+const gridHelper = new THREE.GridHelper(40, 40, 0x111133, 0x0a0a1a);
+gridHelper.position.y = -8;
+scene.add(gridHelper);
+
+// ── State ───────────────────────────────────────────────────────────
+let graphData = null;
+let nodeMeshes = [];
+let edgeLines = [];
+let particles = [];
+let velocityMap = new Map();
+let forceEnabled = false;
+let hoveredNode = null;
+let raycaster = new THREE.Raycaster();
+let mouse = new THREE.Vector2(-999, -999);
+let clock = new THREE.Clock();
+
+// ── Fetch graph data ────────────────────────────────────────────────
+const API_KEY = new URLSearchParams(window.location.search).get('key') || '';
+async function fetchGraph() {
+  try {
+    const resp = await fetch('/graph', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(API_KEY ? {'X-API-Key': API_KEY} : {})
+      },
+      body: JSON.stringify({ threshold: 0.50, max_edges: 300 })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+  } catch (e) {
+    console.error('Failed to fetch graph:', e);
+    return { nodes: [], edges: [], dims: 1024 };
+  }
+}
+
+// ── Build scene from graph data ─────────────────────────────────────
+function buildGraph(data) {
+  // Clear previous
+  nodeMeshes.forEach(m => scene.remove(m));
+  edgeLines.forEach(l => scene.remove(l));
+  particles.forEach(p => scene.remove(p.mesh));
+  nodeMeshes = []; edgeLines = []; particles = [];
+  velocityMap.clear();
+
+  graphData = data;
+  const { nodes, edges } = data;
+
+  // Update UI
+  document.getElementById('node-count').textContent = `${nodes.length} nodes`;
+  document.getElementById('edge-count').textContent = `${edges.length} edges`;
+  if (edges.length > 0) {
+    const sims = edges.map(e => e.similarity);
+    const minS = Math.min(...sims).toFixed(3);
+    const maxS = Math.max(...sims).toFixed(3);
+    document.getElementById('sim-range').textContent = `sim: ${minS}–${maxS}`;
+  }
+
+  // ── Nodes ─────────────────────────────────────────────────────
+  const nodeGroup = new THREE.Group();
+  nodes.forEach((node, i) => {
+    // Main sphere
+    const color = new THREE.Color(node.color);
+    const geo = new THREE.SphereGeometry(NODE_BASE_SIZE, 24, 24);
+    const mat = new THREE.MeshStandardMaterial({
+      color: color,
+      emissive: color,
+      emissiveIntensity: 0.5,
+      roughness: 0.3,
+      metalness: 0.7,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(...node.position);
+    mesh.userData = { node, index: i, baseScale: 1 };
+    scene.add(mesh);
+    nodeMeshes.push(mesh);
+
+    // Glow halo
+    const glowGeo = new THREE.SphereGeometry(NODE_BASE_SIZE * 1.8, 16, 16);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.08,
+      side: THREE.BackSide,
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    mesh.add(glow);
+    mesh.userData.glow = glow;
+
+    velocityMap.set(i, new THREE.Vector3(0, 0, 0));
+  });
+
+  // ── Edges ─────────────────────────────────────────────────────
+  const edgeGroup = new THREE.Group();
+  const edgePositions = [];
+  const edgeColors = [];
+  const edgeAlphas = [];
+
+  edges.forEach((edge, ei) => {
+    const src = nodes[edge.source];
+    const tgt = nodes[edge.target];
+    if (!src || !tgt) return;
+
+    const points = [
+      new THREE.Vector3(...src.position),
+      new THREE.Vector3(...tgt.position),
+    ];
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+
+    // Color blend between source and target
+    const c1 = new THREE.Color(src.color);
+    const c2 = new THREE.Color(tgt.color);
+    const blended = c1.clone().lerp(c2, 0.5);
+
+    const opacity = EDGE_BASE_OPACITY + edge.similarity * 0.4;
+    const mat = new THREE.LineBasicMaterial({
+      color: blended,
+      transparent: true,
+      opacity: opacity,
+      linewidth: 1,
+    });
+    const line = new THREE.Line(geo, mat);
+    line.userData = { edge, sourceIdx: edge.source, targetIdx: edge.target };
+    scene.add(line);
+    edgeLines.push(line);
+
+    // Particle flowing along edge
+    const particleGeo = new THREE.SphereGeometry(0.04, 6, 6);
+    const particleMat = new THREE.MeshBasicMaterial({
+      color: blended,
+      transparent: true,
+      opacity: 0.7,
+    });
+    const particleMesh = new THREE.Mesh(particleGeo, particleMat);
+    scene.add(particleMesh);
+    particles.push({
+      mesh: particleMesh,
+      source: new THREE.Vector3(...src.position),
+      target: new THREE.Vector3(...tgt.position),
+      t: Math.random(),
+      speed: PARTICLE_SPEED * (0.5 + Math.random()),
+    });
+  });
+
+  document.getElementById('loading').style.display = 'none';
+}
+
+// ── Force-directed layout ───────────────────────────────────────────
+function applyForces() {
+  if (!forceEnabled || !graphData) return;
+  const { nodes, edges } = graphData;
+  const n = nodes.length;
+
+  // Repulsion between all pairs (O(n^2) but fine for <500 nodes)
+  for (let i = 0; i < n; i++) {
+    const vi = velocityMap.get(i);
+    const pi = nodeMeshes[i].position;
+    for (let j = i + 1; j < n; j++) {
+      const pj = nodeMeshes[j].position;
+      const dx = pi.x - pj.x;
+      const dy = pi.y - pj.y;
+      const dz = pi.z - pj.z;
+      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz) + 0.01;
+      const force = FORCE_REPULSION / (dist * dist);
+      const fx = (dx / dist) * force;
+      const fy = (dy / dist) * force;
+      const fz = (dz / dist) * force;
+      vi.x += fx; vi.y += fy; vi.z += fz;
+      const vj = velocityMap.get(j);
+      vj.x -= fx; vj.y -= fy; vj.z -= fz;
+    }
+  }
+
+  // Attraction along edges
+  edges.forEach(edge => {
+    const pi = nodeMeshes[edge.source]?.position;
+    const pj = nodeMeshes[edge.target]?.position;
+    if (!pi || !pj) return;
+    const dx = pj.x - pi.x;
+    const dy = pj.y - pi.y;
+    const dz = pj.z - pi.z;
+    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    const force = (dist - 3) * FORCE_STRENGTH * edge.similarity;
+    const fx = (dx / dist) * force;
+    const fy = (dy / dist) * force;
+    const fz = (dz / dist) * force;
+    velocityMap.get(edge.source).add(new THREE.Vector3(fx, fy, fz));
+    velocityMap.get(edge.target).add(new THREE.Vector3(-fx, -fy, -fz));
+  });
+
+  // Center gravity
+  for (let i = 0; i < n; i++) {
+    const vi = velocityMap.get(i);
+    const pi = nodeMeshes[i].position;
+    vi.x -= pi.x * 0.001;
+    vi.y -= pi.y * 0.001;
+    vi.z -= pi.z * 0.001;
+    // Apply velocity
+    pi.x += vi.x;
+    pi.y += vi.y;
+    pi.z += vi.z;
+    vi.multiplyScalar(DAMPING);
+  }
+
+  // Update edge positions
+  edgeLines.forEach(line => {
+    const { sourceIdx, targetIdx } = line.userData;
+    const sp = nodeMeshes[sourceIdx].position;
+    const tp = nodeMeshes[targetIdx].position;
+    const pos = line.geometry.attributes.position;
+    pos.setXYZ(0, sp.x, sp.y, sp.z);
+    pos.setXYZ(1, tp.x, tp.y, tp.z);
+    pos.needsUpdate = true;
+  });
+
+  // Update particle positions
+  particles.forEach(p => {
+    p.source.copy(nodeMeshes[edgeLines.find(l => l.userData.sourceIdx === nodes.indexOf(graphData.nodes.find(n => n.position[0] === p.source.x)))?.userData.sourceIdx]?.position || p.source);
+  });
+}
+
+// ── Raycasting (hover) ──────────────────────────────────────────────
+function onMouseMove(e) {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(nodeMeshes);
+
+  const tooltip = document.getElementById('tooltip');
+
+  if (intersects.length > 0) {
+    const hit = intersects[0].object;
+    const node = hit.userData.node;
+
+    if (hoveredNode !== hit) {
+      // Reset previous
+      if (hoveredNode) {
+        hoveredNode.scale.setScalar(1);
+        hoveredNode.material.emissiveIntensity = 0.5;
+        hoveredNode.userData.glow.material.opacity = 0.08;
+        // Reset edges
+        edgeLines.forEach(l => {
+          if (l.userData._wasHighlighted) {
+            l.material.opacity = EDGE_BASE_OPACITY + l.userData.edge.similarity * 0.4;
+            l.userData._wasHighlighted = false;
+          }
+        });
+      }
+      hoveredNode = hit;
+      hit.scale.setScalar(NODE_HOVER_SIZE / NODE_BASE_SIZE);
+      hit.material.emissiveIntensity = 1.0;
+      hit.userData.glow.material.opacity = 0.2;
+
+      // Highlight connected edges
+      edgeLines.forEach(l => {
+        if (l.userData.sourceIdx === hit.userData.index || l.userData.targetIdx === hit.userData.index) {
+          l.material.opacity = EDGE_HIGHLIGHT_OPACITY;
+          l.userData._wasHighlighted = true;
+        }
+      });
+    }
+
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 15) + 'px';
+    tooltip.style.top = (e.clientY - 10) + 'px';
+    tooltip.querySelector('.tt-key').textContent = node.key || '(no key)';
+    tooltip.querySelector('.tt-content').textContent = node.content;
+    tooltip.querySelector('.tt-meta').textContent = `kind: ${node.kind} · source: ${node.source || '—'}`;
+  } else {
+    if (hoveredNode) {
+      hoveredNode.scale.setScalar(1);
+      hoveredNode.material.emissiveIntensity = 0.5;
+      hoveredNode.userData.glow.material.opacity = 0.08;
+      edgeLines.forEach(l => {
+        if (l.userData._wasHighlighted) {
+          l.material.opacity = EDGE_BASE_OPACITY + l.userData.edge.similarity * 0.4;
+          l.userData._wasHighlighted = false;
+        }
+      });
+      hoveredNode = null;
+    }
+    tooltip.style.display = 'none';
+  }
+}
+
+// ── Animation Loop ──────────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  const elapsed = clock.getElapsedTime();
+
+  controls.update();
+
+  // Pulse nodes
+  nodeMeshes.forEach((mesh, i) => {
+    const pulse = 1.0 + Math.sin(elapsed * 2 + i * 0.5) * 0.05;
+    if (mesh !== hoveredNode) {
+      mesh.scale.setScalar(pulse);
+    }
+    // Orbit glow
+    if (mesh.userData.glow) {
+      mesh.userData.glow.material.opacity = 0.06 + Math.sin(elapsed * 1.5 + i * 0.3) * 0.03;
+    }
+  });
+
+  // Animate particles
+  particles.forEach(p => {
+    p.t += p.speed;
+    if (p.t > 1) p.t -= 1;
+    const t = p.t;
+    // Ease in-out
+    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    p.mesh.position.lerpVectors(p.source, p.target, ease);
+    // Update source/target if nodes moved (force layout)
+    if (graphData) {
+      const line = edgeLines.find(l => l === p.mesh.parent?.children?.find?.(c => c === p.mesh));
+    }
+    p.mesh.material.opacity = 0.3 + Math.sin(elapsed * 3 + p.t * 10) * 0.3;
+  });
+
+  // Force layout
+  applyForces();
+
+  // Move lights
+  pointLight1.position.x = Math.sin(elapsed * 0.3) * 15;
+  pointLight1.position.z = Math.cos(elapsed * 0.3) * 15;
+  pointLight2.position.x = Math.cos(elapsed * 0.2) * 12;
+  pointLight2.position.z = Math.sin(elapsed * 0.2) * 12;
+
+  composer.render();
+}
+
+// ── Controls ────────────────────────────────────────────────────────
+window.toggleAutoRotate = () => {
+  controls.autoRotate = !controls.autoRotate;
+  document.getElementById('btn-auto').classList.toggle('active', controls.autoRotate);
+};
+window.resetCamera = () => {
+  camera.position.set(0, 8, 25);
+  controls.target.set(0, 0, 0);
+  controls.update();
+};
+window.toggleForce = () => {
+  forceEnabled = !forceEnabled;
+  document.getElementById('btn-force').classList.toggle('active', forceEnabled);
+};
+window.exportImage = () => {
+  renderer.render(scene, camera);
+  const link = document.createElement('a');
+  link.download = 'sqac-graph.png';
+  link.href = renderer.domElement.toDataURL('image/png');
+  link.click();
+};
+
+// ── Resize ──────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
+window.addEventListener('mousemove', onMouseMove);
+
+// ── Init ────────────────────────────────────────────────────────────
+const data = await fetchGraph();
+buildGraph(data);
+animate();
+</script>
+</body>
+</html>

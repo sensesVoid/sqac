@@ -300,6 +300,23 @@ Starts the server and opens the dashboard in your browser:
 sqac dashboard --dir ./memory --port 8420 --api-key sk-secret
 ```
 
+### `sqac graph` — Open the 3D hyperdimensional graph
+
+Opens an interactive 3D visualization where each entry is a node connected by VSA similarity. Features bloom glow, animated particles, force-directed layout, and hover tooltips.
+
+```bash
+sqac graph --dir ./memory --port 8420 --api-key sk-secret --threshold 0.50
+```
+
+**Graph visualization features:**
+- **3D force-directed layout** — nodes repel, edges attract, cluster structure emerges
+- **Bloom post-processing** — glowing nodes and edges with UnrealBloomPass
+- **Animated particles** — flow along edges showing similarity connections
+- **Hover tooltips** — shows entry key, content, kind, and source
+- **Kind-colored nodes** — blue=fact, orange=skill, green=doc, purple=turn
+- **Auto-rotate** — smooth camera orbit (toggle on/off)
+- **Export** — save the graph as a PNG screenshot
+
 ---
 
 ## Python API
@@ -572,6 +589,8 @@ SQAC_DIR=./memory SQAC_API_KEY=sk-secret python -m sqac.server
 | `POST` | `/rack/write` | Write with automatic kind routing. |
 | `POST` | `/session/observe` | Feed a conversation turn into the offloader. |
 | `POST` | `/session/recall` | Recall from session memory. |
+| `POST` | `/graph` | Graph data: nodes + VSA similarity edges (JSON). |
+| `GET` | `/graph` | 3D hyperdimensional graph visualization (HTML). |
 
 **Authentication:** API key via `X-API-Key` header (or `SQAC_API_KEY` env). `/health` is always open.
 
@@ -718,6 +737,6 @@ SQAC stands on published work. Every link verified; no folklore citations.
 
 ---
 
-**Status:** research-grade, under active development. Core stable and tested (104/104 tests passing).
+**Status:** research-grade, under active development. Core stable and tested (110/110 tests passing).
 
 *Built as an implementation of the SQ thesis — see `docs/THESIS.md` for the full research narrative.*
