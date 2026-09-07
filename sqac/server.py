@@ -5,10 +5,12 @@
     python -m sqac.cli serve --dir ./memory --port 8420 --api-key sk-xxx
 """
 from __future__ import annotations
-import argparse, os, time
+import argparse, json, os, threading, time
+from collections import Counter
 from pathlib import Path
 from typing import Optional
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from .format import compact_cartridge, _HAS_LZ4
@@ -19,6 +21,15 @@ from .offloader import ContextOffloader
 _api_key = os.environ.get("SQAC_API_KEY", "")
 _security = APIKeyHeader(name="X-API-Key", auto_error=False)
 _start_time = time.time()
+
+# ── Metrics counters ────────────────────────────────────────────────────
+_metrics_lock = threading.Lock()
+_req_counts: Counter = Counter()        # endpoint -> count
+_req_latencies: list[float] = []        # last 1000 request latencies
+_req_errors: Counter = Counter()        # status_code -> count
+_search_latencies: list[float] = []     # last 1000 search latencies
+_teach_count = 0
+_compact_count = 0
 
 def _verify_key(key: str = Security(_security)):
     if _api_key and key != _api_key:
@@ -74,6 +85,21 @@ class SessionRecallRequest(BaseModel):
 class HitResponse(BaseModel):
     content: str; confidence: float; source: str; mode: str; meta: dict = {}
 
+@app.middleware("http")
+async def _track_metrics(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    elapsed = time.time() - start
+    endpoint = request.url.path
+    with _metrics_lock:
+        _req_counts[endpoint] += 1
+        _req_latencies.append(elapsed)
+        if len(_req_latencies) > 1000:
+            _req_latencies.pop(0)
+        if response.status_code >= 400:
+            _req_errors[str(response.status_code)] += 1
+    return response
+
 @app.get("/health")
 def health():
     return {"status": "ok", "simd": _HAS_SIMD, "lz4": _HAS_LZ4, "uptime_s": round(time.time()-_start_time, 1)}
@@ -84,13 +110,20 @@ def stats(cartridge: Optional[str] = None, _=Depends(_verify_key)):
 
 @app.post("/search")
 def search_endpoint(req: SearchRequest, _=Depends(_verify_key)):
+    t0 = time.time()
     store = _get_store(req.cartridge)
     if req.threshold is not None: store.fuzzy_threshold = req.threshold
     hits = store.search(req.query, top_k=req.top_k, kind=req.kind)
+    latency = (time.time() - t0) * 1000
+    with _metrics_lock:
+        _search_latencies.append(latency)
+        if len(_search_latencies) > 1000:
+            _search_latencies.pop(0)
     return {"hits": [HitResponse(content=h.content, confidence=round(h.confidence,4), source=h.source, mode=h.mode, meta=h.meta).model_dump() for h in hits], "count": len(hits)}
 
 @app.post("/teach")
 def teach(req: TeachRequest, _=Depends(_verify_key)):
+    global _teach_count
     _ensure_state()
     store = _get_store(req.cartridge)
     store.add(req.content, key=req.key, source=req.source, kind=req.kind)
@@ -100,14 +133,19 @@ def teach(req: TeachRequest, _=Depends(_verify_key)):
     # Reload from disk so subsequent searches see the new entry
     if not req.cartridge or req.cartridge == "memory":
         _state["default_store"] = SqacStore.load(path)
+    with _metrics_lock:
+        _teach_count += 1
     return {"ok": True, "entries": len(store), "path": str(path)}
 
 @app.post("/compact")
 def compact_endpoint(req: CompactRequest, _=Depends(_verify_key)):
+    global _compact_count
     _ensure_state()
     name = req.cartridge or "memory"
     path = _state["dir"] / f"{name}.sqac"
     if not path.exists(): raise HTTPException(404, f"cartridge not found: {name}")
+    with _metrics_lock:
+        _compact_count += 1
     return compact_cartridge(path)
 
 @app.get("/cartridges")
@@ -146,6 +184,196 @@ def session_recall(req: SessionRecallRequest, _=Depends(_verify_key)):
     o = _state.get("offloader")
     if not o: raise HTTPException(400, "no session offloader")
     return {"text": o.recall(req.query, top_k=req.top_k), "hit": bool(o.recall(req.query, top_k=req.top_k))}
+
+@app.get("/metrics")
+def metrics(_=Depends(_verify_key)):
+    """Prometheus-compatible metrics endpoint."""
+    uptime = time.time() - _start_time
+    lines = [
+        "# HELP sqac_uptime_seconds Server uptime in seconds.",
+        "# TYPE sqac_uptime_seconds gauge",
+        f'sqac_uptime_seconds {uptime:.1f}',
+        "# HELP sqac_requests_total Total requests per endpoint.",
+        "# TYPE sqac_requests_total counter",
+    ]
+    with _metrics_lock:
+        for ep, count in sorted(_req_counts.items()):
+            safe_ep = ep.replace("/", "_").strip("_")
+            lines.append(f'sqac_requests_total{{endpoint="{safe_ep}"}} {count}')
+        lines += [
+            "# HELP sqac_errors_total Total error responses by status.",
+            "# TYPE sqac_errors_total counter",
+        ]
+        for code, count in sorted(_req_errors.items()):
+            lines.append(f'sqac_errors_total{{status="{code}"}} {count}')
+        lines += [
+            "# HELP sqac_search_latency_ms Search latency in milliseconds.",
+            "# TYPE sqac_search_latency_ms summary",
+        ]
+        if _search_latencies:
+            sl = sorted(_search_latencies)
+            n = len(sl)
+            lines.append(f'sqac_search_latency_ms{{quantile="0.5"}} {sl[n//2]:.2f}')
+            lines.append(f'sqac_search_latency_ms{{quantile="0.95"}} {sl[int(n*0.95)]:.2f}')
+            lines.append(f'sqac_search_latency_ms{{quantile="0.99"}} {sl[int(n*0.99)]:.2f}')
+            lines.append(f'sqac_search_latency_ms_sum {sum(sl):.2f}')
+            lines.append(f'sqac_search_latency_ms_count {n}')
+        lines += [
+            "# HELP sqac_request_latency_ms Request latency in milliseconds.",
+            "# TYPE sqac_request_latency_ms summary",
+        ]
+        if _req_latencies:
+            rl = sorted(_req_latencies)
+            n = len(rl)
+            lines.append(f'sqac_request_latency_ms{{quantile="0.5"}} {rl[n//2]*1000:.2f}')
+            lines.append(f'sqac_request_latency_ms{{quantile="0.95"}} {rl[int(n*0.95)]*1000:.2f}')
+            lines.append(f'sqac_request_latency_ms{{quantile="0.99"}} {rl[int(n*0.99)]*1000:.2f}')
+            lines.append(f'sqac_request_latency_ms_sum {sum(rl)*1000:.2f}')
+            lines.append(f'sqac_request_latency_ms_count {n}')
+        lines += [
+            f"# HELP sqac_teach_total Total teach operations.",
+            f"# TYPE sqac_teach_total counter",
+            f"sqac_teach_total {_teach_count}",
+            f"# HELP sqac_compact_total Total compact operations.",
+            f"# TYPE sqac_compact_total counter",
+            f"sqac_compact_total {_compact_count}",
+        ]
+    _ensure_state()
+    store = _get_store()
+    stats = store.stats()
+    lines += [
+        f"# HELP sqac_entries Current entry count.",
+        f"# TYPE sqac_entries gauge",
+        f'sqac_entries {{cartridge="memory"}} {stats["entries"]}',
+        f"# HELP sqac_dims Vector dimensionality.",
+        f"# TYPE sqac_dims gauge",
+        f'sqac_dims {stats["dims"]}',
+        f"# HELP sqac_simd_enabled Whether Rust SIMD is active.",
+        f"# TYPE sqac_simd_enabled gauge",
+        f'sqac_simd_enabled {1 if _HAS_SIMD else 0}',
+        f"# HELP sqac_lz4_enabled Whether lz4 compression is active.",
+        f"# TYPE sqac_lz4_enabled gauge",
+        f'sqac_lz4_enabled {1 if _HAS_LZ4 else 0}',
+    ]
+    return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4; charset=utf-8")
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard(_=Depends(_verify_key)):
+    """Self-contained HTML dashboard — no external deps."""
+    _ensure_state()
+    store = _get_store()
+    stats = store.stats()
+    uptime = time.time() - _start_time
+    # Get top entries for display
+    hits = store.search("", top_k=20)
+    # If empty query returns nothing, get all entries by searching with a wildcard-ish term
+    if not hits:
+        hits = store.search("the", top_k=20)
+    rack = _state.get("rack")
+    cartridges = rack.names() if rack else sorted(p.stem for p in _state["dir"].glob("*.sqac"))
+    with _metrics_lock:
+        total_requests = sum(_req_counts.values())
+        total_errors = sum(_req_errors.values())
+        search_p50 = (sorted(_search_latencies)[len(_search_latencies)//2] if _search_latencies else 0)
+        search_p99 = (sorted(_search_latencies)[int(len(_search_latencies)*0.99)] if _search_latencies else 0)
+    kinds_html = "".join(f'<span class="badge">{k}: {v}</span>' for k, v in sorted(stats.get("kinds", {}).items()))
+    entries_html = ""
+    for h in hits[:15]:
+        tag = "exact" if h.mode == "exact" else "fuzzy"
+        entries_html += f'<div class="entry"><span class="tag tag-{tag}">{tag}</span> '
+        entries_html += f'<span class="conf">{h.confidence:.3f}</span> '
+        entries_html += f'<span class="content">{h.content[:120]}{'…' if len(h.content) > 120 else ''}</span>'
+        if h.source:
+            entries_html += f' <span class="source">{h.source}</span>'
+        entries_html += '</div>\n'
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SQAC Dashboard</title>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#c9d1d9;padding:24px;max-width:960px;margin:0 auto}}
+h1{{font-size:1.5rem;margin-bottom:4px;color:#58a6ff}}
+.subtitle{{color:#8b949e;font-size:.85rem;margin-bottom:20px}}
+.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px}}
+.card{{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px}}
+.card .label{{font-size:.75rem;color:#8b949e;text-transform:uppercase;letter-spacing:.5px}}
+.card .value{{font-size:1.6rem;font-weight:600;color:#c9d1d9;margin-top:4px}}
+.card .value.green{{color:#3fb950}}
+.card .value.blue{{color:#58a6ff}}
+.badge{{display:inline-block;background:#1f6feb33;color:#58a6ff;border:1px solid #1f6feb;border-radius:12px;padding:2px 10px;font-size:.8rem;margin:2px}}
+h2{{font-size:1.1rem;margin:20px 0 10px;color:#c9d1d9}}
+.entry{{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:.85rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}}
+.entry .content{{flex:1;min-width:200px}}
+.tag{{font-size:.7rem;padding:2px 6px;border-radius:4px;font-weight:600}}
+.tag-exact{{background:#238636;color:#fff}}
+.tag-fuzzy{{background:#1f6feb;color:#fff}}
+.conf{{color:#8b949e;font-family:monospace;font-size:.8rem;min-width:40px}}
+.source{{color:#8b949e;font-size:.75rem}}
+.table{{width:100%;border-collapse:collapse;font-size:.85rem}}
+.table th,.table td{{padding:6px 10px;text-align:left;border-bottom:1px solid #21262d}}
+.table th{{color:#8b949e;font-weight:500}}
+footer{{margin-top:24px;padding-top:12px;border-top:1px solid #21263d;color:#484f58;font-size:.75rem}}
+</style>
+</head>
+<body>
+<h1>⚡ SQAC Dashboard</h1>
+<div class="subtitle">Real-time overview — {time.strftime('%Y-%m-%d %H:%M:%S')}</div>
+
+<div class="grid">
+  <div class="card"><div class="label">Entries</div><div class="value blue">{stats['entries']}</div></div>
+  <div class="card"><div class="label">Dimensions</div><div class="value">{stats['dims']}</div></div>
+  <div class="card"><div class="label">Uptime</div><div class="value green">{uptime/3600:.1f}h</div></div>
+  <div class="card"><div class="label">Requests</div><div class="value">{total_requests}</div></div>
+  <div class="card"><div class="label">Errors</div><div class="value">{total_errors}</div></div>
+  <div class="card"><div class="label">Search p50</div><div class="value green">{search_p50:.1f}ms</div></div>
+  <div class="card"><div class="label">Search p99</div><div class="value">{search_p99:.1f}ms</div></div>
+  <div class="card"><div class="label">Cartridge</div><div class="value">{stats.get('encoder','')}</div></div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="label">Features</div>
+    <div style="margin-top:6px">
+      {'<span class="badge">SIMD</span>' if stats.get('simd') else ''}
+      {'<span class="badge">LZ4</span>' if stats.get('lz4') else ''}
+      {'<span class="badge">Semantic</span>' if stats.get('semantic') else ''}
+    </div>
+  </div>
+  <div class="card">
+    <div class="label">Knowledge Kinds</div>
+    <div style="margin-top:6px">{kinds_html or '<span class="badge">generic</span>'}</div>
+  </div>
+  <div class="card">
+    <div class="label">Cartridges</div>
+    <div style="margin-top:6px">{''.join(f'<span class="badge">{c}</span>' for c in cartridges)}</div>
+  </div>
+</div>
+
+<h2>Entries</h2>
+{entries_html or '<div class="entry"><span class="content">No entries yet — teach something with <code>sqac teach</code></span></div>'}
+
+<h2>Endpoints</h2>
+<table class="table">
+<tr><th>Method</th><th>Path</th><th>Description</th></tr>
+<tr><td>GET</td><td>/health</td><td>Health check (no auth)</td></tr>
+<tr><td>GET</td><td>/stats</td><td>Cartridge statistics</td></tr>
+<tr><td>GET</td><td>/metrics</td><td>Prometheus metrics</td></tr>
+<tr><td>GET</td><td>/dashboard</td><td>This dashboard</td></tr>
+<tr><td>POST</td><td>/search</td><td>Search the memory</td></tr>
+<tr><td>POST</td><td>/teach</td><td>Teach a new fact</td></tr>
+<tr><td>POST</td><td>/compact</td><td>Remove tombstones</td></tr>
+<tr><td>GET</td><td>/cartridges</td><td>List cartridges</td></tr>
+<tr><td>POST</td><td>/rack/search</td><td>Search across rack</td></tr>
+<tr><td>POST</td><td>/rack/write</td><td>Write with routing</td></tr>
+</table>
+
+<footer>SQAC v0.1.0 — VSA memory cartridges for LLMs — <a href="/health" style="color:#58a6ff">Health</a> · <a href="/metrics" style="color:#58a6ff">Metrics</a> · <a href="/docs" style="color:#58a6ff">API Docs</a></footer>
+</body></html>"""
+    return HTMLResponse(html)
+
 
 def main(argv: list[str] | None = None) -> int:
     global _api_key

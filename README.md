@@ -286,6 +286,20 @@ sqac pack rules.txt -o rules.sqac [--kind fact] [--name "my-rules"]
 sqac stats --db memory.sqac
 ```
 
+### `sqac serve` — Start the HTTP API server
+
+```bash
+sqac serve --dir ./memory --port 8420 --api-key sk-secret --rack
+```
+
+### `sqac dashboard` — Open the web dashboard
+
+Starts the server and opens the dashboard in your browser:
+
+```bash
+sqac dashboard --dir ./memory --port 8420 --api-key sk-secret
+```
+
 ---
 
 ## Python API
@@ -704,6 +718,6 @@ SQAC stands on published work. Every link verified; no folklore citations.
 
 ---
 
-**Status:** research-grade, under active development. Core stable and tested (97/97 tests passing).
+**Status:** research-grade, under active development. Core stable and tested (104/104 tests passing).
 
 *Built as an implementation of the SQ thesis — see `docs/THESIS.md` for the full research narrative.*
