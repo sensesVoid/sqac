@@ -25,6 +25,11 @@ Version history:
   v2: auxiliary vectors moved into a per-entry raw binary block (FLAG_BINVEC),
       ~2x smaller than hex. v1 files remain fully readable; v2 files are
       refused by v1 readers via the version check (entry layout changed).
+  v3: knowledge kind added to the entry flags (bits 4-11, 0-255): what sort
+      of knowledge the entry carries (generic/fact/skill/doc/turn). Enables
+      kind-filtered retrieval and kind-aware ranking policy. v2 files read
+      as kind=generic; v3 files are refused by v2 readers via the version
+      check (flag semantics changed).
 """
 
 from __future__ import annotations
@@ -37,11 +42,13 @@ from pathlib import Path
 from typing import Any
 
 MAGIC = b"SQAC"
-VERSION = 2
+VERSION = 3
 
 # Entry flag bits
 FLAG_DELETED = 0x0001  # tombstone: entry ignored by reads
 FLAG_BINVEC = 0x0002   # raw binary vector block present (v2+)
+FLAG_KIND_SHIFT = 4    # bits 4-11: knowledge kind, uint8 (v3+)
+FLAG_KIND_MASK = 0xFF << FLAG_KIND_SHIFT
 
 
 class FormatError(ValueError):
@@ -132,6 +139,7 @@ class Entry:
     payload: dict[str, Any]
     deleted: bool = False
     binvec: bytes = b""
+    kind: int = 0  # knowledge kind (0 = generic; v2 files read as 0)
 
 
 def pack_bits(bits) -> bytearray:
@@ -198,6 +206,7 @@ def write_cartridge(
         flags = FLAG_DELETED if e.deleted else 0
         if e.binvec:
             flags |= FLAG_BINVEC
+        flags |= (e.kind & 0xFF) << FLAG_KIND_SHIFT
         pb = json.dumps(e.payload, ensure_ascii=False).encode("utf-8")
         parts.append(struct.pack("<HI", flags, len(pb)))
         parts.append(bytes(e.key_bits))
@@ -278,6 +287,7 @@ def read_cartridge(path: str | Path) -> Cartridge:
                 payload=payload,
                 deleted=bool(flags & FLAG_DELETED),
                 binvec=binvec,
+                kind=(flags & FLAG_KIND_MASK) >> FLAG_KIND_SHIFT,
             )
         )
 

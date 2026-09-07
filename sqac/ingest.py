@@ -68,7 +68,7 @@ def _looks_like_jsonl(raw: str) -> bool:
     return bool(raw.strip())
 
 
-def dedup_store(store: SqacStore, items: list[dict], threshold: float) -> tuple[int, int]:
+def dedup_store(store: SqacStore, items: list[dict], threshold: float, kind: int | str | None = None) -> tuple[int, int]:
     """Greedy near-dup removal using the store's best available encoder.
 
     Returns (added, skipped). Dedup compares candidate content against
@@ -97,7 +97,7 @@ def dedup_store(store: SqacStore, items: list[dict], threshold: float) -> tuple[
                 skipped += 1
                 continue
             accepted.append(v)
-            store.add(o["_content"], key=o.get("_key"), meta=o["_meta"], source=o["_source"])
+            store.add(o["_content"], key=o.get("_key"), meta=o["_meta"], source=o["_source"], kind=kind)
             added += 1
     return added, skipped
 
@@ -111,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--source-field", default=None, help="JSON field to use as provenance")
     ap.add_argument("--semantic", action="store_true", help="enable MiniLM semantic tier")
     ap.add_argument("--dedup", type=float, default=0.0, help="near-dup similarity threshold (e.g. 0.92); 0 = off")
+    ap.add_argument("--kind", default=None, help="knowledge kind stamp: fact/skill/doc/turn (default: generic)")
     ap.add_argument("--name", default="")
     args = ap.parse_args(argv)
 
@@ -141,10 +142,10 @@ def main(argv: list[str] | None = None) -> int:
 
     store = SqacStore(semantic=args.semantic)
     if args.dedup > 0:
-        added, skipped = dedup_store(store, prepared, args.dedup)
+        added, skipped = dedup_store(store, prepared, args.dedup, kind=args.kind)
     else:
         for o in prepared:
-            store.add(o["_content"], key=o["_key"], meta=o["_meta"], source=o["_source"])
+            store.add(o["_content"], key=o["_key"], meta=o["_meta"], source=o["_source"], kind=args.kind)
         added, skipped = len(prepared), 0
 
     store.save(args.out, name=args.name or path.stem, description=f"ingested from {path}")

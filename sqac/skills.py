@@ -39,7 +39,7 @@ try:
 except ImportError:
     yaml = None  # type: ignore[assignment]
 
-from .store import SqacStore
+from .store import KIND_SKILL, SqacStore
 
 # ── Skill data model ────────────────────────────────────────────────────────
 
@@ -279,10 +279,20 @@ def to_entries(skills: list[Skill]) -> list[dict[str, Any]]:
 
 
 def pack_cartridge(skills: list[Skill], path: str | Path, name: str = "skill-library", semantic: bool = False) -> None:
-    """Pack validated skills into a .sqac cartridge (multi-key routing)."""
+    """Pack validated skills into a .sqac cartridge (multi-key routing).
+
+    Entries are stamped kind=skill (format v3) so kind-filtered retrieval
+    and kind-aware ranking can distinguish them from facts and docs.
+    """
     store = SqacStore(semantic=semantic)
     for entry in to_entries(skills):
-        store.add(entry["content"], key=entry["key"], meta=entry["meta"], source=entry["source"])
+        store.add(
+            entry["content"],
+            key=entry["key"],
+            meta=entry["meta"],
+            source=entry["source"],
+            kind=KIND_SKILL,
+        )
     store.save(path, name=name, description=f"{len(skills)} skills, {len(store)} entries")
     size = Path(path).stat().st_size
     print(f"packed {len(skills)} skills -> {path} ({len(store)} entries, {size / 1024:.1f} KB, semantic={'on' if semantic else 'off'})")

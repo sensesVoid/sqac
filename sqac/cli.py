@@ -33,18 +33,21 @@ def main(argv: list[str] | None = None) -> int:
     p_teach = sub.add_parser("teach", help="teach one fact")
     p_teach.add_argument("content")
     p_teach.add_argument("--key", default=None, help="lookup key (defaults to content)")
+    p_teach.add_argument("--kind", default=None, help="knowledge kind: fact/skill/doc/turn (default: generic)")
     p_teach.add_argument("--source", default="cli")
     add_db(p_teach)
 
     p_search = sub.add_parser("search", help="query the memory")
     p_search.add_argument("query")
     p_search.add_argument("--k", type=int, default=3)
+    p_search.add_argument("--kind", default=None, help="filter by knowledge kind: fact/skill/doc/turn")
     p_search.add_argument("--threshold", type=float, default=None)
     add_db(p_search)
 
     p_pack = sub.add_parser("pack", help="build a cartridge from a text file (one fact per line)")
     p_pack.add_argument("input")
     p_pack.add_argument("-o", "--out", required=True)
+    p_pack.add_argument("--kind", default=None, help="knowledge kind stamp: fact/skill/doc/turn")
     p_pack.add_argument("--name", default="")
     p_pack.add_argument("--source", default="pack")
 
@@ -55,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "teach":
         store = _open(args.db)
-        store.add(args.content, key=args.key, source=args.source)
+        store.add(args.content, key=args.key, source=args.source, kind=args.kind)
         store.save(args.db)
         print(f"taught: {args.content[:70]}{'…' if len(args.content) > 70 else ''}")
         print(f"cartridge: {args.db} ({len(store)} entries)")
@@ -64,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         store = _open(args.db)
         if args.threshold is not None:
             store.fuzzy_threshold = args.threshold
-        hits = store.search(args.query, top_k=args.k)
+        hits = store.search(args.query, top_k=args.k, kind=args.kind)
         if not hits:
             print("no hit (confidence below threshold)")
             return 1
@@ -82,14 +85,20 @@ def main(argv: list[str] | None = None) -> int:
         ]
         store = SqacStore()
         for ln in lines:
-            store.add(ln, source=args.source)
+            store.add(ln, source=args.source, kind=args.kind)
         store.save(args.out, name=args.name, description=f"packed from {args.input}")
         print(f"packed {len(lines)} facts -> {args.out} ({len(store)} entries)")
 
     elif args.cmd == "stats":
         store = _open(args.db)
         for k, v in store.stats().items():
-            print(f"{k}: {v}")
+            if k == "kinds":
+                if v:
+                    print("kinds:")
+                    for kk, vv in sorted(v.items()):
+                        print(f"  {kk}: {vv}")
+            else:
+                print(f"{k}: {v}")
 
     return 0
 

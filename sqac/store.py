@@ -32,6 +32,34 @@ from .format import (
 )
 
 
+# ── knowledge kinds (v3 flag bits, format.py) ─────────────────────────
+# Closed enum: 0 = generic/unknown (absent kind = scan always, back-compat).
+# kind answers "what sort of knowledge is this" — independent of the
+# indexing tiers (exact/lexical/semantic), which answer "how is it indexed".
+KIND_GENERIC = 0
+KIND_FACT = 1
+KIND_SKILL = 2
+KIND_DOC = 3
+KIND_TURN = 4  # conversation-turn offload (context bucket)
+KIND_NAMES = {
+    KIND_GENERIC: "generic",
+    KIND_FACT: "fact",
+    KIND_SKILL: "skill",
+    KIND_DOC: "doc",
+    KIND_TURN: "turn",
+}
+_NAME_TO_KIND = {v: k for k, v in KIND_NAMES.items()}
+
+
+def resolve_kind(kind) -> int:
+    """Accept int or name ("fact"/"skill"/"doc"/"turn"); 0 for unknown names."""
+    if kind is None:
+        return KIND_GENERIC
+    if isinstance(kind, int):
+        return kind
+    return _NAME_TO_KIND.get(str(kind).lower(), KIND_GENERIC)
+
+
 def _make_sem_encoder(model_name: str, dims: int):
     """Build the semantic encoder named in a cartridge header.
 
@@ -137,8 +165,14 @@ class SqacStore:
         key: Optional[str] = None,
         meta: Optional[dict[str, Any]] = None,
         source: str = "user",
+        kind: int | str | None = KIND_GENERIC,
     ) -> int:
-        """Teach the store one fact. O(1) amortized, non-destructive."""
+        """Teach the store one fact. O(1) amortized, non-destructive.
+
+        kind: knowledge kind (KIND_* int or name: "fact"/"skill"/"doc"/
+        "turn"). Kinds enable filtered retrieval and kind-aware ranking;
+        they do not affect which index tiers an entry participates in.
+        """
         content = content.strip()
         if not content:
             raise ValueError("content must be non-empty")
@@ -146,7 +180,13 @@ class SqacStore:
         norm = normalize(key_text)
         idx = len(self._entries)
         self._entries.append(
-            {"content": content, "key_norm": norm, "meta": meta or {}, "source": source}
+            {
+                "content": content,
+                "key_norm": norm,
+                "meta": meta or {},
+                "source": source,
+                "kind": resolve_kind(kind),
+            }
         )
         self._keys.append(self.encoder.encode_bits(key_text))
         self._ckeys.append(self.encoder.encode_bits(content))
@@ -169,14 +209,29 @@ class SqacStore:
 
     # ── read path ────────────────────────────────────────────────────────
 
-    def search(self, query: str, top_k: int = 3) -> list[Hit]:
-        """Exact-first, fuzzy-fallback retrieval with confidence."""
+    def search(self, query: str, top_k: int = 3, kind: int | str | None = None) -> list[Hit]:
+        """Exact-first, fuzzy-fallback retrieval with confidence.
+
+        kind: optional filter (KIND_* int or name). None = all kinds.
+        Kinds filter which entries are eligible; they never change which
+        tiers run — the exact/lexical/semantic merge is unchanged.
+        """
         t0 = time.perf_counter()
         norm = normalize(query)
+        want_kind: Optional[int] = None
+        if kind is not None:
+            want_kind = kind if isinstance(kind, int) else resolve_kind(kind)
+
+        def eligible(i: int) -> bool:
+            if self._entries[i].get("deleted"):
+                return False
+            if want_kind is not None and self._entries[i].get("kind", KIND_GENERIC) != want_kind:
+                return False
+            return True
 
         # 1) Exact hit: O(1), confidence 1.0
         idx = self._exact.get(norm)
-        if idx is not None and not self._entries[idx].get("deleted"):
+        if idx is not None and eligible(idx):
             e = self._entries[idx]
             return [
                 Hit(
@@ -184,7 +239,11 @@ class SqacStore:
                     confidence=1.0,
                     source=e["source"],
                     mode="exact",
-                    meta={**e["meta"], "latency_ms": _ms(time.perf_counter() - t0)},
+                    meta={
+                        **e["meta"],
+                        "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
+                        "latency_ms": _ms(time.perf_counter() - t0),
+                    },
                 )
             ]
 
@@ -195,7 +254,7 @@ class SqacStore:
         #    at this tier — thesis Part VI).
         qbits = self.encoder.encode_bits(query)
         results: list[tuple[float, int, str]] = []
-        live = [i for i in range(len(self._entries)) if not self._entries[i].get("deleted")]
+        live = [i for i in range(len(self._entries)) if eligible(i)]
         if live:
             sims = self._bulk_similarity(qbits, live, tier="lexical")
             for i, sim in zip(live, sims):
@@ -224,7 +283,11 @@ class SqacStore:
                     confidence=sim,
                     source=e["source"],
                     mode=mode,
-                    meta={**e["meta"], "latency_ms": _ms(time.perf_counter() - t0)},
+                    meta={
+                        **e["meta"],
+                        "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
+                        "latency_ms": _ms(time.perf_counter() - t0),
+                    },
                 )
             )
             if len(out) >= top_k:
@@ -238,8 +301,14 @@ class SqacStore:
             return hits[0]
         return None
 
-    def search_grouped(self, query: str, top_k: int = 3, group_key: str = "skill",
-                       recall: int = 40) -> list[Hit]:
+    def search_grouped(
+        self,
+        query: str,
+        top_k: int = 3,
+        group_key: str = "skill",
+        recall: int = 40,
+        kind: int | str | None = None,
+    ) -> list[Hit]:
         """Group-aware ranking for multi-key packs (skills, docs-by-entity).
 
         Multi-key packs store many entries pointing at one logical item
@@ -248,15 +317,20 @@ class SqacStore:
         recall window, keep each group's best hit, return the top_k groups
         ranked by their best member. Measured on the 50-problem skill bench:
         potion flat 45/50 -> grouped 49/50.
+
+        Groups are (kind, meta[group_key]) pairs so same-named items of
+        different kinds don't merge. kind= optionally restricts the whole
+        search to one knowledge kind.
         """
-        hits = self.search(query, top_k=recall)
-        best: dict[str, Hit] = {}
+        hits = self.search(query, top_k=recall, kind=kind)
+        best: dict[tuple[int, str], Hit] = {}
         for h in hits:
             g = h.meta.get(group_key, "")
             if not g:
                 continue
-            if g not in best or h.confidence > best[g].confidence:
-                best[g] = h
+            gk = (resolve_kind(h.meta.get("kind")), str(g))
+            if gk not in best or h.confidence > best[gk].confidence:
+                best[gk] = h
         return sorted(best.values(), key=lambda h: -h.confidence)[:top_k]
 
     # ── persistence ──────────────────────────────────────────────────────
@@ -276,6 +350,7 @@ class SqacStore:
                 "content": e["content"],
                 "key_norm": e["key_norm"],
                 "source": e["source"],
+                "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
                 **({"meta": e["meta"]} if e["meta"] else {}),
             }
             if self.format_version >= 2:
@@ -294,6 +369,7 @@ class SqacStore:
                     payload=payload,
                     deleted=bool(e.get("deleted")),
                     binvec=binvec,
+                    kind=e.get("kind", KIND_GENERIC),
                 )
             )
         enc_name = f"bsc-ngram-v1:{self.encoder.seed}:{self.encoder.ngram}"
@@ -329,6 +405,7 @@ class SqacStore:
             )
         for e in cart.entries:
             norm = e.payload.get("key_norm", "")
+            kind = e.kind if e.kind else resolve_kind(e.payload.get("kind"))
             idx = len(store._entries)
             store._entries.append(
                 {
@@ -336,6 +413,7 @@ class SqacStore:
                     "key_norm": norm,
                     "meta": e.payload.get("meta", {}),
                     "source": e.payload.get("source", "user"),
+                    "kind": kind,
                     **({"deleted": True} if e.deleted else {}),
                 }
             )
@@ -441,6 +519,12 @@ class SqacStore:
     def stats(self) -> dict:
         import os
 
+        kinds: dict[str, int] = {}
+        for e in self._entries:
+            if e.get("deleted"):
+                continue
+            k = KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic")
+            kinds[k] = kinds.get(k, 0) + 1
         return {
             "entries": len(self),
             "dims": self.dims,
@@ -448,6 +532,7 @@ class SqacStore:
             "fuzzy_threshold": self.fuzzy_threshold,
             "semantic": self.semantic,
             "semantic_threshold": getattr(self, "semantic_threshold", None),
+            "kinds": kinds,
         }
 
 
