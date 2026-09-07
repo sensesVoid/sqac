@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SQAC Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#c9d1d9;padding:24px;max-width:1100px;margin:0 auto}
+h1{font-size:1.6rem;margin-bottom:4px;color:#58a6ff}
+.subtitle{color:#8b949e;font-size:.85rem;margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px}
+.card .label{font-size:.72rem;color:#8b949e;text-transform:uppercase;letter-spacing:.5px}
+.card .value{font-size:1.5rem;font-weight:600;color:#c9d1d9;margin-top:4px}
+.card .value.green{color:#3fb950}
+.card .value.blue{color:#58a6ff}
+.card .value.orange{color:#f0883e}
+.badge{display:inline-block;background:#1f6feb33;color:#58a6ff;border:1px solid #1f6feb;border-radius:12px;padding:2px 10px;font-size:.78rem;margin:2px}
+.badge.fact{background:#58a6ff22;color:#58a6ff;border-color:#58a6ff44}
+.badge.skill{background:#f0883e22;color:#f0883e;border-color:#f0883e44}
+.badge.doc{background:#3fb95022;color:#3fb950;border-color:#3fb95044}
+h2{font-size:1.1rem;margin:24px 0 12px;color:#c9d1d9;border-bottom:1px solid #21262d;padding-bottom:6px}
+.entry{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:10px 14px;margin-bottom:6px;font-size:.85rem;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;transition:border-color .2s}
+.entry:hover{border-color:#30363d}
+.entry .content{flex:1;min-width:200px;line-height:1.4}
+.tag{font-size:.68rem;padding:2px 6px;border-radius:4px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.tag-fact{background:#58a6ff;color:#fff}
+.tag-skill{background:#f0883e;color:#fff}
+.tag-doc{background:#3fb950;color:#fff}
+.source{color:#8b949e;font-size:.72rem;margin-top:2px}
+.table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:8px}
+.table th,.table td{padding:8px 12px;text-align:left;border-bottom:1px solid #21262d}
+.table th{color:#8b949e;font-weight:500;font-size:.78rem;text-transform:uppercase;letter-spacing:.3px}
+.table tr:hover{background:#161b2288}
+.graph-link{display:inline-block;background:#1f6feb;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-size:.9rem;font-weight:500;margin:16px 0;transition:background .2s}
+.graph-link:hover{background:#388bfd}
+.section-row{display:flex;gap:16px;flex-wrap:wrap}
+.section-row .card{flex:1;min-width:280px}
+footer{margin-top:32px;padding-top:12px;border-top:1px solid #21262d;color:#484f58;font-size:.75rem}
+</style>
+</head>
+<body>
+<h1>⚡ SQAC Dashboard</h1>
+<div class="subtitle">Standalone view — 31 entries from demo cartridge · 2026-09-07</div>
+
+<a class="graph-link" href="standalone_graph.html">🔗 Open 3D Hyperdimensional Graph</a>
+
+<div class="grid">
+  <div class="card"><div class="label">Total Entries</div><div class="value blue">31</div></div>
+  <div class="card"><div class="label">Facts</div><div class="value">18</div></div>
+  <div class="card"><div class="label">Skills</div><div class="value orange">5</div></div>
+  <div class="card"><div class="label">Docs</div><div class="value green">8</div></div>
+  <div class="card"><div class="label">Dimensions</div><div class="value">1024</div></div>
+  <div class="card"><div class="label">Encoder</div><div class="value" style="font-size:1rem">sqac-v1:ngram=3</div></div>
+  <div class="card"><div class="label">Fuzzy Threshold</div><div class="value">0.60</div></div>
+  <div class="card"><div class="label">Graph Edges</div><div class="value">300</div></div>
+</div>
+
+<div class="section-row">
+  <div class="card">
+    <div class="label">Features</div>
+    <div style="margin-top:8px">
+      <span class="badge">Rust SIMD ✓</span>
+      <span class="badge">lz4 Compression ✓</span>
+      <span class="badge">File Locking ✓</span>
+      <span class="badge">Query Cache ✓</span>
+      <span class="badge">Input Sanitization ✓</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="label">Knowledge Kinds</div>
+    <div style="margin-top:8px">
+      <span class="badge fact">fact × 18</span>
+      <span class="badge skill">skill × 5</span>
+      <span class="badge doc">doc × 8</span>
+    </div>
+  </div>
+</div>
+
+<h2>Entries</h2>
+
+<h3 style="color:#58a6ff;font-size:.9rem;margin:16px 0 8px">📋 Facts (18)</h3>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Our deploys are ARM64 only — AMD64 images are not supported</div><div class="source">deployment-target · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Error budget is 0.1% — any breach triggers an incident review</div><div class="source">error-budget · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Payment processor is Stripe — no other payment providers allowed</div><div class="source">payment-provider · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">On-call rotates weekly, Team Alpha goes first</div><div class="source">oncall-rotation · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Database backups run every 6 hours to S3 with 30-day retention</div><div class="source">backup-policy · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">All PRs require two approvals before merging</div><div class="source">pr-policy · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Staging environment mirrors production exactly</div><div class="source">staging-policy · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Secrets are stored in Vault — never in env files or code</div><div class="source">secrets-policy · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Rate limit is 1000 requests per minute per API key</div><div class="source">rate-limit · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">WebSocket connections timeout after 30 seconds of inactivity</div><div class="source">ws-timeout · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Kubernetes cluster runs on EKS with 3 node groups: general, compute, and memory</div><div class="source">k8s-infra · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Prometheus scrapes metrics every 15 seconds — Grafana dashboards are in the observability namespace</div><div class="source">monitoring · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">CI pipeline runs on GitHub Actions — build, test, lint, deploy in sequence</div><div class="source">ci-pipeline · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Docker images are built with multi-stage builds — final image is alpine-based</div><div class="source">docker-policy · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Nginx handles TLS termination and load balancing across 4 backend pods</div><div class="source">nginx-config · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Redis cluster has 3 masters and 3 replicas for high availability</div><div class="source">redis-config · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">PostgreSQL uses read replicas for analytics queries — writes go to primary only</div><div class="source">postgres-config · user</div></div></div>
+<div class="entry"><span class="tag tag-fact">fact</span><div><div class="content">Celery workers run on 2 dedicated nodes with 8GB memory limit each</div><div class="source">celery-config · user</div></div></div>
+
+<h3 style="color:#f0883e;font-size:.9rem;margin:16px 0 8px">🧠 Skills (5)</h3>
+<div class="entry"><span class="tag tag-skill">skill</span><div><div class="content">SKILL weighted-index: label items 1..N. Take i coins from item i. The total excess weight tells you which item has the defect.</div><div class="source">skill-weighing · user</div></div></div>
+<div class="entry"><span class="tag tag-skill">skill</span><div><div class="content">SKILL process-of-elimination: list all candidates. For each test, cross off those that fail. The last one standing is the answer.</div><div class="source">skill-elimination · user</div></div></div>
+<div class="entry"><span class="tag tag-skill">skill</span><div><div class="content">SKILL bayesian-update: start with prior probabilities. Multiply each by the likelihood given evidence. Normalize to get posterior.</div><div class="source">skill-bayesian · user</div></div></div>
+<div class="entry"><span class="tag tag-skill">skill</span><div><div class="content">SKILL critical-path: map all tasks with dependencies. Find the longest chain — that is the critical path and minimum project duration.</div><div class="source">skill-critical-path · user</div></div></div>
+<div class="entry"><span class="tag tag-skill">skill</span><div><div class="content">SKILL binary-search-debug: bisect the failing range. Run the midpoint. If it fails, search left half; if it passes, search right. Repeat until the culprit commit is found.</div><div class="source">skill-binary-debug · user</div></div></div>
+
+<h3 style="color:#3fb950;font-size:.9rem;margin:16px 0 8px">📖 Docs (8)</h3>
+<div class="entry"><span class="tag tag-doc">doc</span><div><div class="content">The API accepts JSON payloads with Content-Type application/json. Maximum body size is 1MB.</div><div class="source">api-contract · user</div></div></div>
+<div class="entry"><span class="tag tag-doc">doc</span><div><div class="content">Authentication uses JWT tokens with 24-hour expiry. Refresh tokens last 30 days.</div><div class="source">auth-doc · user</div></div></div>
+<div class="entry"><span class="tag tag-doc">doc</span><div><div class="content">The /health endpoint returns 200 OK with uptime, version, and dependency status.</div><div class="source">health-doc · user</div></div></div>
+<div class="entry"><span class="tag tag-doc">doc</span><div><div class="content">Rate limiting returns 429 Too Many Requests with Retry-After header.</div><div class="source">rate-limit-doc · user</div></div></div>
+<div class="entry"><span class="tag tag-doc">doc</span><div><div class="content">WebSocket protocol supports JSON messages only. Binary frames are rejected.</div><div class="source">ws-doc · user</div></div></div>
+<div class="entry"><span class="tag tag-doc">doc</span><div><div class="content">GraphQL endpoint is at /graphql — supports queries, mutations, and subscriptions.</div><div class="source">graphql-doc · user</div></div></div>
+<div class="entry"><span class="tag tag-doc">doc</span><div><div class="content">The webhook endpoint accepts POST requests with HMAC-SHA256 signature verification.</div><div class="source">webhook-doc · user</div></div></div>
+<div class="entry"><span class="tag tag-doc">doc</span><div><div class="content">Caching layer uses Redis with 5-minute TTL for read-heavy endpoints.</div><div class="source">cache-doc · user</div></div></div>
+
+<h2>Top Similarity Connections</h2>
+<table class="table">
+<tr><th>From</th><th>To</th><th>Similarity</th></tr>
+<tr><td>rate-limit</td><td>rate-limit-doc</td><td style="color:#3fb950">0.970</td></tr>
+<tr><td>auth-doc</td><td>health-doc</td><td style="color:#3fb950">0.963</td></tr>
+<tr><td>pr-policy</td><td>docker-policy</td><td style="color:#3fb950">0.962</td></tr>
+<tr><td>redis-config</td><td>cache-doc</td><td style="color:#58a6ff">0.958</td></tr>
+<tr><td>ws-timeout</td><td>ws-doc</td><td style="color:#58a6ff">0.955</td></tr>
+<tr><td>api-contract</td><td>graphql-doc</td><td style="color:#58a6ff">0.952</td></tr>
+<tr><td>backup-policy</td><td>postgres-config</td><td style="color:#58a6ff">0.949</td></tr>
+<tr><td>skill-weighing</td><td>skill-elimination</td><td style="color:#f0883e">0.945</td></tr>
+</table>
+
+<h2>API Endpoints</h2>
+<table class="table">
+<tr><th>Method</th><th>Path</th><th>Description</th></tr>
+<tr><td><span class="badge">GET</span></td><td>/health</td><td>Health check (no auth) — SIMD, LZ4, uptime</td></tr>
+<tr><td><span class="badge">GET</span></td><td>/stats</td><td>Cartridge statistics</td></tr>
+<tr><td><span class="badge">GET</span></td><td>/metrics</td><td>Prometheus-compatible metrics</td></tr>
+<tr><td><span class="badge">GET</span></td><td>/dashboard</td><td>Web dashboard (this page)</td></tr>
+<tr><td><span class="badge">GET</span></td><td>/graph</td><td>3D hyperdimensional graph</td></tr>
+<tr><td><span class="badge">POST</span></td><td>/search</td><td>Search the memory</td></tr>
+<tr><td><span class="badge">POST</span></td><td>/teach</td><td>Teach a new fact</td></tr>
+<tr><td><span class="badge">POST</span></td><td>/compact</td><td>Remove tombstones</td></tr>
+<tr><td><span class="badge">POST</span></td><td>/graph</td><td>Graph data (JSON) — nodes + VSA similarity edges</td></tr>
+<tr><td><span class="badge">POST</span></td><td>/rack/search</td><td>Search across all rack cartridges</td></tr>
+<tr><td><span class="badge">POST</span></td><td>/rack/write</td><td>Write with automatic kind routing</td></tr>
+</table>
+
+<footer>
+  SQAC v0.1.0 — VSA memory cartridges for LLMs<br>
+  110/110 tests passing · Rust SIMD · lz4 compression · HTTP API server<br>
+  <a href="standalone_graph.html" style="color:#58a6ff">Open 3D Graph</a> ·
+  <a href="https://github.com/sensesVoid/sqac" style="color:#58a6ff">GitHub</a>
+</footer>
+</body>
+</html>
