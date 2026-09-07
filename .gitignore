@@ -18,3 +18,7 @@ venv/
 
 # Hugging Face cache
 .cache/
+
+# benchmark scratch
+.bench_ckpt.jsonl
+.bench_llm.log
