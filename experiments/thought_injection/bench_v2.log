@@ -1,0 +1,71 @@
+cartridges: verbose=34|concise=34 all 4 skills
+[1/40] length-conversion    x=144.46  A✓ B✗ C✗ D✗ (route length-convers fuzzy/0.72)
+[2/40] length-conversion    x=1068.37 A✓ B✓ C✗ D✓ (route length-convers fuzzy/0.70)
+[3/40] length-conversion    x=661.01  A✓ B✗ C✗ D✓ (route length-convers fuzzy/0.79)
+[4/40] length-conversion    x=294.77  A✗ B✓ C✗ D✓ (route length-convers fuzzy/0.75)
+[5/40] length-conversion    x=732.09  A✓ B✓ C✗ D✗ (route length-convers fuzzy/0.78)
+[6/40] length-conversion    x=11.95   A✗ B✗ C✗ D✓ (route length-convers fuzzy/0.79)
+[7/40] length-conversion    x=686.94  A✓ B✗ C✗ D✓ (route length-convers fuzzy/0.61)
+[8/40] length-conversion    x=28.47   A✓ B✗ C✓ D✗ (route length-convers fuzzy/0.63)
+[9/40] length-conversion    x=98.52   A✓ B✗ C✗ D✓ (route length-convers fuzzy/0.75)
+[10/40] length-conversion    x=158.34  A✓ B✓ C✗ D✓ (route length-convers fuzzy/0.79)
+[11/40] mass-conversion      x=114.50  A✓ B✗ C✗ D✗ (route mass-conversio fuzzy/0.76)
+[12/40] mass-conversion      x=10747.59 A✗ B✗ C✗ D✗ (route mass-conversio fuzzy/0.71)
+[13/40] mass-conversion      x=6645.70 A✓ B✗ C✓ D✗ (route mass-conversio fuzzy/0.72)
+[14/40] mass-conversion      x=177.13  A✓ B✗ C✗ D✗ (route mass-conversio fuzzy/0.74)
+[15/40] mass-conversion      x=101.10  A✓ B✗ C✓ D✓ (route mass-conversio fuzzy/0.76)
+[16/40] mass-conversion      x=52.71   A✓ B✗ C✓ D✗ (route mass-conversio fuzzy/0.81)
+[17/40] mass-conversion      x=98.20   A✓ B✗ C✗ D✗ (route mass-conversio fuzzy/0.80)
+[18/40] mass-conversion      x=3507.97 A✓ B✓ C✗ D✗ (route mass-conversio fuzzy/0.71)
+[19/40] mass-conversion      x=2061.01 A✓ B✓ C✓ D✓ (route mass-conversio fuzzy/0.75)
+[20/40] mass-conversion      x=6483.54 A✗ B✓ C✓ D✓ (route mass-conversio fuzzy/0.73)
+[21/40] temperature-conversion x=-11.90  A✗ B✗ C✓ D✗ (route temperature-co fuzzy/0.81)
+[22/40] temperature-conversion x=10.20   A✓ B✗ C✗ D✗ (route temperature-co fuzzy/0.73)
+[23/40] temperature-conversion x=4.10    A✗ B✗ C✗ D✗ (route temperature-co fuzzy/0.73)
+[24/40] temperature-conversion x=29.10   A✗ B✗ C✗ D✗ (route temperature-co fuzzy/0.71)
+[25/40] temperature-conversion x=226.00  A✗ B✓ C✓ D✗ (route temperature-co fuzzy/0.83)
+[26/40] temperature-conversion x=31.50   A✓ B✗ C✗ D✗ (route temperature-co fuzzy/0.79)
+[27/40] temperature-conversion x=184.60  A✗ B✗ C✗ D✗ (route temperature-co fuzzy/0.82)
+[28/40] temperature-conversion x=46.40   A✗ B✓ C✗ D✗ (route temperature-co fuzzy/0.83)
+[29/40] temperature-conversion x=59.00   A✓ B✓ C✓ D✓ (route temperature-co fuzzy/0.83)
+[30/40] temperature-conversion x=135.30  A✓ B✗ C✗ D✗ (route temperature-co fuzzy/0.81)
+[31/40] rate-times-time      x=101.76  A✓ B✗ C✓ D✓ (route rate-times-tim fuzzy/0.77)
+[32/40] rate-times-time      x=102.08  A✗ B✗ C✓ D✓ (route rate-times-tim fuzzy/0.76)
+[33/40] rate-times-time      x=448.91  A✓ B✗ C✓ D✓ (route rate-times-tim fuzzy/0.84)
+[34/40] rate-times-time      x=121.80  A✓ B✗ C✓ D✗ (route rate-times-tim fuzzy/0.69)
+[35/40] rate-times-time      x=524.16  A✓ B✓ C✓ D✓ (route rate-times-tim fuzzy/0.82)
+[36/40] rate-times-time      x=332.20  A✗ B✗ C✓ D✓ (route rate-times-tim fuzzy/0.77)
+[37/40] rate-times-time      x=235.60  A✓ B✗ C✓ D✓ (route rate-times-tim fuzzy/0.83)
+[38/40] rate-times-time      x=95.94   A✗ B✗ C✓ D✗ (route rate-times-tim fuzzy/0.75)
+[39/40] rate-times-time      x=63.00   A✗ B✗ C✓ D✗ (route rate-times-tim fuzzy/0.70)
+[40/40] rate-times-time      x=78.96   A✓ B✓ C✓ D✗ (route rate-times-tim fuzzy/0.81)
+
+== RESULTS (Groq / allam-2-7b) ==
+retrieval (verbose): 40/40 (100%)
+retrieval (concise): 40/40 (100%)
+arm  acc     prompt   out tok   total   
+A    65%     37       20        56      
+B    30%     39       156       195     
+C    48%     212      185       397     
+D    42%     140      17        157     
+C vs B: acc +18%, out tok +28.3, total tok +202.0
+D vs B: acc +12%, out tok -139.8, total tok -38.0
+D vs C: acc -5%, out tok -168.1, total tok -240.1
+
+per-family accuracy:
+  length        A=80%  B=40%  C=10%  D=70%
+  mass          A=80%  B=30%  C=50%  D=30%
+  rate          A=60%  B=20%  C=100%  D=60%
+  temperature   A=40%  B=30%  C=30%  D=10%
+
+D-arm output samples:
+  How many meters are in 473.96 feet?
+    -> ANSWER = 473.96 * 0.3048
+  Convert 325.64 meters to feet.
+    -> ANSWER = 1068.34
+  How many kilometers are in 410.73 miles?
+    -> ANSWER = 661.10 km
+  Change 183.16 miles into kilometers.
+    -> ANSWER = 295.00 kilometers
+
+saved -> results_allam_v2.json

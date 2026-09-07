@@ -1,0 +1,109 @@
+# Thought-Injection Skills — curated reasoning procedures for unit/temperature
+# conversion word problems. content = the "thought process" we want the small
+# instruct model to follow. keys = concrete situation triggers for routing.
+# Fitted the same rules as coding_skills.yaml: pure procedure, zero answers.
+
+# ── LENGTH CONVERSION ────────────────────────────────────────────────────────
+
+- name: length-conversion
+  domain: math
+  difficulty: medium
+  pattern: unit-conversion
+  content: |
+    SKILL length-conversion: Convert lengths by following these steps exactly.
+    Step 1 - Find the source unit and the target unit in the question.
+    Step 2 - Use only these factors: 1 mile = 1.609344 km; 1 km = 0.621371
+    miles; 1 foot = 0.3048 m; 1 meter = 3.28084 ft; 1 inch = 2.54 cm.
+    Step 3 - If the target unit is the smaller one, multiply the given number
+    by the factor; if the target unit is the larger one, divide by the factor.
+    Step 4 - Round to two decimal places.
+    Step 5 - End your answer with ANSWER = followed by the single number.
+  keys:
+    - convert miles to kilometers
+    - how many kilometers are in 25 miles
+    - miles to kilometers conversion
+    - how many miles are in 100 kilometers
+    - convert 50 feet to meters
+    - how many meters is 30 feet
+    - how many feet is 50 meters
+    - convert 8 inches to centimeters
+    - how many centimeters is 12 inches
+    - change 40 kilometers into miles
+    - 25 miles in kilometers please
+    - how far is 60 miles in kilometers
+
+# ── MASS / WEIGHT CONVERSION ────────────────────────────────────────────────
+
+- name: mass-conversion
+  domain: math
+  difficulty: medium
+  pattern: unit-conversion
+  content: |
+    SKILL mass-conversion: Convert weights by following these steps exactly.
+    Step 1 - Find the source unit and the target unit in the question.
+    Step 2 - Use only these factors: 1 lb = 0.45359237 kg; 1 kg = 2.2046226
+    lb; 1 oz = 28.349523 g.
+    Step 3 - If the target unit is the smaller one, multiply the given number
+    by the factor; if the target unit is the larger one, divide by the factor.
+    Step 4 - Round to two decimal places.
+    Step 5 - End your answer with ANSWER = followed by the single number.
+  keys:
+    - convert pounds to kilograms
+    - how many kilograms is 150 pounds
+    - how many pounds is 20 kilograms
+    - convert 10 kilograms to pounds
+    - how many pounds in 8 kilograms
+    - convert 32 ounces to grams
+    - how many grams is 5 ounces
+    - pounds to kg
+
+# ── TEMPERATURE CONVERSION ──────────────────────────────────────────────────
+
+- name: temperature-conversion
+  domain: math
+  difficulty: medium
+  pattern: formula
+  content: |
+    SKILL temperature-conversion: Convert temperatures by following these
+    steps exactly.
+    Step 1 - Decide the direction: Celsius to Fahrenheit, or Fahrenheit to
+    Celsius.
+    Step 2 - Celsius to Fahrenheit: multiply the Celsius value by 9, divide
+    by 5, then add 32.
+    Step 3 - Fahrenheit to Celsius: subtract 32 first, then multiply by 5
+    and divide by 9.
+    Step 4 - Round to one decimal place.
+    Step 5 - End your answer with ANSWER = followed by the single number.
+  keys:
+    - convert 100 degrees Celsius to Fahrenheit
+    - convert 212 degrees Fahrenheit to Celsius
+    - what is 25 degrees C in Fahrenheit
+    - what is 98.6 degrees Fahrenheit in Celsius
+    - celsius to fahrenheit conversion
+    - fahrenheit to celsius
+    - how hot is 40 celsius in fahrenheit
+    - temperature conversion help
+
+# ── RATE × TIME (DISTANCE) ──────────────────────────────────────────────────
+
+- name: rate-times-time
+  domain: math
+  difficulty: easy
+  pattern: formula
+  content: |
+    SKILL rate-times-time: Solve distance problems by following these steps
+    exactly.
+    Step 1 - Identify the speed and the time from the question.
+    Step 2 - Check the units: if speed is miles per hour and time is in
+    hours, multiply speed by time to get miles.
+    Step 3 - If the question asks about a different unit, convert first using
+    the length factors, then multiply.
+    Step 4 - Round to two decimal places.
+    Step 5 - End your answer with ANSWER = followed by the single number.
+  keys:
+    - how far do you travel at 60 miles per hour for 3 hours
+    - distance equals speed times time
+    - miles per hour times hours
+    - traveling at 45 mph for 2 hours
+    - how many miles traveled at 50 miles per hour for 4 hours
+    - a car drives at 65 miles per hour for 5 hours

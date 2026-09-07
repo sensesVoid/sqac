@@ -1,0 +1,1646 @@
+{
+  "model": "allam-2-7b",
+  "retrieval_ok": 40,
+  "records": [
+    {
+      "family": "length",
+      "skill": "length-conversion",
+      "question": "Convert 473.96 feet to meters.",
+      "truth": 144.46,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.758,
+        "routed_skill": "length-conversion"
+      },
+      "A": {
+        "output": "144.45",
+        "reasoning": "",
+        "pred": 144.45,
+        "correct": true,
+        "prompt_tokens": 33,
+        "output_tokens": 9,
+        "reasoning_tokens": 0,
+        "latency_s": 0.35
+      },
+      "B": {
+        "output": "We know that 1 foot is approximately equal to 0.3048 meters. So, to convert feet to meters, we need to multiply the number of feet by 0.3048.\n\nIn this case, we have 473.96 feet. So, we calculate the conversion as follows:\n\n473.96 feet * 0.3048 meters/foot = 145.9928 meters\n\nTherefore, 473.96 feet is equivalent to approximately 145.99 meters.",
+        "reasoning": "",
+        "pred": 145.99,
+        "correct": true,
+        "prompt_tokens": 35,
+        "output_tokens": 130,
+        "reasoning_tokens": 0,
+        "latency_s": 0.39
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. In this case, we have feet as the source unit and meters as the target unit.\n\nStep 2: Recall the conversion factors. 1 mile = 1.609344 km, 1 km = 0.621371 miles, 1 foot = 0.3048 m, 1 meter = 3.28084 ft, and 1 inch = 2.54 cm.\n\nStep 3: Convert feet to meters. Since meters is the smaller unit, we divide by the conversion factor.\n473.96 feet \u00f7 0.3048 m/foot = 1550 meters\n\nStep 4: Round the result to two decimal places.\n1550 meters \u2248 1550.00 meters\n\nStep 5: Display the answer with ANSWER =.\nANSWER = 1550.00",
+        "reasoning": "",
+        "pred": 1550.0,
+        "correct": false,
+        "prompt_tokens": 236,
+        "output_tokens": 228,
+        "reasoning_tokens": 0,
+        "latency_s": 0.52
+      }
+    },
+    {
+      "family": "length",
+      "skill": "length-conversion",
+      "question": "Convert 325.64 meters to feet.",
+      "truth": 1068.37,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.704,
+        "routed_skill": "length-conversion"
+      },
+      "A": {
+        "output": "1068.31 feet",
+        "reasoning": "",
+        "pred": 1068.31,
+        "correct": true,
+        "prompt_tokens": 33,
+        "output_tokens": 11,
+        "reasoning_tokens": 0,
+        "latency_s": 0.3
+      },
+      "B": {
+        "output": "We know that 1 meter is approximately equal to 3.28 feet. So, to convert meters to feet, we can multiply the number of meters by 3.28.\n\nHere's the calculation for 325.64 meters:\n\n325.64 meters * 3.28 feet/meter = 1069.9976 feet\n\nSo, 325.64 meters is approximately 1069.9976 feet.",
+        "reasoning": "",
+        "pred": 1069.9976,
+        "correct": true,
+        "prompt_tokens": 35,
+        "output_tokens": 115,
+        "reasoning_tokens": 0,
+        "latency_s": 0.43
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, we have meters (source) and feet (target).\nStep 2: Find the conversion factors.\nStep 3: Apply the conversion factors. To convert meters to feet, we divide by the conversion factor for meters (1 m / 3.28084 ft).\nStep 4: Round the result to two decimal places.\nStep 5: End the answer with ANSWER = followed by the rounded number.\n\n325.64 meters \u00f7 (1 m / 3.28084 ft) \u2248 99.99 feet (rounded to two decimal places)\n\nANSWER: 99.99",
+        "reasoning": "",
+        "pred": 99.99,
+        "correct": false,
+        "prompt_tokens": 236,
+        "output_tokens": 167,
+        "reasoning_tokens": 0,
+        "latency_s": 0.47
+      }
+    },
+    {
+      "family": "length",
+      "skill": "length-conversion",
+      "question": "How many kilometers are in 410.73 miles?",
+      "truth": 661.01,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.788,
+        "routed_skill": "length-conversion"
+      },
+      "A": {
+        "output": "660.00",
+        "reasoning": "",
+        "pred": 660.0,
+        "correct": true,
+        "prompt_tokens": 35,
+        "output_tokens": 9,
+        "reasoning_tokens": 0,
+        "latency_s": 0.35
+      },
+      "B": {
+        "output": "We have 410.73 miles, and we need to convert them into kilometers. The conversion factor between miles and kilometers is that 1 mile is approximately equal to 1.60934 kilometers.\n\nSo, to find out how many kilometers are in 410.73 miles, we'll multiply the number of miles by this conversion factor:\n\n410.73 miles * 1.60934 kilometers/mile = 660.00 kilometers approximately\n\nSo, there are 660.00 kilometers in 410.73 miles.",
+        "reasoning": "",
+        "pred": 410.73,
+        "correct": false,
+        "prompt_tokens": 37,
+        "output_tokens": 138,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, we have 410.73 miles as the source unit and kilometers as the target unit.\n\nStep 2: Find the conversion factors between the units.\n- 1 mile = 1.609344 km\n- 1 km = 0.621371 miles\n- 1 foot = 0.3048 m\n- 1 meter = 3.28084 ft\n- 1 inch = 2.54 cm\n\nStep 3: Apply the conversion factors based on the target unit (kilometers). Since kilometers are larger than miles, we divide by the conversion factor.\n\n410.73 miles \u00f7 1.609344 km/mile = 256.000000 km\n\nStep 4: Round the result to two decimal places.\n\n256.00\n\nStep 5: End the answer with ANSWER = followed by the rounded number.\n\nANSWER = 256.00",
+        "reasoning": "",
+        "pred": 256.0,
+        "correct": false,
+        "prompt_tokens": 238,
+        "output_tokens": 253,
+        "reasoning_tokens": 0,
+        "latency_s": 0.49
+      }
+    },
+    {
+      "family": "length",
+      "skill": "length-conversion",
+      "question": "Express 183.16 miles as kilometers.",
+      "truth": 294.77,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.626,
+        "routed_skill": "length-conversion"
+      },
+      "A": {
+        "output": "183.16",
+        "reasoning": "",
+        "pred": 183.16,
+        "correct": false,
+        "prompt_tokens": 33,
+        "output_tokens": 9,
+        "reasoning_tokens": 0,
+        "latency_s": 0.3
+      },
+      "B": {
+        "output": "We know that 1 mile is approximately equal to 1.60934 kilometers. So, to convert miles into kilometers, we multiply the number of miles by this conversion factor.\n\nIn this case, we want to convert 183.16 miles into kilometers. So we multiply:\n\n183.16 miles * 1.60934 kilometers/mile \u2248 295.96 kilometers\n\nSo, 183.16 miles is approximately 295.96 kilometers.",
+        "reasoning": "",
+        "pred": 295.96,
+        "correct": true,
+        "prompt_tokens": 35,
+        "output_tokens": 124,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit (miles) and the target unit (kilometers).\nStep 2: Determine the conversion factors.\nStep 3: Apply the conversion factors. To convert miles to kilometers, multiply by the factor 1.609344.\nStep 4: Calculate the result. 183.16 * 1.609344 = 300.00\nStep 5: Round the result to two decimal places. 300.00\n\nThe final answer is ANSWER = 300.00 kilometers.",
+        "reasoning": "",
+        "pred": 300.0,
+        "correct": true,
+        "prompt_tokens": 236,
+        "output_tokens": 140,
+        "reasoning_tokens": 0,
+        "latency_s": 0.4
+      }
+    },
+    {
+      "family": "length",
+      "skill": "length-conversion",
+      "question": "Express 454.9 miles as kilometers.",
+      "truth": 732.09,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.64,
+        "routed_skill": "length-conversion"
+      },
+      "A": {
+        "output": "454.9 miles is approximately 731.9 kilometers. \n\n\u0625\u0630\u0627\u064b \u0627\u0644\u0625\u062c\u0627\u0628\u0629 \u0647\u064a 731.9 \u0643\u064a\u0644\u0648\u0645\u062a\u0631. \n\n\u064a\u0631\u062c\u0649 \u0645\u0631\u0627\u0639\u0627\u0629 \u0623\u0646 \u0627\u0644\u0645\u064a\u0644 \u0647\u0648 \u0648\u062d\u062f\u0629 \u0642\u064a\u0627\u0633 \u0623\u0645\u0631\u064a\u0643\u064a\u0629 \u0648\u064a\u0639\u0627\u062f\u0644 \u062a\u0642\u0631\u064a\u0628\u0627\u064b 1.609 \u0643\u064a\u0644\u0648\u0645\u062a\u0631. \u0644\u062a\u062d\u0648\u064a\u0644 \u0627\u0644\u0623\u0645\u064a\u0627\u0644 \u0625\u0644\u0649 \u0643\u064a\u0644\u0648\u0645\u062a\u0631\u0627\u062a\u060c \u0646\u0642\u0648\u0645 \u0628\u0636\u0631\u0628 \u0627\u0644\u0642\u064a\u0645\u0629 \u0628\u0627\u0644\u0645\u064a\u0644 \u0641\u064a 1.609. \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u062d\u0627\u0644\u0629\u060c 454.9 \u0645\u064a\u0644 \u0645\u0636\u0631\u0648\u0628 \u0641\u064a 1.609 \u064a\u0639\u0637\u064a \u0627\u0644\u0646\u062a\u064a\u062c\u0629 731.9 \u0643\u064a\u0644\u0648\u0645\u062a\u0631.",
+        "reasoning": "",
+        "pred": 731.9,
+        "correct": true,
+        "prompt_tokens": 32,
+        "output_tokens": 106,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      },
+      "B": {
+        "output": "We know that 1 mile is approximately equal to 1.60934 kilometers. So, to convert miles into kilometers, we multiply the number of miles by this conversion factor.\n\nIn this case, we have:\n\n454.9 miles * 1.60934 kilometers/mile \u2248 731.98 kilometers\n\nSo, 454.9 miles is approximately 731.98 kilometers.",
+        "reasoning": "",
+        "pred": 731.98,
+        "correct": true,
+        "prompt_tokens": 34,
+        "output_tokens": 105,
+        "reasoning_tokens": 0,
+        "latency_s": 0.43
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit (miles) and the target unit (kilometers).\nStep 2: Determine the conversion factors.\nStep 3: Apply the conversion factors. To convert miles to kilometers, multiply by the factor 1.609344.\nStep 4: Calculate the result. 454.9 miles * 1.609344 = 731.92928\nStep 5: Round the result to two decimal places. 731.93\nANSWER = 731.93",
+        "reasoning": "",
+        "pred": 731.93,
+        "correct": true,
+        "prompt_tokens": 235,
+        "output_tokens": 135,
+        "reasoning_tokens": 0,
+        "latency_s": 0.46
+      }
+    },
+    {
+      "family": "length",
+      "skill": "length-conversion",
+      "question": "Change 19.23 kilometers into miles.",
+      "truth": 11.95,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.786,
+        "routed_skill": "length-conversion"
+      },
+      "A": {
+        "output": "11.94 miles",
+        "reasoning": "",
+        "pred": 11.94,
+        "correct": true,
+        "prompt_tokens": 32,
+        "output_tokens": 9,
+        "reasoning_tokens": 0,
+        "latency_s": 0.29
+      },
+      "B": {
+        "output": "We know that 1 kilometer (km) is equal to 0.621371 miles (mi). To convert kilometers into miles, we will multiply the number of kilometers by this conversion factor.\n\nSo, for 19.23 kilometers:\n\n19.23 km * 0.621371 mi/km = 12.09999 mi (approximately)\n\nTherefore, 19.23 kilometers is approximately 12.09999 miles.",
+        "reasoning": "",
+        "pred": 12.09999,
+        "correct": true,
+        "prompt_tokens": 34,
+        "output_tokens": 121,
+        "reasoning_tokens": 0,
+        "latency_s": 0.4
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, we have 19.23 kilometers as the source unit and miles as the target unit.\n\nStep 2: Recall the conversion factors.\n1 mile = 1.609344 km\n1 km = 0.621371 miles\n1 foot = 0.3048 m\n1 meter = 3.28084 ft\n1 inch = 2.54 cm\n\nStep 3: Apply the conversion factors. Since we want to convert kilometers to miles, we divide by the conversion factor.\n19.23 km / (0.621371 miles/km) = 31.05 miles\n\nStep 4: Round the result to two decimal places.\n31.05 miles\n\nStep 5: End the answer with ANSWER =.\nANSWER = 31.05",
+        "reasoning": "",
+        "pred": 31.05,
+        "correct": false,
+        "prompt_tokens": 235,
+        "output_tokens": 216,
+        "reasoning_tokens": 0,
+        "latency_s": 0.65
+      }
+    },
+    {
+      "family": "length",
+      "skill": "length-conversion",
+      "question": "How many feet are in 209.38 meters?",
+      "truth": 686.94,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.697,
+        "routed_skill": "length-conversion"
+      },
+      "A": {
+        "output": "686.92",
+        "reasoning": "",
+        "pred": 686.92,
+        "correct": true,
+        "prompt_tokens": 35,
+        "output_tokens": 9,
+        "reasoning_tokens": 0,
+        "latency_s": 0.3
+      },
+      "B": {
+        "output": "We know that 1 meter is approximately equal to 3.28 feet. So, to convert meters to feet, we multiply the number of meters by 3.28.\n\nHere's the calculation for 209.38 meters:\n\n209.38 meters * 3.28 feet/meter = 660.00 feet (approximately)\n\nSo, there are approximately 660 feet in 209.38 meters.",
+        "reasoning": "",
+        "pred": 209.38,
+        "correct": false,
+        "prompt_tokens": 37,
+        "output_tokens": 111,
+        "reasoning_tokens": 0,
+        "latency_s": 0.37
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, we have 209.38 meters as the source unit and feet as the target unit.\n\nStep 2: Find the conversion factors between the units.\n1 meter = 3.28084 feet\n\nStep 3: Apply the conversion factor based on the target unit (feet). Since 1 meter is smaller than 1 foot, we divide by the conversion factor.\n209.38 meters \u00f7 3.28084 = 64.00 feet (approximately)\n\nStep 4: Round the result to two decimal places.\n64.00 feet (rounded)\n\nStep 5: End the answer with ANSWER = followed by the rounded number.\nANSWER = 64.00",
+        "reasoning": "",
+        "pred": 64.0,
+        "correct": false,
+        "prompt_tokens": 238,
+        "output_tokens": 191,
+        "reasoning_tokens": 0,
+        "latency_s": 0.44
+      }
+    },
+    {
+      "family": "length",
+      "skill": "length-conversion",
+      "question": "Convert 45.81 kilometers to miles.",
+      "truth": 28.47,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.763,
+        "routed_skill": "length-conversion"
+      },
+      "A": {
+        "output": "28.52 miles",
+        "reasoning": "",
+        "pred": 28.52,
+        "correct": true,
+        "prompt_tokens": 32,
+        "output_tokens": 9,
+        "reasoning_tokens": 0,
+        "latency_s": 0.36
+      },
+      "B": {
+        "output": "We know that 1 kilometer (km) is approximately equal to 0.621371 miles. So, to convert kilometers to miles, we can multiply the number of kilometers by this conversion factor.\n\nHere, we have 45.81 kilometers. So, we'll multiply 45.81 by 0.621371:\n\n45.81 km * 0.621371 miles/km \u2248 28.00 miles\n\nSo, 45.81 kilometers is approximately 28.00 miles.",
+        "reasoning": "",
+        "pred": 28.0,
+        "correct": true,
+        "prompt_tokens": 34,
+        "output_tokens": 139,
+        "reasoning_tokens": 0,
+        "latency_s": 0.4
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, we have kilometers (source) and miles (target).\n\nStep 2: Recall the conversion factors.\n1 km = 0.621371 miles\n1 mile = 1.609344 km\n\nStep 3: Apply the conversion factors based on the target unit (miles).\n45.81 km * (1 mile / 0.621371) = 73.50 miles (approximately)\n\nStep 4: Round the result to two decimal places.\n73.50 miles\n\nStep 5: End the answer with ANSWER =.\nANSWER = 73.50",
+        "reasoning": "",
+        "pred": 73.5,
+        "correct": false,
+        "prompt_tokens": 235,
+        "output_tokens": 169,
+        "reasoning_tokens": 0,
+        "latency_s": 0.44
+      }
+    },
+    {
+      "family": "length",
+      "skill": "length-conversion",
+      "question": "How many feet are in 30.03 meters?",
+      "truth": 98.52,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.736,
+        "routed_skill": "length-conversion"
+      },
+      "A": {
+        "output": "33.06",
+        "reasoning": "",
+        "pred": 33.06,
+        "correct": false,
+        "prompt_tokens": 34,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "latency_s": 0.29
+      },
+      "B": {
+        "output": "We know that:\n\n1 meter = 3.28084 feet\n\nNow, we need to convert 30.03 meters into feet. We multiply 30.03 meters by the conversion factor:\n\n30.03 meters * 3.28084 feet/meter = 96.00 feet (approximately)\n\nSo, there are approximately 96.00 feet in 30.03 meters.",
+        "reasoning": "",
+        "pred": 30.03,
+        "correct": false,
+        "prompt_tokens": 36,
+        "output_tokens": 108,
+        "reasoning_tokens": 0,
+        "latency_s": 0.38
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. In this case, the source unit is meters (m) and the target unit is feet (ft).\n\nStep 2: Find the conversion factors between the units.\n1 m = 3.28084 ft\n\nStep 3: Apply the conversion factor based on the target unit (feet). Since 1 m is larger than 1 ft, divide by the conversion factor.\n30.03 m \u00f7 3.28084 = 9.25 feet\n\nStep 4: Round the result to two decimal places.\n9.25 feet\n\nStep 5: End the answer with ANSWER = followed by the rounded number.\nANSWER = 9.25",
+        "reasoning": "",
+        "pred": 9.25,
+        "correct": false,
+        "prompt_tokens": 237,
+        "output_tokens": 176,
+        "reasoning_tokens": 0,
+        "latency_s": 0.44
+      }
+    },
+    {
+      "family": "length",
+      "skill": "length-conversion",
+      "question": "Convert 62.34 inches to centimeters.",
+      "truth": 158.34,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.79,
+        "routed_skill": "length-conversion"
+      },
+      "A": {
+        "output": "158.15",
+        "reasoning": "",
+        "pred": 158.15,
+        "correct": true,
+        "prompt_tokens": 34,
+        "output_tokens": 9,
+        "reasoning_tokens": 0,
+        "latency_s": 0.3
+      },
+      "B": {
+        "output": "We need to convert inches to centimeters. There are 2.54 centimeters in 1 inch. So, to convert inches to centimeters, we multiply the number of inches by 2.54.\n\nHere's the calculation for 62.34 inches:\n\n62.34 inches * 2.54 cm/inch = 158.058 cm\n\nSo, 62.34 inches is equivalent to approximately 158.058 centimeters.",
+        "reasoning": "",
+        "pred": 158.058,
+        "correct": true,
+        "prompt_tokens": 36,
+        "output_tokens": 121,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. In this case, we have inches (source) and centimeters (target).\n\nStep 2: Recall the conversion factors. 1 inch = 2.54 cm.\n\nStep 3: Apply the conversion factor. Since centimeters is the smaller unit, we divide by the conversion factor.\n62.34 inches \u00f7 2.54 cm/inch = 24.41 cm\n\nStep 4: Round the result to two decimal places.\n24.41 cm\n\nStep 5: End the answer with ANSWER =.\nANSWER = 24.41",
+        "reasoning": "",
+        "pred": 24.41,
+        "correct": false,
+        "prompt_tokens": 237,
+        "output_tokens": 156,
+        "reasoning_tokens": 0,
+        "latency_s": 0.48
+      }
+    },
+    {
+      "family": "mass",
+      "skill": "mass-conversion",
+      "question": "Convert 252.44 pounds to kilograms.",
+      "truth": 114.5,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.795,
+        "routed_skill": "mass-conversion"
+      },
+      "A": {
+        "output": "114.41 kg",
+        "reasoning": "",
+        "pred": 114.41,
+        "correct": true,
+        "prompt_tokens": 34,
+        "output_tokens": 10,
+        "reasoning_tokens": 0,
+        "latency_s": 0.32
+      },
+      "B": {
+        "output": "We know that 1 pound is approximately equal to 0.453592 kilograms. So, to convert pounds to kilograms, we need to divide the number of pounds by 0.453592.\n\nIn this case, we want to convert 252.44 pounds into kilograms. So, we'll perform the division:\n\n252.44 pounds / 0.453592 kilograms/pound \u2248 555.00 kilograms\n\nSo, 252.44 pounds is approximately equal to 555.00 kilograms.",
+        "reasoning": "",
+        "pred": 555.0,
+        "correct": false,
+        "prompt_tokens": 36,
+        "output_tokens": 145,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, 252.44 pounds is the source unit and we want to convert it to kilograms (kg), which is the target unit.\n\nStep 2: Define the conversion factors.\n1 lb = 0.45359237 kg\n1 kg = 2.2046226 lb\n1 oz = 28.349523 g\n\nStep 3: Apply the conversion factors based on the target unit (kg). Since 1 kg is larger than 1 lb, we divide the source number by the conversion factor for kg.\n252.44 lb \u00f7 0.45359237 kg/lb = 555.000000 kg (approximately)\n\nStep 4: Round the result to two decimal places.\n555.00 kg (approximately)\n\nStep 5: End the answer with ANSWER = followed by the rounded number.\nANSWER = 555.00",
+        "reasoning": "",
+        "pred": 555.0,
+        "correct": false,
+        "prompt_tokens": 218,
+        "output_tokens": 251,
+        "reasoning_tokens": 0,
+        "latency_s": 0.5
+      }
+    },
+    {
+      "family": "mass",
+      "skill": "mass-conversion",
+      "question": "Convert 379.11 ounces into grams.",
+      "truth": 10747.59,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.707,
+        "routed_skill": "mass-conversion"
+      },
+      "A": {
+        "output": "1069.97 grams",
+        "reasoning": "",
+        "pred": 1069.97,
+        "correct": false,
+        "prompt_tokens": 34,
+        "output_tokens": 11,
+        "reasoning_tokens": 0,
+        "latency_s": 0.3
+      },
+      "B": {
+        "output": "We know that 1 ounce is approximately equal to 28.3495 grams. So, to convert ounces into grams, we need to multiply the number of ounces by the conversion factor.\n\nHere's the calculation:\n\n379.11 ounces * 28.3495 grams/ounce = 11185.057955 grams\n\nSo, 379.11 ounces is approximately equal to 11185.057955 grams.",
+        "reasoning": "",
+        "pred": 11185.057955,
+        "correct": false,
+        "prompt_tokens": 36,
+        "output_tokens": 123,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, 379.11 ounces is the source unit and grams (g) is the target unit.\n\nStep 2: Define the conversion factors.\n1 oz = 28.349523 g\n1 lb = 0.45359237 kg\n1 kg = 2.2046226 lb\n\nStep 3: Apply the conversion factors.\nTo convert ounces to grams, we multiply by the conversion factor:\n379.11 oz * 28.349523 g/oz = ?\n\nStep 4: Perform the multiplication.\n997.7597 kg (rounded to two decimal places)\n\nStep 5: End the answer with the final result.\nANSWER = 997.76",
+        "reasoning": "",
+        "pred": 997.76,
+        "correct": false,
+        "prompt_tokens": 218,
+        "output_tokens": 207,
+        "reasoning_tokens": 0,
+        "latency_s": 0.51
+      }
+    },
+    {
+      "family": "mass",
+      "skill": "mass-conversion",
+      "question": "Convert 234.42 ounces to grams.",
+      "truth": 6645.7,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.772,
+        "routed_skill": "mass-conversion"
+      },
+      "A": {
+        "output": "6,636.62 grams",
+        "reasoning": "",
+        "pred": 636.62,
+        "correct": false,
+        "prompt_tokens": 34,
+        "output_tokens": 12,
+        "reasoning_tokens": 0,
+        "latency_s": 0.4
+      },
+      "B": {
+        "output": "We know that 1 ounce is approximately equal to 28.3495 grams. So, to convert ounces to grams, we need to multiply the number of ounces by the conversion factor.\n\nHere's the calculation:\n\n234.42 ounces * 28.3495 grams/ounce = 6595.9589 grams\n\nSo, 234.42 ounces is approximately 6595.96 grams.",
+        "reasoning": "",
+        "pred": 6595.96,
+        "correct": true,
+        "prompt_tokens": 36,
+        "output_tokens": 113,
+        "reasoning_tokens": 0,
+        "latency_s": 0.43
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, we have 234.42 ounces as the source unit and grams as the target unit.\n\nStep 2: Define the conversion factors.\n1 oz = 28.349523 g\n1 lb = 0.45359237 kg\n1 kg = 2.2046226 lb\n\nStep 3: Apply the conversion factors.\nTo convert ounces to grams, we multiply by the conversion factor:\n234.42 oz * 28.349523 g/oz = 6599.999999999999 g (approximately 6600 g)\n\nStep 4: Round the result to two decimal places.\n6600 g\n\nStep 5: End the answer with ANSWER =.\nANSWER = 6600",
+        "reasoning": "",
+        "pred": 6600.0,
+        "correct": true,
+        "prompt_tokens": 218,
+        "output_tokens": 224,
+        "reasoning_tokens": 0,
+        "latency_s": 0.51
+      }
+    },
+    {
+      "family": "mass",
+      "skill": "mass-conversion",
+      "question": "How many kilograms is 390.51 pounds?",
+      "truth": 177.13,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.8,
+        "routed_skill": "mass-conversion"
+      },
+      "A": {
+        "output": "390.51",
+        "reasoning": "",
+        "pred": 390.51,
+        "correct": false,
+        "prompt_tokens": 35,
+        "output_tokens": 9,
+        "reasoning_tokens": 0,
+        "latency_s": 0.36
+      },
+      "B": {
+        "output": "We have a weight measured in pounds (lb) and we need to convert it into kilograms (kg). One pound is approximately equal to 0.453592 kilograms. \n\nSo, to find out how many kilograms are in 390.51 pounds, we can use the following calculation:\n\n390.51 pounds * 0.453592 kg/pound = number of kilograms\n\nNow, let's do the math:\n\n390.51 * 0.453592 = 172.00099528 kilograms\n\nRounded to two decimal places, 390.51 pounds is approximately 172.00 kilograms.",
+        "reasoning": "",
+        "pred": 172.0,
+        "correct": false,
+        "prompt_tokens": 37,
+        "output_tokens": 173,
+        "reasoning_tokens": 0,
+        "latency_s": 0.42
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, 390.51 pounds is the source unit and we want to convert it to kilograms (target unit).\n\nStep 2: Define the conversion factors.\n1 lb = 0.45359237 kg\n1 kg = 2.2046226 lb\n1 oz = 28.349523 g\n\nStep 3: Apply the conversion factors based on the target unit (kilograms).\nSince we want to convert to kilograms, we divide the source unit (pounds) by the conversion factor for pounds to kilograms.\n\nStep 4: Perform the calculation.\n390.51 pounds / 2.2046226 = 176.01 kilograms\n\nStep 5: Round the result to two decimal places and end the answer with ANSWER =.\nRounded result: 176.01 kg\n\nFinal answer: ANSWER = 176.01",
+        "reasoning": "",
+        "pred": 176.01,
+        "correct": true,
+        "prompt_tokens": 219,
+        "output_tokens": 246,
+        "reasoning_tokens": 0,
+        "latency_s": 0.49
+      }
+    },
+    {
+      "family": "mass",
+      "skill": "mass-conversion",
+      "question": "How many kilograms are in 222.89 pounds?",
+      "truth": 101.1,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.758,
+        "routed_skill": "mass-conversion"
+      },
+      "A": {
+        "output": "101.01",
+        "reasoning": "",
+        "pred": 101.01,
+        "correct": true,
+        "prompt_tokens": 36,
+        "output_tokens": 9,
+        "reasoning_tokens": 0,
+        "latency_s": 0.37
+      },
+      "B": {
+        "output": "We have a conversion factor between pounds and kilograms: 1 pound is approximately equal to 0.453592 kilograms. We can use this conversion factor to find out how many kilograms are in 222.89 pounds.\n\nHere's the calculation:\n\n222.89 pounds * (0.453592 kilograms / 1 pound) = 99.999894 kilograms\n\nSo, there are approximately 100 kilograms in 222.89 pounds.",
+        "reasoning": "",
+        "pred": 222.89,
+        "correct": false,
+        "prompt_tokens": 38,
+        "output_tokens": 126,
+        "reasoning_tokens": 0,
+        "latency_s": 0.39
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, 222.89 pounds is the source unit and we want to convert it to kilograms (target unit).\n\nStep 2: Define the conversion factors.\n1 lb = 0.45359237 kg\n1 kg = 2.2046226 lb\n1 oz = 28.349523 g\n\nStep 3: Apply the conversion factors based on the target unit (kilograms).\nSince we want to convert to kilograms, we divide the source unit (pounds) by the conversion factor for pounds to kilograms.\n\nStep 4: Perform the calculation.\n222.89 lb \u00f7 (2.2046226 kg/lb) = 99.9999999 kg (approximately 100 kg)\n\nStep 5: Round the result to two decimal places.\n100 kg (rounded)\n\nANSWER: 100",
+        "reasoning": "",
+        "pred": 100.0,
+        "correct": true,
+        "prompt_tokens": 220,
+        "output_tokens": 243,
+        "reasoning_tokens": 0,
+        "latency_s": 0.87
+      }
+    },
+    {
+      "family": "mass",
+      "skill": "mass-conversion",
+      "question": "Convert 116.2 pounds into kilograms.",
+      "truth": 52.71,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.752,
+        "routed_skill": "mass-conversion"
+      },
+      "A": {
+        "output": "52.67",
+        "reasoning": "",
+        "pred": 52.67,
+        "correct": true,
+        "prompt_tokens": 33,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "latency_s": 0.35
+      },
+      "B": {
+        "output": "We have 116.2 pounds, and we want to convert this into kilograms. Thankfully, 1 kilogram is equal to approximately 2.20462 pounds. So, we can set up a simple conversion:\n\n116.2 pounds * (1 kilogram / 2.20462 pounds)\n\nNow, let's do the calculation:\n\n116.2 * 0.45359237 \u2248 51.00 kilograms\n\nSo, 116.2 pounds is approximately equal to 51.00 kilograms.",
+        "reasoning": "",
+        "pred": 51.0,
+        "correct": false,
+        "prompt_tokens": 35,
+        "output_tokens": 143,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, 116.2 pounds is the source unit and we want to convert it to kilograms (kg), which is the target unit.\n\nStep 2: Define the conversion factors.\n1 lb = 0.45359237 kg\n1 kg = 2.2046226 lb\n1 oz = 28.349523 g\n\nStep 3: Apply the conversion factors based on the target unit (kilograms).\nSince we want to convert to kg, we divide the source unit (pounds) by the conversion factor for kg.\n\nStep 4: Perform the calculation.\n116.2 pounds / 2.2046226 kg/pound = 52.99999999999999 kg (approximately 53 kg)\n\nStep 5: Round the result to two decimal places.\n53 kg (rounded)\n\nANSWER = 53",
+        "reasoning": "",
+        "pred": 53.0,
+        "correct": true,
+        "prompt_tokens": 217,
+        "output_tokens": 242,
+        "reasoning_tokens": 0,
+        "latency_s": 0.52
+      }
+    },
+    {
+      "family": "mass",
+      "skill": "mass-conversion",
+      "question": "Convert 216.5 pounds into kilograms.",
+      "truth": 98.2,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.757,
+        "routed_skill": "mass-conversion"
+      },
+      "A": {
+        "output": "98.26",
+        "reasoning": "",
+        "pred": 98.26,
+        "correct": true,
+        "prompt_tokens": 33,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "latency_s": 0.32
+      },
+      "B": {
+        "output": "We know that 1 pound is approximately equal to 0.453592 kilograms. So, to convert pounds into kilograms, we need to multiply the weight in pounds by this conversion factor.\n\nHere's the calculation:\n\n216.5 pounds * 0.453592 kg/pound \u2248 99.99999999999999 kilograms\n\nRounded to two decimal places, the weight of 216.5 pounds in kilograms is approximately 99.99 kilograms.",
+        "reasoning": "",
+        "pred": 99.99,
+        "correct": true,
+        "prompt_tokens": 35,
+        "output_tokens": 133,
+        "reasoning_tokens": 0,
+        "latency_s": 0.4
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, 216.5 pounds is the source unit and we want to convert it to kilograms (kg), which is the target unit.\n\nStep 2: Define the conversion factors.\n1 lb = 0.45359237 kg\n1 kg = 2.2046226 lb\n1 oz = 28.349523 g\n\nStep 3: Apply the conversion factors based on the target unit (kg). Since 1 kg is larger than 1 lb, we divide the source value by the conversion factor.\n216.5 lb \u00f7 0.45359237 kg/lb = 475.200000 kg\n\nStep 4: Round the result to two decimal places.\n475.20\n\nStep 5: End the answer with ANSWER =.\nANSWER = 475.20",
+        "reasoning": "",
+        "pred": 475.2,
+        "correct": false,
+        "prompt_tokens": 217,
+        "output_tokens": 233,
+        "reasoning_tokens": 0,
+        "latency_s": 0.47
+      }
+    },
+    {
+      "family": "mass",
+      "skill": "mass-conversion",
+      "question": "Convert 123.74 ounces to grams.",
+      "truth": 3507.97,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.756,
+        "routed_skill": "mass-conversion"
+      },
+      "A": {
+        "output": "3521.43 grams",
+        "reasoning": "",
+        "pred": 3521.43,
+        "correct": true,
+        "prompt_tokens": 34,
+        "output_tokens": 11,
+        "reasoning_tokens": 0,
+        "latency_s": 0.3
+      },
+      "B": {
+        "output": "We know that 1 ounce is approximately equal to 28.3495 grams. So, to convert ounces to grams, we need to multiply the number of ounces by the conversion factor.\n\nHere's the calculation:\n\n123.74 ounces * 28.3495 grams/ounce = 3500.0054 grams\n\nSo, 123.74 ounces is approximately 3500.01 grams.",
+        "reasoning": "",
+        "pred": 3500.01,
+        "correct": true,
+        "prompt_tokens": 36,
+        "output_tokens": 113,
+        "reasoning_tokens": 0,
+        "latency_s": 0.66
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, 123.74 ounces is the source unit and grams (g) is the target unit.\n\nStep 2: Define the conversion factors.\n1 lb = 0.45359237 kg\n1 kg = 2.2046226 lb\n1 oz = 28.349523 g\n\nStep 3: Apply the conversion factors.\nTo convert ounces to grams, we need to multiply by the conversion factor from ounces to grams (1 oz * 28.349523 g/oz).\n\nStep 4: Perform the calculation.\n123.74 oz * 28.349523 g/oz = 3499.9999999999997 g (approximately 3500 g)\n\nStep 5: Round the result to two decimal places.\n3500 g (rounded)\n\nANSWER = 3500",
+        "reasoning": "",
+        "pred": 3500.0,
+        "correct": true,
+        "prompt_tokens": 218,
+        "output_tokens": 250,
+        "reasoning_tokens": 0,
+        "latency_s": 0.48
+      }
+    },
+    {
+      "family": "mass",
+      "skill": "mass-conversion",
+      "question": "How many grams is 72.7 ounces?",
+      "truth": 2061.01,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.803,
+        "routed_skill": "mass-conversion"
+      },
+      "A": {
+        "output": "2040.0",
+        "reasoning": "",
+        "pred": 2040.0,
+        "correct": true,
+        "prompt_tokens": 33,
+        "output_tokens": 9,
+        "reasoning_tokens": 0,
+        "latency_s": 0.3
+      },
+      "B": {
+        "output": "We have 72.7 ounces, and we need to convert them into grams. However, the conversion factor between ounces and grams varies based on the substance. For water, which has a density of approximately 1 gram per cubic centimeter, 1 ounce is approximately 28.35 grams.\n\nHowever, since we don't know the density of the substance in question, we'll use the general conversion factor for water:\n\n1 ounce = 28.35 grams\n\nNow, let's calculate the grams:\n\n72.7 ounces * 28.35 grams/ounce = 2000.0555 grams\n\nSo, 72.7 ounces is approximately 2000.0555 grams.",
+        "reasoning": "",
+        "pred": 2000.0555,
+        "correct": false,
+        "prompt_tokens": 35,
+        "output_tokens": 176,
+        "reasoning_tokens": 0,
+        "latency_s": 0.41
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, 72.7 ounces is the source unit and grams is the target unit.\n\nStep 2: Define the conversion factors.\n1 lb = 0.45359237 kg\n1 kg = 2.2046226 lb\n1 oz = 28.349523 g\n\nStep 3: Apply the conversion factors.\nIf the target unit is the smaller one, multiply the given number by the factor. In this case, we need to convert ounces to grams, so we multiply by the conversion factor for ounces to grams.\n\n72.7 ounces * 28.349523 g/oz = ...\n\nStep 4: Perform the multiplication.\n72.7 * 28.349523 = 2000.000000\n\nStep 5: Round the result to two decimal places.\n2000.00 rounded to two decimal places is 2000.00\n\nThe final answer is: ANSWER = 2000.00 grams",
+        "reasoning": "",
+        "pred": 2000.0,
+        "correct": false,
+        "prompt_tokens": 217,
+        "output_tokens": 274,
+        "reasoning_tokens": 0,
+        "latency_s": 0.51
+      }
+    },
+    {
+      "family": "mass",
+      "skill": "mass-conversion",
+      "question": "How many grams is 228.7 ounces?",
+      "truth": 6483.54,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.777,
+        "routed_skill": "mass-conversion"
+      },
+      "A": {
+        "output": "6400.0",
+        "reasoning": "",
+        "pred": 6400.0,
+        "correct": true,
+        "prompt_tokens": 34,
+        "output_tokens": 9,
+        "reasoning_tokens": 0,
+        "latency_s": 0.3
+      },
+      "B": {
+        "output": "We have 228.7 ounces, and we need to convert them into grams. However, the standard conversion factor between ounces and grams is for fluid ounces, not regular ounces. Fortunately, the conversion factor for regular ounces to grams is very close to the fluid ounce conversion factor.\n\n1 fluid ounce is approximately equal to 29.5735 grams. Since the conversion factor for regular ounces to grams is very close to this, we can use the fluid ounce conversion factor as a rough estimate.\n\nNow, let's convert 228.7 ounces into grams using the fluid ounce conversion factor:\n\n228.7 ounces * 29.5735 grams/fluid ounce \u2248 6595.95 grams\n\nSo, 228.7 ounces is approximately 6595.95 grams.",
+        "reasoning": "",
+        "pred": 6595.95,
+        "correct": true,
+        "prompt_tokens": 36,
+        "output_tokens": 198,
+        "reasoning_tokens": 0,
+        "latency_s": 0.43
+      },
+      "C": {
+        "output": "Step 1: Identify the source unit and target unit. Here, 228.7 ounces is the source unit and grams is the target unit.\n\nStep 2: Define the conversion factors.\n1 lb = 0.45359237 kg\n1 kg = 2.2046226 lb\n1 oz = 28.349523 g\n\nStep 3: Apply the conversion factors.\nIf the target unit is the smaller one, multiply the given number by the factor. In this case, we need to convert ounces to grams, so we multiply by the conversion factor for ounces to grams.\n\nStep 4: Perform the multiplication.\n228.7 ounces * 28.349523 g/oz = 6399.999999999999 g (approximately 6400 g)\n\nStep 5: Round the result to two decimal places.\n6400 g (rounded to two decimal places)\n\nANSWER = 6400",
+        "reasoning": "",
+        "pred": 6400.0,
+        "correct": true,
+        "prompt_tokens": 218,
+        "output_tokens": 256,
+        "reasoning_tokens": 0,
+        "latency_s": 0.56
+      }
+    },
+    {
+      "family": "temperature",
+      "skill": "temperature-conversion",
+      "question": "How hot is -24.4 celsius in fahrenheit?",
+      "truth": -11.9,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.815,
+        "routed_skill": "temperature-conversion"
+      },
+      "A": {
+        "output": "-40.0",
+        "reasoning": "",
+        "pred": -40.0,
+        "correct": false,
+        "prompt_tokens": 38,
+        "output_tokens": 7,
+        "reasoning_tokens": 0,
+        "latency_s": 0.35
+      },
+      "B": {
+        "output": "We need to convert -24.4 degrees Celsius to Fahrenheit. The formula for this conversion is:\n\n(Celsius temperature * 9/5) + 32 = Fahrenheit temperature\n\nNow, let's plug in the given value:\n\n(-24.4 * 9/5) + 32 = Fahrenheit temperature\n\nNow, let's do the math:\n\n(-24.4 * 1.8) + 32 = Fahrenheit temperature\n\n-45.96 + 32 = Fahrenheit temperature\n\n13.04 = Fahrenheit temperature\n\nSo, -24.4 degrees Celsius is approximately 13.04 degrees Fahrenheit.",
+        "reasoning": "",
+        "pred": 13.04,
+        "correct": false,
+        "prompt_tokens": 40,
+        "output_tokens": 179,
+        "reasoning_tokens": 0,
+        "latency_s": 0.53
+      },
+      "C": {
+        "output": "To convert -24.4\u00b0C to Fahrenheit, follow the steps:\n\n1. Determine the direction: Celsius to Fahrenheit.\n2. Multiply the Celsius value by 9, divide by 5, and add 32: (-24.4 * 9/5) + 32 = -44.04\u00b0F\n3. Round to one decimal place: -44.04\u00b0F\n4. End the answer with ANSWER =: ANSWER = -44.04\n\nSo, -24.4\u00b0C is -44.04\u00b0F.",
+        "reasoning": "",
+        "pred": -44.04,
+        "correct": false,
+        "prompt_tokens": 208,
+        "output_tokens": 150,
+        "reasoning_tokens": 0,
+        "latency_s": 0.46
+      }
+    },
+    {
+      "family": "temperature",
+      "skill": "temperature-conversion",
+      "question": "What is 50.3 degrees F in Celsius?",
+      "truth": 10.2,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.733,
+        "routed_skill": "temperature-conversion"
+      },
+      "A": {
+        "output": "50.3\u00b0F is equivalent to 10.1\u00b0C. \n\nTo convert Fahrenheit to Celsius, you can use the formula: (F - 32) \u00d7 5/9 = C\n\nIn this case, (50.3 - 32) \u00d7 5/9 = 10.1\u00b0C",
+        "reasoning": "",
+        "pred": 10.1,
+        "correct": true,
+        "prompt_tokens": 35,
+        "output_tokens": 83,
+        "reasoning_tokens": 0,
+        "latency_s": 0.34
+      },
+      "B": {
+        "output": "To convert Fahrenheit to Celsius, we use the formula:\n\nCelsius = (Fahrenheit - 32) \u00d7 5/9\n\nIn our case, the temperature is 50.3 degrees Fahrenheit. So we'll plug that value into our formula:\n\nCelsius = (50.3 - 32) \u00d7 5/9\nCelsius = (18.3) \u00d7 5/9\nCelsius = 91.11... \u00d7 5/9\nCelsius \u2248 45.00...\n\nSo, 50.3 degrees Fahrenheit is approximately 45 degrees Celsius.",
+        "reasoning": "",
+        "pred": 45.0,
+        "correct": false,
+        "prompt_tokens": 37,
+        "output_tokens": 163,
+        "reasoning_tokens": 0,
+        "latency_s": 0.43
+      },
+      "C": {
+        "output": "To convert 50.3 degrees Fahrenheit to Celsius, we'll follow these steps:\n\n1. Determine the conversion direction: Celsius to Fahrenheit (since we want to convert Fahrenheit to Celsius).\n2. Apply the formula for converting Fahrenheit to Celsius: (F - 32) * 5 / 9\n3. Substitute the given temperature: (50.3 - 32) * 5 / 9\n4. Perform the calculations: (18.3) * 5 / 9 \u2248 8.333\n5. Round the result to one decimal place: 8.33\n\nThe final answer is 8.33 degrees Celsius.",
+        "reasoning": "",
+        "pred": 8.33,
+        "correct": false,
+        "prompt_tokens": 205,
+        "output_tokens": 177,
+        "reasoning_tokens": 0,
+        "latency_s": 0.43
+      }
+    },
+    {
+      "family": "temperature",
+      "skill": "temperature-conversion",
+      "question": "What is 39.4 degrees F in Celsius?",
+      "truth": 4.1,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.729,
+        "routed_skill": "temperature-conversion"
+      },
+      "A": {
+        "output": "29.1",
+        "reasoning": "",
+        "pred": 29.1,
+        "correct": false,
+        "prompt_tokens": 35,
+        "output_tokens": 7,
+        "reasoning_tokens": 0,
+        "latency_s": 0.3
+      },
+      "B": {
+        "output": "To convert Fahrenheit to Celsius, we use the formula:\n\nCelsius = (Fahrenheit - 32) \u00d7 5/9\n\nIn this case, we have 39.4 degrees Fahrenheit. So we'll plug that value into our formula:\n\nCelsius = (39.4 - 32) \u00d7 5/9\nCelsius = (7.4 \u00d7 5/9)\nCelsius = 39.4444...\n\nSo, 39.4 degrees Fahrenheit is approximately 3.5 degrees Celsius.",
+        "reasoning": "",
+        "pred": 3.5,
+        "correct": false,
+        "prompt_tokens": 37,
+        "output_tokens": 144,
+        "reasoning_tokens": 0,
+        "latency_s": 0.41
+      },
+      "C": {
+        "output": "To convert 39.4 degrees Fahrenheit to Celsius, we'll follow these steps:\n\n1. Determine the conversion direction: Celsius to Fahrenheit (since we want to convert Fahrenheit to Celsius).\n2. Apply the formula for converting Fahrenheit to Celsius: (F - 32) * 5 / 9\n3. Plug in the given value: (39.4 - 32) * 5 / 9\n4. Calculate the result: (7.4) * 5 / 9 \u2248 4.9333\n5. Round to one decimal place: 4.93\n\nThe final answer is 4.93 degrees Celsius.",
+        "reasoning": "",
+        "pred": 4.93,
+        "correct": false,
+        "prompt_tokens": 205,
+        "output_tokens": 174,
+        "reasoning_tokens": 0,
+        "latency_s": 0.42
+      }
+    },
+    {
+      "family": "temperature",
+      "skill": "temperature-conversion",
+      "question": "What is 84.4 degrees F in Celsius?",
+      "truth": 29.1,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.734,
+        "routed_skill": "temperature-conversion"
+      },
+      "A": {
+        "output": "37.0",
+        "reasoning": "",
+        "pred": 37.0,
+        "correct": false,
+        "prompt_tokens": 35,
+        "output_tokens": 7,
+        "reasoning_tokens": 0,
+        "latency_s": 0.3
+      },
+      "B": {
+        "output": "To convert Fahrenheit to Celsius, we use the formula:\n\n(\u00b0F - 32) \u00d7 5/9 = \u00b0C\n\nIn our case, the temperature is 84.4\u00b0F. So we'll plug that into our formula:\n\n(84.4 - 32) \u00d7 5/9 = \u00b0C\n\nNow we calculate the difference:\n\n52.4 \u00d7 5/9 = \u00b0C\n\nFinally, we divide by 9 and multiply by 9/5 to get the temperature in Celsius:\n\n(52.4 \u00d7 5/9) \u00d7 (9/5) = \u00b0C\n\nLet's do the math:\n\n(52.4 \u00d7 5/9) \u00d7 (9/5) = 35.666666666666664\u00b0C\n\nSo, 84.4 degrees Fahrenheit is equivalent to approximately 35.67 degrees Celsius.",
+        "reasoning": "",
+        "pred": 35.67,
+        "correct": false,
+        "prompt_tokens": 37,
+        "output_tokens": 233,
+        "reasoning_tokens": 0,
+        "latency_s": 0.47
+      },
+      "C": {
+        "output": "To convert 84.4 degrees Fahrenheit to Celsius, we'll follow these steps:\n\n1. Determine the conversion direction: Celsius to Fahrenheit (since we want to convert Fahrenheit to Celsius).\n2. Apply the formula for converting Fahrenheit to Celsius: (F - 32) * 5 / 9\n3. Substitute the given temperature: (84.4 - 32) * 5 / 9\n4. Perform the calculations: (52.4) * 5 / 9 \u2248 26.67\n5. Round the result to one decimal place: 26.67\n\nThe final answer is 26.67 degrees Celsius.",
+        "reasoning": "",
+        "pred": 26.67,
+        "correct": false,
+        "prompt_tokens": 205,
+        "output_tokens": 179,
+        "reasoning_tokens": 0,
+        "latency_s": 0.48
+      }
+    },
+    {
+      "family": "temperature",
+      "skill": "temperature-conversion",
+      "question": "Convert 107.8 degrees Celsius to Fahrenheit.",
+      "truth": 226.0,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.822,
+        "routed_skill": "temperature-conversion"
+      },
+      "A": {
+        "output": "228.0",
+        "reasoning": "",
+        "pred": 228.0,
+        "correct": true,
+        "prompt_tokens": 38,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "latency_s": 0.29
+      },
+      "B": {
+        "output": "To convert Celsius to Fahrenheit, we need to use the following formula:\n\n\u00b0F = (\u00b0C \u00d7 9/5) + 32\n\nGiven temperature in Celsius: 107.8\u00b0C\n\nNow, we'll plug the value into the formula:\n\n\u00b0F = (107.8 \u00d7 9/5) + 32\n\u00b0F = (979.2/5) + 32\n\u00b0F = 195.92 + 32\n\u00b0F = 227.92\n\nSo, 107.8 degrees Celsius is equivalent to approximately 227.92 degrees Fahrenheit.",
+        "reasoning": "",
+        "pred": 227.92,
+        "correct": true,
+        "prompt_tokens": 40,
+        "output_tokens": 166,
+        "reasoning_tokens": 0,
+        "latency_s": 0.44
+      },
+      "C": {
+        "output": "Step 1: Decide the direction - Celsius to Fahrenheit.\nStep 2: Apply the formula for converting Celsius to Fahrenheit.\n107.8 * 9 / 5 + 32 = 211.44\n\nStep 4: Round the result to one decimal place.\n211.44 \u2248 211.4\n\nStep 5: End the answer with ANSWER = followed by the single number.\nANSWER = 211.4",
+        "reasoning": "",
+        "pred": 211.4,
+        "correct": false,
+        "prompt_tokens": 208,
+        "output_tokens": 127,
+        "reasoning_tokens": 0,
+        "latency_s": 0.56
+      }
+    },
+    {
+      "family": "temperature",
+      "skill": "temperature-conversion",
+      "question": "What is -0.3 degrees C in Fahrenheit?",
+      "truth": 31.5,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.787,
+        "routed_skill": "temperature-conversion"
+      },
+      "A": {
+        "output": "32",
+        "reasoning": "",
+        "pred": 32.0,
+        "correct": true,
+        "prompt_tokens": 35,
+        "output_tokens": 5,
+        "reasoning_tokens": 0,
+        "latency_s": 0.29
+      },
+      "B": {
+        "output": "We need to convert Celsius to Fahrenheit. The formula for this conversion is:\n\n\u00b0F = (\u00b0C \u00d7 9/5) + 32\n\nGiven the temperature in Celsius is -0.3\u00b0C, we can plug this value into the formula:\n\n\u00b0F = (-0.3 \u00d7 9/5) + 32\n\nNow, let's do the calculations:\n\n\u00b0F = (-0.54) + 32\n\u00b0F = -0.54 + 32\n\u00b0F = 21.46\n\nSo, -0.3 degrees Celsius is approximately 21.46 degrees Fahrenheit.",
+        "reasoning": "",
+        "pred": 21.46,
+        "correct": false,
+        "prompt_tokens": 37,
+        "output_tokens": 161,
+        "reasoning_tokens": 0,
+        "latency_s": 0.61
+      },
+      "C": {
+        "output": "To convert -0.3 degrees Celsius to Fahrenheit, follow the steps:\n\n1. Determine the direction: Celsius to Fahrenheit.\n2. Apply the formula: (-0.3) * 9/5 + 32\n3. Calculate the result: (-0.3) * 1.8 + 32 = -1.44 + 32 = 30.56\n4. Round to one decimal place: 30.56\n5. End the answer with ANSWER = 30.56\n\nSo, -0.3 degrees Celsius is equal to 30.56 degrees Fahrenheit.",
+        "reasoning": "",
+        "pred": 30.56,
+        "correct": false,
+        "prompt_tokens": 205,
+        "output_tokens": 159,
+        "reasoning_tokens": 0,
+        "latency_s": 0.47
+      }
+    },
+    {
+      "family": "temperature",
+      "skill": "temperature-conversion",
+      "question": "Convert 84.8 degrees Celsius to Fahrenheit.",
+      "truth": 184.6,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.815,
+        "routed_skill": "temperature-conversion"
+      },
+      "A": {
+        "output": "377.6",
+        "reasoning": "",
+        "pred": 377.6,
+        "correct": false,
+        "prompt_tokens": 37,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "latency_s": 0.32
+      },
+      "B": {
+        "output": "To convert Celsius to Fahrenheit, we use the following formula:\n\n\u00b0F = (\u00b0C \u00d7 9/5) + 32\n\nGiven temperature in Celsius: 84.8\u00b0C\n\nNow, we'll plug the value into the formula:\n\n\u00b0F = (84.8 \u00d7 9/5) + 32\n\u00b0F = (757.6/5) + 32\n\u00b0F = 157.6 + 32\n\u00b0F = 190.6\n\nSo, 84.8 degrees Celsius is equivalent to approximately 190.6 degrees Fahrenheit.",
+        "reasoning": "",
+        "pred": 190.6,
+        "correct": false,
+        "prompt_tokens": 39,
+        "output_tokens": 158,
+        "reasoning_tokens": 0,
+        "latency_s": 0.4
+      },
+      "C": {
+        "output": "Step 1: Decide the direction - Celsius to Fahrenheit.\nStep 2: Apply the formula for converting Celsius to Fahrenheit.\n84.8 * 9 / 5 + 32 = ...\nStep 3: Calculate the result.\n84.8 * 9 / 5 + 32 = 99.92\nStep 4: Round the result to one decimal place.\n99.92 rounded is 99.9\nStep 5: End the answer with ANSWER = followed by the single number.\nANSWER = 99.9",
+        "reasoning": "",
+        "pred": 99.9,
+        "correct": false,
+        "prompt_tokens": 207,
+        "output_tokens": 144,
+        "reasoning_tokens": 0,
+        "latency_s": 0.4
+      }
+    },
+    {
+      "family": "temperature",
+      "skill": "temperature-conversion",
+      "question": "How hot is 8 celsius in fahrenheit?",
+      "truth": 46.4,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.843,
+        "routed_skill": "temperature-conversion"
+      },
+      "A": {
+        "output": "36",
+        "reasoning": "",
+        "pred": 36.0,
+        "correct": false,
+        "prompt_tokens": 35,
+        "output_tokens": 5,
+        "reasoning_tokens": 0,
+        "latency_s": 0.36
+      },
+      "B": {
+        "output": "The conversion formula between Celsius and Fahrenheit is:\n\n\u00b0F = (\u00b0C \u00d7 9/5) + 32\n\nGiven the temperature in Celsius is 8\u00b0C, we can plug this value into the formula:\n\n\u00b0F = (8 \u00d7 9/5) + 32\n\nNow, let's do the calculations:\n\n\u00b0F = (72/5) + 32\n\u00b0F = 14.4 + 32\n\u00b0F = 46.4\n\nSo, 8\u00b0C is equivalent to 46.4\u00b0F.",
+        "reasoning": "",
+        "pred": 46.4,
+        "correct": true,
+        "prompt_tokens": 37,
+        "output_tokens": 143,
+        "reasoning_tokens": 0,
+        "latency_s": 0.41
+      },
+      "C": {
+        "output": "To convert a temperature from Celsius to Fahrenheit, we'll follow these steps:\n\n1. Determine the conversion direction: Celsius to Fahrenheit.\n2. Perform the calculations: (8 * 9/5) + 32 = 56.6\n3. Round to one decimal place: 56.6\n4. End the answer with ANSWER =: 56.6\n\nThe temperature 8 degrees Celsius is 56.6 degrees Fahrenheit.",
+        "reasoning": "",
+        "pred": 56.6,
+        "correct": false,
+        "prompt_tokens": 205,
+        "output_tokens": 121,
+        "reasoning_tokens": 0,
+        "latency_s": 0.44
+      }
+    },
+    {
+      "family": "temperature",
+      "skill": "temperature-conversion",
+      "question": "How hot is 15 celsius in fahrenheit?",
+      "truth": 59.0,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.84,
+        "routed_skill": "temperature-conversion"
+      },
+      "A": {
+        "output": "59",
+        "reasoning": "",
+        "pred": 59.0,
+        "correct": true,
+        "prompt_tokens": 36,
+        "output_tokens": 5,
+        "reasoning_tokens": 0,
+        "latency_s": 0.36
+      },
+      "B": {
+        "output": "We need to convert Celsius to Fahrenheit. The formula for this conversion is:\n\n\u00b0F = (\u00b0C \u00d7 9/5) + 32\n\nGiven the temperature in Celsius is 15\u00b0C, we can plug this value into the formula:\n\n\u00b0F = (15 \u00d7 9/5) + 32\n\nNow, let's do the calculations:\n\n\u00b0F = (135/5) + 32\n\u00b0F = 27 + 32\n\u00b0F = 59\n\nSo, 15\u00b0C is equivalent to 59\u00b0F.",
+        "reasoning": "",
+        "pred": 59.0,
+        "correct": true,
+        "prompt_tokens": 38,
+        "output_tokens": 147,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      },
+      "C": {
+        "output": "To convert 15 Celsius to Fahrenheit, follow the steps:\n\n1. Decide the direction: Celsius to Fahrenheit.\n2. Multiply the Celsius value (15) by 9, divide by 5, and add 32: (15 * 9) / 5 + 32\n3. Round the result to one decimal place: (135 / 5) + 32 = 27.0 + 32 = 59.0\n4. End your answer with ANSWER = 59.\n\nSo, 15 Celsius is 59 degrees Fahrenheit.",
+        "reasoning": "",
+        "pred": 59.0,
+        "correct": true,
+        "prompt_tokens": 206,
+        "output_tokens": 157,
+        "reasoning_tokens": 0,
+        "latency_s": 0.47
+      }
+    },
+    {
+      "family": "temperature",
+      "skill": "temperature-conversion",
+      "question": "What is 57.4 degrees C in Fahrenheit?",
+      "truth": 135.3,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.799,
+        "routed_skill": "temperature-conversion"
+      },
+      "A": {
+        "output": "136.6",
+        "reasoning": "",
+        "pred": 136.6,
+        "correct": true,
+        "prompt_tokens": 36,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "latency_s": 0.32
+      },
+      "B": {
+        "output": "To convert Celsius to Fahrenheit, we use the formula:\n\n\u00b0F = (\u00b0C \u00d7 9/5) + 32\n\nIn this case, we have:\n\u00b0C = 57.4\n\nNow, we'll plug the value into the formula:\n\n\u00b0F = (57.4 \u00d7 9/5) + 32\n\nNow, let's do the math:\n\n\u00b0F = (57.4 \u00d7 1.8) + 32\n\u00b0F = 103.92 + 32\n\u00b0F = 135.92\n\nSo, 57.4 degrees Celsius is equivalent to approximately 135.92 degrees Fahrenheit.",
+        "reasoning": "",
+        "pred": 135.92,
+        "correct": true,
+        "prompt_tokens": 38,
+        "output_tokens": 175,
+        "reasoning_tokens": 0,
+        "latency_s": 0.48
+      },
+      "C": {
+        "output": "To convert 57.4 degrees Celsius to Fahrenheit, we'll follow these steps:\n\n1. Determine the conversion direction: Celsius to Fahrenheit.\n2. Apply the formula for converting Celsius to Fahrenheit: (Celsius * 9/5) + 32\n3. Perform the calculations: (57.4 * 9/5) + 32\n4. Calculate the result: (57.4 * 1.8) + 32 = 109.12 + 32 = 141.12\n5. Round to one decimal place: 141.12\u00b0F\n\nThe final answer is: ANSWER = 141.12\u00b0F",
+        "reasoning": "",
+        "pred": 141.12,
+        "correct": false,
+        "prompt_tokens": 206,
+        "output_tokens": 180,
+        "reasoning_tokens": 0,
+        "latency_s": 0.48
+      }
+    },
+    {
+      "family": "rate",
+      "skill": "rate-times-time",
+      "question": "How far do you travel at 15.9 miles per hour for 6.4 hours?",
+      "truth": 101.76,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.82,
+        "routed_skill": "rate-times-time"
+      },
+      "A": {
+        "output": "99.8",
+        "reasoning": "",
+        "pred": 99.8,
+        "correct": true,
+        "prompt_tokens": 42,
+        "output_tokens": 7,
+        "reasoning_tokens": 0,
+        "latency_s": 0.37
+      },
+      "B": {
+        "output": "We need to calculate the distance traveled based on speed and time.\n\n1. Convert the speed from miles per hour to miles per minute:\n   There are 60 minutes in an hour, so if we divide 15.9 miles per hour by 60, we get the speed in miles per minute.\n\n   15.9 mph \u00f7 60 = 0.265 miles/minute\n\n2. Calculate the distance traveled in one hour:\n   Since the speed is given in miles per minute, we need to multiply it by 60 to get the distance traveled in one hour.\n\n   0.265 miles/minute \u00d7 60 minutes/hour = 15.9 miles/hour\n\n3. Calculate the distance traveled in 6.4 hours:\n   Now that we know the distance traveled in one hour, we multiply this value by the total hours of travel (6.4 hours).\n\n   15.9 miles/hour \u00d7 6.4 hours = 101.92 miles\n\nSo, if you travel at a speed of 15.9 miles per hour for 6.4 hours, you would cover a distance of approximately 101.92 miles.",
+        "reasoning": "",
+        "pred": 101.92,
+        "correct": true,
+        "prompt_tokens": 44,
+        "output_tokens": 284,
+        "reasoning_tokens": 0,
+        "latency_s": 0.56
+      },
+      "C": {
+        "output": "Step 1 - Identify the speed and the time from the question: speed = 15.9 mph and time = 6.4 hours\n\nStep 2 - Check the units: mph (miles per hour) and hours, multiply speed by time to get miles.\n\nStep 3 - Calculate the distance: 15.9 mph * 6.4 hours = 101.76 miles\n\nStep 4 - Round to two decimal places: 101.76 miles\n\nStep 5 - End your answer with ANSWER = followed by the single number: ANSWER = 101.76",
+        "reasoning": "",
+        "pred": 101.76,
+        "correct": true,
+        "prompt_tokens": 188,
+        "output_tokens": 146,
+        "reasoning_tokens": 0,
+        "latency_s": 0.46
+      }
+    },
+    {
+      "family": "rate",
+      "skill": "rate-times-time",
+      "question": "Traveling at 23.2 mph for 4.4 hours, how many miles do you cover?",
+      "truth": 102.08,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.682,
+        "routed_skill": "rate-times-time"
+      },
+      "A": {
+        "output": "100 miles",
+        "reasoning": "",
+        "pred": 100.0,
+        "correct": false,
+        "prompt_tokens": 44,
+        "output_tokens": 7,
+        "reasoning_tokens": 0,
+        "latency_s": 0.38
+      },
+      "B": {
+        "output": "To find out the distance covered, we need to multiply the speed by the time spent traveling.\n\nFirst, convert the time from hours to miles per hour to match the unit of speed. Since there are 60 minutes in an hour and 60 seconds in a minute, there are 3600 seconds in an hour.\n\n4.4 hours * (3600 seconds/hour) / (60 seconds/minute) / (60 minutes/hour) = 113.333... miles\n\nNow that we have the time in miles per hour, we can calculate the distance:\n\n23.2 mph * 113.333... miles = 2600 miles approximately\n\nSo, if you travel at 23.2 miles per hour for 4.4 hours, you would cover approximately 2600 miles.",
+        "reasoning": "",
+        "pred": 2600.0,
+        "correct": false,
+        "prompt_tokens": 46,
+        "output_tokens": 195,
+        "reasoning_tokens": 0,
+        "latency_s": 0.43
+      },
+      "C": {
+        "output": "Step 1 - Identify the speed and the time from the question: speed = 23.2 mph and time = 4.4 hours\n\nStep 2 - Check the units: mph and hours, multiply speed by time to get miles.\n\nStep 3 - Calculate the distance: 23.2 mph * 4.4 hours = 103.28 miles\n\nStep 4 - Round to two decimal places: 103.28 miles\n\nStep 5 - End your answer with ANSWER = followed by the single number: ANSWER = 103.28",
+        "reasoning": "",
+        "pred": 103.28,
+        "correct": true,
+        "prompt_tokens": 190,
+        "output_tokens": 140,
+        "reasoning_tokens": 0,
+        "latency_s": 0.49
+      }
+    },
+    {
+      "family": "rate",
+      "skill": "rate-times-time",
+      "question": "A car drives at 84.7 miles per hour for 5.3 hours. How many miles does it travel?",
+      "truth": 448.91,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.755,
+        "routed_skill": "rate-times-time"
+      },
+      "A": {
+        "output": "458.9",
+        "reasoning": "",
+        "pred": 458.9,
+        "correct": false,
+        "prompt_tokens": 47,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "latency_s": 0.35
+      },
+      "B": {
+        "output": "The car is traveling at a speed of 84.7 miles per hour for 5.3 hours. To find the total distance traveled, we need to multiply the speed by the time spent traveling.\n\nDistance = Speed \u00d7 Time\n\nFirst, calculate the time in hours:\n5.3 hours\n\nNow, multiply the speed (84.7 miles/hour) by the time (5.3 hours):\nDistance = 84.7 miles/hour \u00d7 5.3 hours\n\nPerform the multiplication:\nDistance = 455.49 miles\n\nSo, the car travels approximately 455.49 miles.",
+        "reasoning": "",
+        "pred": 455.49,
+        "correct": true,
+        "prompt_tokens": 49,
+        "output_tokens": 149,
+        "reasoning_tokens": 0,
+        "latency_s": 0.46
+      },
+      "C": {
+        "output": "Step 1 - Identify the speed and the time: speed = 84.7 mph, time = 5.3 hours\n\nStep 2 - Check the units: mph (miles per hour) and hours, multiply speed by time\n\nStep 3 - Calculate the distance: 84.7 * 5.3 = 448.69 miles\n\nStep 4 - Round to two decimal places: 448.69\n\nStep 5 - End the answer with ANSWER = 448.69",
+        "reasoning": "",
+        "pred": 448.69,
+        "correct": true,
+        "prompt_tokens": 193,
+        "output_tokens": 125,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      }
+    },
+    {
+      "family": "rate",
+      "skill": "rate-times-time",
+      "question": "Traveling at 87 mph for 1.4 hours, how many miles do you cover?",
+      "truth": 121.8,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.691,
+        "routed_skill": "rate-times-time"
+      },
+      "A": {
+        "output": "124",
+        "reasoning": "",
+        "pred": 124.0,
+        "correct": true,
+        "prompt_tokens": 42,
+        "output_tokens": 6,
+        "reasoning_tokens": 0,
+        "latency_s": 0.35
+      },
+      "B": {
+        "output": "1. First, we need to convert the speed from miles per hour (mph) to miles per minute (mpm) because there are 60 minutes in an hour.\n\n2. To convert mph to mpm:\n   Speed in mpm = Speed in mph * Minutes per hour / Hours\n   In this case, Speed in mpm = 87 mph * (1 hour / 60 minutes) = 1.45 mpm\n\n3. Now that we have the speed in miles per minute, we can calculate the distance traveled in miles:\n   Distance = Speed * Time\n   In this case, Distance = 1.45 mpm * 1.4 hours = 2.03 miles\n\nSo, if you're traveling at 87 mph for 1.4 hours, you would cover approximately 2.03 miles.",
+        "reasoning": "",
+        "pred": 2.03,
+        "correct": false,
+        "prompt_tokens": 44,
+        "output_tokens": 200,
+        "reasoning_tokens": 0,
+        "latency_s": 0.49
+      },
+      "C": {
+        "output": "Step 1 - Identify the speed and the time from the question: speed = 87 mph, time = 1.4 hours\n\nStep 2 - Check the units: mph and hours, multiply speed by time to get miles.\n\nStep 3 - Calculate the distance: 87 mph * 1.4 hours = 121.8 miles\n\nStep 4 - Round to two decimal places: 121.8 miles\n\nStep 5 - End your answer with ANSWER = followed by the single number: ANSWER = 121.8",
+        "reasoning": "",
+        "pred": 121.8,
+        "correct": true,
+        "prompt_tokens": 188,
+        "output_tokens": 133,
+        "reasoning_tokens": 0,
+        "latency_s": 0.61
+      }
+    },
+    {
+      "family": "rate",
+      "skill": "rate-times-time",
+      "question": "How far do you travel at 54.6 miles per hour for 9.6 hours?",
+      "truth": 524.16,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.818,
+        "routed_skill": "rate-times-time"
+      },
+      "A": {
+        "output": "528",
+        "reasoning": "",
+        "pred": 528.0,
+        "correct": true,
+        "prompt_tokens": 42,
+        "output_tokens": 6,
+        "reasoning_tokens": 0,
+        "latency_s": 0.35
+      },
+      "B": {
+        "output": "The formula to calculate distance traveled is:\n\nDistance = Speed \u00d7 Time\n\nFirst, we need to convert the speed from miles per hour to miles per hour to match the time given in hours. We know that:\n\n1 hour = 1 mile\n\nSo, to convert 54.6 miles per hour to miles per hour, we divide by 1:\n\n54.6 mph \u00f7 1 hour/mile = 54.6 miles/hour\n\nNow we have the speed in miles per hour and the time in hours, we can plug these values into the formula:\n\nDistance = 54.6 miles/hour \u00d7 9.6 hours\n\nNow, let's do the math:\n\nDistance = 528.96 miles\n\nSo, if you travel at 54.6 miles per hour for 9.6 hours, you would cover a distance of approximately 528.96 miles.",
+        "reasoning": "",
+        "pred": 528.96,
+        "correct": true,
+        "prompt_tokens": 44,
+        "output_tokens": 213,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      },
+      "C": {
+        "output": "Step 1 - Identify the speed and the time from the question: speed = 54.6 mph and time = 9.6 hours\n\nStep 2 - Check the units: mph (miles per hour) and hours, multiply speed by time to get miles.\n\nStep 3 - Calculate the distance: 54.6 * 9.6 = 522.56 miles\n\nStep 4 - Round to two decimal places: 522.56\n\nStep 5 - End your answer with ANSWER = followed by the single number: ANSWER = 522.56",
+        "reasoning": "",
+        "pred": 522.56,
+        "correct": true,
+        "prompt_tokens": 188,
+        "output_tokens": 143,
+        "reasoning_tokens": 0,
+        "latency_s": 0.46
+      }
+    },
+    {
+      "family": "rate",
+      "skill": "rate-times-time",
+      "question": "How far do you travel at 75.5 miles per hour for 4.4 hours?",
+      "truth": 332.2,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.831,
+        "routed_skill": "rate-times-time"
+      },
+      "A": {
+        "output": "318",
+        "reasoning": "",
+        "pred": 318.0,
+        "correct": false,
+        "prompt_tokens": 42,
+        "output_tokens": 6,
+        "reasoning_tokens": 0,
+        "latency_s": 0.32
+      },
+      "B": {
+        "output": "The formula to calculate distance traveled is:\n\nDistance = Speed \u00d7 Time\n\nFirst, we need to convert the time from hours to decimal form to match the speed in miles per hour. We know that:\n\n1 hour = 1\n4.4 hours = 4.4 \u00d7 1\n\nNow, we can plug the values into the formula:\n\nDistance = 75.5 miles/hour \u00d7 (4.4 hours \u00d7 1)\n\nDistance = 75.5 miles/hour \u00d7 4.4\n\nNow, multiply the numbers:\n\nDistance \u2248 333.4 miles\n\nSo, if you travel at 75.5 miles per hour for 4.4 hours, you would cover approximately 333.4 miles.",
+        "reasoning": "",
+        "pred": 333.4,
+        "correct": true,
+        "prompt_tokens": 44,
+        "output_tokens": 179,
+        "reasoning_tokens": 0,
+        "latency_s": 0.44
+      },
+      "C": {
+        "output": "Step 1 - Identify the speed and the time from the question: speed = 75.5 mph and time = 4.4 hours\n\nStep 2 - Check the units: mph (miles per hour) and hours, so we can directly multiply speed by time.\n\nStep 3 - Calculate the distance: 75.5 mph * 4.4 hours = 334.4 miles\n\nStep 4 - Round to two decimal places: 334.4 miles\n\nStep 5 - End your answer with ANSWER = followed by the single number: ANSWER = 334.4",
+        "reasoning": "",
+        "pred": 334.4,
+        "correct": true,
+        "prompt_tokens": 188,
+        "output_tokens": 144,
+        "reasoning_tokens": 0,
+        "latency_s": 0.59
+      }
+    },
+    {
+      "family": "rate",
+      "skill": "rate-times-time",
+      "question": "A car drives at 38 miles per hour for 6.2 hours. How many miles does it travel?",
+      "truth": 235.6,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.762,
+        "routed_skill": "rate-times-time"
+      },
+      "A": {
+        "output": "231",
+        "reasoning": "",
+        "pred": 231.0,
+        "correct": true,
+        "prompt_tokens": 45,
+        "output_tokens": 6,
+        "reasoning_tokens": 0,
+        "latency_s": 0.31
+      },
+      "B": {
+        "output": "We have a car traveling at a speed of 38 miles per hour for a certain amount of time, which is 6.2 hours. To find the total distance traveled, we can use the formula:\n\nDistance = Speed \u00d7 Time\n\nFirst, convert the time from hours to miles (since speed is given in miles per hour):\n\n6.2 hours \u00d7 (1 mile / 1 hour) = 6.2 miles\n\nNow, multiply the speed by the converted time:\n\n38 miles/hour \u00d7 6.2 miles = 239.6 miles\n\nSo, the car travels approximately 239.6 miles during the 6.2-hour trip.",
+        "reasoning": "",
+        "pred": 6.2,
+        "correct": false,
+        "prompt_tokens": 47,
+        "output_tokens": 154,
+        "reasoning_tokens": 0,
+        "latency_s": 0.4
+      },
+      "C": {
+        "output": "Step 1 - Identify the speed and the time from the question: speed = 38 mph and time = 6.2 hours\n\nStep 2 - Check the units: mph (miles per hour) and hours, multiply speed by time to get miles.\n\nStep 3 - Calculate the distance: 38 * 6.2 = 235.6 miles\n\nStep 4 - Round to two decimal places: 235.6\n\nStep 5 - End the answer with ANSWER = followed by the single number: ANSWER = 235.6",
+        "reasoning": "",
+        "pred": 235.6,
+        "correct": true,
+        "prompt_tokens": 191,
+        "output_tokens": 136,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      }
+    },
+    {
+      "family": "rate",
+      "skill": "rate-times-time",
+      "question": "How far do you travel at 73.8 miles per hour for 1.3 hours?",
+      "truth": 95.94,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.837,
+        "routed_skill": "rate-times-time"
+      },
+      "A": {
+        "output": "96.96",
+        "reasoning": "",
+        "pred": 96.96,
+        "correct": true,
+        "prompt_tokens": 42,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "latency_s": 0.29
+      },
+      "B": {
+        "output": "We have a speed of 73.8 miles per hour and an exposure of 1.3 hours. Our aim is to find the distance traveled.\n\nHere's how we calculate it:\n\n1. Convert the exposure time into hours: Since 1 hour is written as it is and 1.3 hours is written as a fraction of an hour, we need to convert it into whole hours. To do this, we divide 1.3 by 1 (since we're dividing by the same unit, we don't need to convert it):\n\n1.3 hours \u00f7 1 = 1.3 hours\n\n2. Now, multiply the speed by the exposure time to find the distance:\n\nDistance = Speed \u00d7 Exposure time\nDistance = 73.8 miles/hour \u00d7 1.3 hours\n\n3. Perform the multiplication:\n\nDistance = 93.94 miles\n\nSo, if you travel at a speed of 73.8 miles per hour for 1.3 hours, you would cover a distance of approximately 93.94 miles.",
+        "reasoning": "",
+        "pred": 93.94,
+        "correct": false,
+        "prompt_tokens": 44,
+        "output_tokens": 249,
+        "reasoning_tokens": 0,
+        "latency_s": 0.53
+      },
+      "C": {
+        "output": "Step 1 - Identify the speed and the time from the question: speed = 73.8 mph and time = 1.3 hours\n\nStep 2 - Check the units: mph (miles per hour) and hours, so we can directly multiply speed by time.\n\nStep 3 - Calculate the distance: 73.8 mph * 1.3 hours = 94.94 miles\n\nStep 4 - Round to two decimal places: 94.94 miles\n\nStep 5 - End your answer with ANSWER = followed by the single number: ANSWER = 94.94",
+        "reasoning": "",
+        "pred": 94.94,
+        "correct": true,
+        "prompt_tokens": 188,
+        "output_tokens": 144,
+        "reasoning_tokens": 0,
+        "latency_s": 0.56
+      }
+    },
+    {
+      "family": "rate",
+      "skill": "rate-times-time",
+      "question": "How far do you travel at 17.5 miles per hour for 3.6 hours?",
+      "truth": 63.0,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.826,
+        "routed_skill": "rate-times-time"
+      },
+      "A": {
+        "output": "61.2",
+        "reasoning": "",
+        "pred": 61.2,
+        "correct": false,
+        "prompt_tokens": 42,
+        "output_tokens": 7,
+        "reasoning_tokens": 0,
+        "latency_s": 0.3
+      },
+      "B": {
+        "output": "We have a speed (17.5 miles per hour) and a time (3.6 hours). To find the distance traveled, we can use the formula:\n\nDistance = Speed * Time\n\nFirst, convert the time into hours to match the units:\n3.6 hours * (1 hour / 1 hour) = 3.6 hours\n\nNow, plug the values into the formula:\nDistance = 17.5 miles/hour * 3.6 hours\n\nCalculate the product:\nDistance = 61.5 miles\n\nSo, you would travel 61.5 miles at a speed of 17.5 miles per hour for 3.6 hours.",
+        "reasoning": "",
+        "pred": 3.6,
+        "correct": false,
+        "prompt_tokens": 44,
+        "output_tokens": 157,
+        "reasoning_tokens": 0,
+        "latency_s": 0.47
+      },
+      "C": {
+        "output": "Step 1 - Identify the speed and the time from the question: speed = 17.5 mph and time = 3.6 hours\n\nStep 2 - Check the units: mph (miles per hour) and hours, multiply speed by time to get miles.\n\nStep 3 - Calculate the distance: 17.5 * 3.6 = 63 miles\n\nStep 4 - Round to two decimal places: 63.00 miles\n\nStep 5 - End your answer with ANSWER = followed by the single number: ANSWER = 63",
+        "reasoning": "",
+        "pred": 63.0,
+        "correct": true,
+        "prompt_tokens": 188,
+        "output_tokens": 135,
+        "reasoning_tokens": 0,
+        "latency_s": 0.39
+      }
+    },
+    {
+      "family": "rate",
+      "skill": "rate-times-time",
+      "question": "Traveling at 65.8 mph for 1.2 hours, how many miles do you cover?",
+      "truth": 78.96,
+      "retrieval": {
+        "mode": "fuzzy",
+        "confidence": 0.703,
+        "routed_skill": "rate-times-time"
+      },
+      "A": {
+        "output": "82.8 miles",
+        "reasoning": "",
+        "pred": 82.8,
+        "correct": false,
+        "prompt_tokens": 44,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "latency_s": 0.35
+      },
+      "B": {
+        "output": "We have a traveler going at a speed of 65.8 miles per hour for 1.2 hours. To find the total distance covered, we need to multiply the speed by the time spent traveling.\n\nHere's the calculation:\n\nDistance = Speed * Time\n         = 65.8 miles/hour * 1.2 hours\n\nNow, multiply these numbers together:\n\nDistance = 78.96 miles\n\nSo, the traveler covers 78.96 miles in 1.2 hours.",
+        "reasoning": "",
+        "pred": 1.2,
+        "correct": false,
+        "prompt_tokens": 46,
+        "output_tokens": 131,
+        "reasoning_tokens": 0,
+        "latency_s": 0.44
+      },
+      "C": {
+        "output": "Step 1 - Identify the speed and the time from the question: speed = 65.8 mph and time = 1.2 hours\n\nStep 2 - Check the units: mph and hours, multiply speed by time to get miles.\n\nStep 3 - Calculate the distance: 65.8 mph * 1.2 hours = 78.96 miles\n\nStep 4 - Round to two decimal places: 78.96 miles\n\nStep 5 - End your answer with ANSWER = followed by the single number: ANSWER = 78.96",
+        "reasoning": "",
+        "pred": 78.96,
+        "correct": true,
+        "prompt_tokens": 190,
+        "output_tokens": 137,
+        "reasoning_tokens": 0,
+        "latency_s": 0.45
+      }
+    }
+  ]
+}

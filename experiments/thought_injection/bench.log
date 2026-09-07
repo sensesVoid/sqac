@@ -1,0 +1,7 @@
+validated 4 skills (0 warnings)
+cartridge: 34 entries, 4 skills
+tasks: 16
+loading Qwen/Qwen2.5-0.5B-Instruct on CPU...
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]Loading weights:   0%|          | 1/290 [00:00<01:31,  3.17it/s]Loading weights:  38%|███▊      | 111/290 [00:00<00:00, 315.21it/s]Loading weights:  56%|█████▌    | 161/290 [00:00<00:00, 284.91it/s]Loading weights:  69%|██████▉   | 200/290 [00:00<00:00, 263.24it/s]Loading weights:  80%|████████  | 233/290 [00:00<00:00, 253.84it/s]Loading weights:  90%|█████████ | 262/290 [00:01<00:00, 254.59it/s]Loading weights: 100%|██████████| 290/290 [00:01<00:00, 255.37it/s]
+model loaded in 5.2s

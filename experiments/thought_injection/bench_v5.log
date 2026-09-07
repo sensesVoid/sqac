@@ -1,0 +1,67 @@
+cartridges: verbose=34|concise=34 all 4 skills
+resume: 40 prior rows, filling arms none
+[3/40] length-conversion    x=661.01   A✓ B✗ C✗ D✓ E✗ F✗  (route length-convers fuzzy/0.64)
+[4/40] length-conversion    x=294.77   A✓ B✗ C✗ D✓ E✗ F✗  (route length-convers fuzzy/0.78)
+[7/40] length-conversion    x=686.94   A✓ B✓ C✓ D✗ E✗ F✗  (route length-convers fuzzy/0.72)
+[8/40] length-conversion    x=28.47    A✗ B✗ C✓ D✗ E✓ F✗  (route length-convers fuzzy/0.78)
+[10/40] length-conversion    x=158.34   A✓ B✗ C✗ D✓ E✗ F✓  (route length-convers fuzzy/0.75)
+[11/40] mass-conversion      x=114.50   A✓ B✗ C✗ D✗ E✓ F✗  (route mass-conversio fuzzy/0.76)
+[12/40] mass-conversion      x=10747.59  A✗ B✗ C✗ D✓ E✗ F✗  (route mass-conversio fuzzy/0.76)
+[13/40] mass-conversion      x=6645.70  A✗ B✓ C✓ D✓ E✗ F✗  (route mass-conversio fuzzy/0.73)
+[14/40] mass-conversion      x=177.13   A✓ B✗ C✗ D✗ E✓ F✗  (route mass-conversio fuzzy/0.74)
+[15/40] mass-conversion      x=101.10   A✓ B✓ C✗ D✗ E✓ F✗  (route mass-conversio fuzzy/0.76)
+[16/40] mass-conversion      x=52.71    A✓ B✗ C✓ D✗ E✓ F✗  (route mass-conversio fuzzy/0.75)
+[17/40] mass-conversion      x=98.20    A✓ B✓ C✗ D✓ E✓ F✗  (route mass-conversio fuzzy/0.76)
+[20/40] mass-conversion      x=6483.54  A✗ B✗ C✓ D✓ E✗ F✗  (route mass-conversio fuzzy/0.77)
+[21/40] temperature-conversion x=-11.90   A✗ B✗ C✓ D✗ E✓ F✗  (route temperature-co fuzzy/0.81)
+[23/40] temperature-conversion x=4.10     A✗ B✗ C✗ D✗ E✓ F✗  (route temperature-co fuzzy/0.82)
+[24/40] temperature-conversion x=29.10    A✗ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.71)
+[25/40] temperature-conversion x=226.00   A✓ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.80)
+[26/40] temperature-conversion x=31.50    A✓ B✓ C✗ D✓ E✓ F✗  (route temperature-co fuzzy/0.83)
+[27/40] temperature-conversion x=184.60   A✗ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.80)
+[28/40] temperature-conversion x=46.40    A✗ B✓ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.83)
+[30/40] temperature-conversion x=135.30   A✓ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.83)
+[31/40] rate-times-time      x=101.76   A✓ B✓ C✓ D✗ E✓ F✓  (route rate-times-tim fuzzy/0.82)
+[32/40] rate-times-time      x=102.08   A✗ B✗ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.68)
+[33/40] rate-times-time      x=448.91   A✗ B✓ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.75)
+[34/40] rate-times-time      x=121.80   A✓ B✓ C✓ D✗ E✓ F✓  (route rate-times-tim fuzzy/0.83)
+[36/40] rate-times-time      x=332.20   A✗ B✗ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.77)
+[40/40] rate-times-time      x=78.96    A✗ B✗ C✓ D✗ E✓ F✓  (route rate-times-tim fuzzy/0.70)
+
+== RESULTS (Groq / allam-2-7b) ==
+retrieval (verbose): 40/40 (100%)
+retrieval (concise): 40/40 (100%)
+arm  acc     prompt   out tok   total   
+A    57%     37       14        51      
+B    40%     39       161       200     
+C    45%     213      182       394     
+D    48%     141      16        156     
+E    50%     153      26        179     
+F    30%     145      101       246     
+C vs B: acc +5%, out tok +20.9, total tok +194.7
+D vs B: acc +7%, out tok -145.3, total tok -43.6
+E vs B: acc +10%, out tok -134.4, total tok -20.7
+E vs D: acc +3%, out tok +10.9, total tok +22.9
+F vs D: acc -18%, out tok +85.6, total tok +89.6
+
+per-family accuracy:
+  length        A=70%  B=30%  C=20%  D=60%  E=10%  F=20%
+  mass          A=70%  B=50%  C=40%  D=60%  E=50%  F=0%
+  rate          A=40%  B=50%  C=100%  D=50%  E=100%  F=90%
+  temperature   A=50%  B=30%  C=20%  D=20%  E=40%  F=10%
+
+E-arm output samples:
+  How many meters are in 473.96 feet?
+    -> '(473.96 * 0.3048) / 2.54'  pred=56.8752
+  Change 325.64 meters into feet.
+    -> '325.64 / 0.3048 * 3 * 12'  pred=38461.41732283464
+  Express 410.73 miles as kilometers.
+    -> '(410.73 / 1.609344) * 1000'  pred=255215.78978764018
+  How many kilometers are in 183.16 miles?
+    -> '183.16 miles * 1.609344 km/mile / 1.609344 km/mile'  pred=None
+  How many kilometers are in 454.9 miles?
+    -> '454.9 miles * 1.609344 km/mile / 1.609344 km/mile'  pred=None
+  Convert 19.23 kilometers to miles.
+    -> '19.23 km * 1.609344 / 1.609344'  pred=19.23
+
+saved -> results_allam_v2.json

@@ -1,0 +1,80 @@
+cartridges: verbose=34|concise=34 all 4 skills
+resume: 40 prior rows, filling arms ['E', 'F']
+[1/40] length-conversion    x=144.46   A✓ B✗ C✗ D✗ E✗ F✗  (route length-convers fuzzy/0.72)
+[2/40] length-conversion    x=1068.37  A✓ B✓ C✗ D✓ E✗ F✗  (route length-convers fuzzy/0.66)
+[3/40] length-conversion    x=661.01   A✓ B✓ C✗ D✓ E✗ F✓  (route length-convers fuzzy/0.78)
+[4/40] length-conversion    x=294.77   A✓ B✓ C✗ D✓ E✗ F✗  (route length-convers fuzzy/0.80)
+[5/40] length-conversion    x=732.09   A✗ B✗ C✗ D✗ E✗ F✗  (route length-convers fuzzy/0.79)
+[6/40] length-conversion    x=11.95    A✓ B✓ C✗ D✓ E✗ F✓  (route length-convers fuzzy/0.77)
+[7/40] length-conversion    x=686.94   A✓ B✗ C✗ D✓ E✗ F✗  (route length-convers fuzzy/0.61)
+[8/40] length-conversion    x=28.47    A✓ B✗ C✓ D✗ E✓ F✗  (route length-convers fuzzy/0.79)
+[9/40] length-conversion    x=98.52    A✗ B✗ C✗ D✓ E✗ F✗  (route length-convers fuzzy/0.74)
+[10/40] length-conversion    x=158.34   A✓ B✓ C✗ D✓ E✗ F✓  (route length-convers fuzzy/0.68)
+[11/40] mass-conversion      x=114.50   A✓ B✗ C✓ D✓ E✓ F✗  (route mass-conversio fuzzy/0.77)
+[12/40] mass-conversion      x=10747.59  A✗ B✗ C✗ D✗ E✗ F✗  (route mass-conversio fuzzy/0.74)
+[13/40] mass-conversion      x=6645.70  A✗ B✓ C✓ D✓ E✗ F✗  (route mass-conversio fuzzy/0.77)
+[14/40] mass-conversion      x=177.13   A✗ B✗ C✓ D✗ E✓ F✗  (route mass-conversio fuzzy/0.80)
+[15/40] mass-conversion      x=101.10   A✓ B✗ C✗ D✓ E✓ F✗  (route mass-conversio fuzzy/0.81)
+[16/40] mass-conversion      x=52.71    A✓ B✗ C✗ D✗ E✓ F✗  (route mass-conversio fuzzy/0.74)
+[17/40] mass-conversion      x=98.20    A✓ B✗ C✗ D✗ E✓ F✗  (route mass-conversio fuzzy/0.80)
+[18/40] mass-conversion      x=3507.97  A✓ B✓ C✓ D✓ E✗ F✗  (route mass-conversio fuzzy/0.79)
+[19/40] mass-conversion      x=2061.01  A✓ B✓ C✗ D✓ E✗ F✗  (route mass-conversio fuzzy/0.71)
+[20/40] mass-conversion      x=6483.54  A✗ B✓ C✓ D✓ E✗ F✗  (route mass-conversio fuzzy/0.73)
+[21/40] temperature-conversion x=-11.90   A✗ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.82)
+[22/40] temperature-conversion x=10.20    A✓ B✗ C✗ D✗ E✓ F✗  (route temperature-co fuzzy/0.83)
+[23/40] temperature-conversion x=4.10     A✗ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.73)
+[24/40] temperature-conversion x=29.10    A✗ B✗ C✗ D✗ E✓ F✗  (route temperature-co fuzzy/0.81)
+[25/40] temperature-conversion x=226.00   A✓ B✓ C✗ D✓ E✗ F✗  (route temperature-co fuzzy/0.82)
+[26/40] temperature-conversion x=31.50    A✓ B✗ C✗ D✗ E✗ F✓  (route temperature-co fuzzy/0.79)
+[27/40] temperature-conversion x=184.60   A✗ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.82)
+[28/40] temperature-conversion x=46.40    A✗ B✓ C✗ D✓ E✗ F✗  (route temperature-co fuzzy/0.82)
+[29/40] temperature-conversion x=59.00    A✓ B✓ C✓ D✓ E✗ F✓  (route temperature-co fuzzy/0.83)
+[30/40] temperature-conversion x=135.30   A✓ B✓ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.80)
+[31/40] rate-times-time      x=101.76   A✓ B✗ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.77)
+[32/40] rate-times-time      x=102.08   A✗ B✓ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.83)
+[33/40] rate-times-time      x=448.91   A✓ B✗ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.84)
+[34/40] rate-times-time      x=121.80   A✓ B✗ C✓ D✗ E✓ F✓  (route rate-times-tim fuzzy/0.69)
+[35/40] rate-times-time      x=524.16   A✓ B✓ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.82)
+[36/40] rate-times-time      x=332.20   A✗ B✓ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.83)
+[37/40] rate-times-time      x=235.60   A✓ B✓ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.70)
+[38/40] rate-times-time      x=95.94    A✗ B✗ C✓ D✗ E✓ F✗  (route rate-times-tim fuzzy/0.75)
+[39/40] rate-times-time      x=63.00    A✗ B✗ C✓ D✗ E✓ F✓  (route rate-times-tim fuzzy/0.83)
+[40/40] rate-times-time      x=78.96    A✓ B✗ C✓ D✗ E✓ F✓  (route rate-times-tim fuzzy/0.78)
+
+== RESULTS (Groq / allam-2-7b) ==
+retrieval (verbose): 40/40 (100%)
+retrieval (concise): 40/40 (100%)
+arm  acc     prompt   out tok   total   
+A    62%     37       14        50      
+B    42%     39       154       193     
+C    42%     213      181       394     
+D    55%     141      16        157     
+E    45%     153      25        177     
+F    35%     145      105       250     
+C vs B: acc +0%, out tok +26.8, total tok +200.6
+D vs B: acc +13%, out tok -138.2, total tok -36.4
+E vs B: acc +3%, out tok -129.6, total tok -15.9
+E vs D: acc -10%, out tok +8.6, total tok +20.5
+F vs D: acc -20%, out tok +89.1, total tok +93.1
+
+per-family accuracy:
+  length        A=80%  B=50%  C=10%  D=70%  E=10%  F=30%
+  mass          A=60%  B=40%  C=50%  D=60%  E=50%  F=0%
+  rate          A=60%  B=40%  C=100%  D=60%  E=100%  F=90%
+  temperature   A=50%  B=40%  C=10%  D=30%  E=20%  F=20%
+
+E-arm output samples:
+  How many meters are in 473.96 feet?
+    -> '(473.96 * 0.3048) / 2.54'  pred=56.8752
+  Change 325.64 meters into feet.
+    -> '325.64 / 0.3048 * 3 * 12'  pred=38461.41732283464
+  Change 410.73 miles into kilometers.
+    -> '(410.73 / 1.609344) * 1000'  pred=255215.78978764018
+  Convert 183.16 miles to kilometers.
+    -> '183.16 miles * 1.609344 km/mile / 1.609344 km/mile'  pred=None
+  How many kilometers are in 454.9 miles?
+    -> '454.9 miles * 1.609344 km/mile / 1.609344 km/mile'  pred=None
+  Convert 19.23 kilometers to miles.
+    -> '19.23 km * 1.609344 / 1.609344'  pred=19.23
+
+saved -> results_allam_v2.json

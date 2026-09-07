@@ -6,8 +6,17 @@ Public API:
     CartridgeRack      — named cartridges + kind-based routing
     BSCEncoder         — zero-dependency binary spatter-code encoder
     read/write         — .sqac binary format v1
+    extract_project_units / build_store / track_once / track
+                        — project auto-build and realtime tracking
 """
 
+from .autobuild import (
+    build_store,
+    extract_project_units,
+    track,
+    track_once,
+    _sync_rack,
+)
 from .encoder import BSCEncoder
 from .format import CartridgeHeader, read_cartridge, write_cartridge
 from .offloader import ContextOffloader
@@ -45,4 +54,9 @@ __all__ = [
     "KIND_NAMES",
     "Hit",
     "resolve_kind",
+    "extract_project_units",
+    "build_store",
+    "track_once",
+    "track",
+    "_sync_rack",
 ]

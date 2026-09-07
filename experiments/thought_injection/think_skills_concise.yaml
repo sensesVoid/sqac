@@ -1,0 +1,87 @@
+# Thought-Injection Skills — CONCISE variant. Terse, factor-first procedures
+# for unit/temperature conversion. Based on findings that minimal-verbosity
+# scaffolding preserves weak-model accuracy (vs verbose step-forcing).
+# content = the procedure to inject; keys = concrete situation triggers.
+
+# ── LENGTH CONVERSION ────────────────────────────────────────────────────────
+
+- name: length-conversion
+  domain: math
+  difficulty: medium
+  pattern: unit-conversion
+  content: |
+    LENGTH: km = miles x 1.609344; miles = km / 1.609344; m = feet x 0.3048;
+    feet = m / 0.3048; cm = inches x 2.54; inches = cm / 2.54.
+    Procedure: read source and target unit; multiply into the smaller unit,
+    divide into the larger unit; output the single number.
+  keys:
+    - convert miles to kilometers
+    - how many kilometers are in 25 miles
+    - miles to kilometers conversion
+    - how many miles are in 100 kilometers
+    - convert 50 feet to meters
+    - how many meters is 30 feet
+    - how many feet is 50 meters
+    - convert 8 inches to centimeters
+    - how many centimeters is 12 inches
+    - change 40 kilometers into miles
+    - 25 miles in kilometers please
+    - how far is 60 miles in kilometers
+
+# ── MASS / WEIGHT CONVERSION ────────────────────────────────────────────────
+
+- name: mass-conversion
+  domain: math
+  difficulty: medium
+  pattern: unit-conversion
+  content: |
+    MASS: kg = lb x 0.45359237; lb = kg / 0.45359237; g = oz x 28.349523;
+    oz = g / 28.349523.
+    Procedure: read source and target unit; multiply into the smaller unit,
+    divide into the larger unit; output the single number.
+  keys:
+    - convert pounds to kilograms
+    - how many kilograms is 150 pounds
+    - how many pounds is 20 kilograms
+    - convert 10 kilograms to pounds
+    - how many pounds in 8 kilograms
+    - convert 32 ounces to grams
+    - how many grams is 5 ounces
+    - pounds to kg
+
+# ── TEMPERATURE CONVERSION ──────────────────────────────────────────────────
+
+- name: temperature-conversion
+  domain: math
+  difficulty: medium
+  pattern: formula
+  content: |
+    TEMP: F = C x 9/5 + 32; C = (F - 32) x 5/9.
+    Procedure: choose direction; apply the matching formula; output the
+    single number.
+  keys:
+    - convert 100 degrees Celsius to Fahrenheit
+    - convert 212 degrees Fahrenheit to Celsius
+    - what is 25 degrees C in Fahrenheit
+    - what is 98.6 degrees Fahrenheit in Celsius
+    - celsius to fahrenheit conversion
+    - fahrenheit to celsius
+    - how hot is 40 celsius in fahrenheit
+    - temperature conversion help
+
+# ── RATE × TIME (DISTANCE) ──────────────────────────────────────────────────
+
+- name: rate-times-time
+  domain: math
+  difficulty: easy
+  pattern: formula
+  content: |
+    RATE: distance = speed x time (keep units consistent).
+    Procedure: read speed and time; multiply; output the single number.
+  keys:
+    - how far do you travel at 60 miles per hour for 3 hours
+    - distance equals speed times time
+    - miles per hour times hours
+    - traveling at 45 mph for 2 hours
+    - how many miles traveled at 50 miles per hour for 4 hours
+    - a car drives at 65 miles per hour for 5 hours

@@ -1,0 +1,224 @@
+- name: miles-to-km
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    MILES->KM: 1 mile = 1.609344 km. Multiply the number of miles by 1.609344.
+  keys:
+    - convert miles to kilometers
+    - miles to kilometers
+    - how many kilometers are in
+    - how many kilometers is
+    - into kilometers
+    - as kilometers
+    - in kilometers
+    - miles to kilometers
+    - miles into kilometers
+    - miles as kilometers
+
+- name: km-to-miles
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    KM->MILES: 1 km = 0.621371 miles. Multiply the number of km by 0.621371.
+  keys:
+    - convert kilometers to miles
+    - kilometers to miles
+    - how many miles are in
+    - how many miles is
+    - into miles
+    - as miles
+    - in miles
+    - kilometers into miles
+    - kilometers as miles
+
+- name: feet-to-m
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    FEET->M: 1 foot = 0.3048 m. Multiply the number of feet by 0.3048.
+  keys:
+    - convert feet to meters
+    - feet to meters
+    - how many meters are in
+    - how many meters is
+    - into meters
+    - as meters
+    - in meters
+    - feet into meters
+    - feet as meters
+
+- name: m-to-feet
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    M->FEET: 1 m = 3.28084 feet. Multiply the number of meters by 3.28084.
+  keys:
+    - convert meters to feet
+    - meters to feet
+    - how many feet are in
+    - how many feet is
+    - into feet
+    - as feet
+    - in feet
+    - meters into feet
+    - meters as feet
+    - meters in feet
+
+- name: inches-to-cm
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    IN->CM: 1 inch = 2.54 cm. Multiply the number of inches by 2.54.
+  keys:
+    - convert inches to centimeters
+    - inches to centimeters
+    - how many centimeters are in
+    - how many centimeters is
+    - into centimeters
+    - as centimeters
+    - in centimeters
+    - inches into centimeters
+    - inches as centimeters
+
+- name: cm-to-inches
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    CM->IN: 1 cm = 0.393701 inches. Multiply the number of centimeters by 0.393701.
+  keys:
+    - convert centimeters to inches
+    - centimeters to inches
+    - how many inches are in
+    - how many inches is
+    - into inches
+    - as inches
+    - in inches
+    - centimeters into inches
+    - centimeters as inches
+
+
+# Mass: 4 single-pair operators
+- name: lbs-to-kg
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    LB->KG: 1 lb = 0.45359237 kg. Multiply the number of pounds by 0.45359237.
+  keys:
+    - convert pounds to kilograms
+    - pounds to kilograms
+    - pounds to kg
+    - how many kilograms is
+    - how many kilograms are in
+    - into kilograms
+    - in kilograms
+    - pounds into kilograms
+    - pounds as kilograms
+
+- name: kg-to-lbs
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    KG->LB: 1 kg = 2.2046226 lb. Multiply the number of kg by 2.2046226.
+  keys:
+    - convert kilograms to pounds
+    - kilograms to pounds
+    - kg to lb
+    - how many pounds is
+    - how many pounds are in
+    - into pounds
+    - in pounds
+    - kilograms into pounds
+    - kilograms as pounds
+
+- name: oz-to-g
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    OZ->G: 1 oz = 28.349523 g. Multiply the number of ounces by 28.349523.
+  keys:
+    - convert ounces to grams
+    - ounces to grams
+    - how many grams is
+    - how many grams are in
+    - into grams
+    - in grams
+    - ounces into grams
+    - ounces as grams
+
+- name: g-to-oz
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    G->OZ: 1 g = 0.03527396 oz. Multiply the number of grams by 0.03527396.
+  keys:
+    - convert grams to ounces
+    - grams to ounces
+    - how many ounces is
+    - how many ounces are in
+    - into ounces
+    - in ounces
+    - grams into ounces
+    - grams as ounces
+
+
+# Temperature: 2 single-pair operators
+- name: c-to-f
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    C->F: F = C * 9/5 + 32. Put the Celsius value into the formula.
+  keys:
+    - convert celsius to fahrenheit
+    - celsius to fahrenheit
+    - c to f
+    - degrees c in fahrenheit
+    - celsius in fahrenheit
+    - how hot is
+    - hot is
+    - degrees celsius in fahrenheit
+    - celsius to fahrenheit
+
+- name: f-to-c
+  domain: math
+  difficulty: medium
+  pattern: operator
+  content: |
+    F->C: C = (F - 32) * 5/9. Put the Fahrenheit value into the formula.
+  keys:
+    - convert fahrenheit to celsius
+    - fahrenheit to celsius
+    - f to c
+    - degrees f in celsius
+    - fahrenheit in celsius
+    - how many degrees c is
+    - degrees fahrenheit in celsius
+    - fahrenheit to celsius
+
+
+# Rate: single operator
+- name: rate-times-time
+  domain: math
+  difficulty: easy
+  pattern: operator
+  content: |
+    RATE: distance = speed * time (units consistent). Read the speed number and
+    the time number; multiply them; output only the product.
+  keys:
+    - miles per hour
+    - mph for
+    - how far do you travel
+    - how many miles does it travel
+    - how many miles do you cover
+    - distance equals speed times time
+    - distance

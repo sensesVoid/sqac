@@ -1,0 +1,55 @@
+cartridges: verbose=34|concise=34 all 4 skills
+resume: 40 prior rows, filling arms ['E', 'F']
+[1/40] length-conversion    x=144.46   A✓ B✓ C✗ D✓ E✗ F✗  (route length-convers fuzzy/0.76)
+[2/40] length-conversion    x=1068.37  A✓ B✓ C✓ D✓ E✗ F✗  (route length-convers fuzzy/0.66)
+[3/40] length-conversion    x=661.01   A✓ B✗ C✗ D✓ E✗ F✗  (route length-convers fuzzy/0.79)
+[4/40] length-conversion    x=294.77   A✗ B✓ C✓ D✓ E✓ F✗  (route length-convers fuzzy/0.63)
+[5/40] length-conversion    x=732.09   A✓ B✓ C✓ D✗ E✗ F✗  (route length-convers fuzzy/0.64)
+[6/40] length-conversion    x=11.95    A✓ B✓ C✗ D✓ E✗ F✗  (route length-convers fuzzy/0.79)
+[7/40] length-conversion    x=686.94   A✓ B✗ C✗ D✓ E✗ F✗  (route length-convers fuzzy/0.70)
+[8/40] length-conversion    x=28.47    A✗ B✗ C✓ D✗ E✓ F✗  (route length-convers fuzzy/0.78)
+[9/40] length-conversion    x=98.52    A✓ B✓ C✗ D✗ E✗ F✗  (route length-convers fuzzy/0.64)
+[10/40] length-conversion    x=158.34   A✓ B✗ C✗ D✓ E✗ F✓  (route length-convers fuzzy/0.75)
+[11/40] mass-conversion      x=114.50   A✓ B✓ C✗ D✗ E✓ F✗  (route mass-conversio fuzzy/0.81)
+[12/40] mass-conversion      x=10747.59  A✗ B✗ C✗ D✗ E✗ F✗  (route mass-conversio fuzzy/0.71)
+[13/40] mass-conversion      x=6645.70  A✓ B✗ C✓ D✗ E✗ F✗  (route mass-conversio fuzzy/0.72)
+[14/40] mass-conversion      x=177.13   A✗ B✗ C✓ D✗ E✓ F✗  (route mass-conversio fuzzy/0.80)
+[15/40] mass-conversion      x=101.10   A✓ B✗ C✗ D✓ E✓ F✓  (route mass-conversio fuzzy/0.81)
+[16/40] mass-conversion      x=52.71    A✓ B✗ C✓ D✗ E✓ F✓  (route mass-conversio fuzzy/0.81)
+[17/40] mass-conversion      x=98.20    A✓ B✗ C✓ D✗ E✓ F✗  (route mass-conversio fuzzy/0.81)
+[18/40] mass-conversion      x=3507.97  A✓ B✗ C✓ D✓ E✓ F✗  (route mass-conversio fuzzy/0.73)
+[19/40] mass-conversion      x=2061.01  A✓ B✓ C✗ D✓ E✗ F✗  (route mass-conversio fuzzy/0.71)
+[20/40] mass-conversion      x=6483.54  A✗ B✗ C✓ D✓ E✗ F✗  (route mass-conversio fuzzy/0.77)
+[21/40] temperature-conversion x=-11.90   A✗ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.82)
+[22/40] temperature-conversion x=10.20    A✓ B✗ C✗ D✗ E✓ F✗  (route temperature-co fuzzy/0.83)
+[23/40] temperature-conversion x=4.10     A✗ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.73)
+[24/40] temperature-conversion x=29.10    A✗ B✗ C✗ D✗ E✓ F✗  (route temperature-co fuzzy/0.73)
+[25/40] temperature-conversion x=226.00   A✓ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.80)
+[26/40] temperature-conversion x=31.50    A✗ B✗ C✗ D✗ E✗ F✓  (route temperature-co fuzzy/0.82)
+[27/40] temperature-conversion x=184.60   A✗ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.82)
+[28/40] temperature-conversion x=46.40    A✗ B✓ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.84)
+[29/40] temperature-conversion x=59.00    A✓ B✓ C✓ D✓ E✗ F✓  (route temperature-co fuzzy/0.84)
+[30/40] temperature-conversion x=135.30   A✓ B✗ C✗ D✗ E✗ F✗  (route temperature-co fuzzy/0.81)
+[31/40] rate-times-time      x=101.76   A✓ B✗ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.77)
+[32/40] rate-times-time      x=102.08   A✗ B✗ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.68)
+[33/40] rate-times-time      x=448.91   A✗ B✗ C✓ D✗ E✗ F✓  (route rate-times-tim fuzzy/0.68)
+[34/40] rate-times-time      x=121.80   A✗ B✗ C✓ D✗ E✓ F✓  (route rate-times-tim fuzzy/0.77)
+[35/40] rate-times-time      x=524.16   A✓ B✗ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.75)
+[36/40] rate-times-time      x=332.20   A✗ B✓ C✓ D✓ E✗ F✓  (route rate-times-tim fuzzy/0.70)
+[37/40] rate-times-time      x=235.60   A✓ B✓ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.70)
+[38/40] rate-times-time      x=95.94    A✓ B✗ C✓ D✗ E✓ F✗  (route rate-times-tim fuzzy/0.84)
+[39/40] rate-times-time      x=63.00    A✓ B✗ C✓ D✓ E✓ F✓  (route rate-times-tim fuzzy/0.76)
+[40/40] rate-times-time      x=78.96    A✓ B✗ C✓ D✗ E✓ F✓  (route rate-times-tim fuzzy/0.78)
+
+== RESULTS (Groq / allam-2-7b) ==
+Traceback (most recent call last):
+  File "/teamspace/studios/this_studio/Project_ SynthQuant/experiments/thought_injection/bench_thought_injection.py", line 209, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/teamspace/studios/this_studio/Project_ SynthQuant/experiments/thought_injection/bench_thought_injection.py", line 172, in main
+    acc = {k: sum(1 for r in merged if r[k]["correct"]) / n for k in ARMS}
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/teamspace/studios/this_studio/Project_ SynthQuant/experiments/thought_injection/bench_thought_injection.py", line 172, in <genexpr>
+    acc = {k: sum(1 for r in merged if r[k]["correct"]) / n for k in ARMS}
+                                       ~^^^
+KeyError: 'E'
