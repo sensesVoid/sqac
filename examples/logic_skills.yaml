@@ -27,6 +27,9 @@
     - how much did she start with, how much was there originally
     - "undo operations in reverse — spent then doubled, gave away then"
     - work backwards from the result
+    - a number was tripled or doubled then changed, find the original number
+    - the result was a value, what was the starting number before the operations
+    - undo multiplied added subtracted step by step from the final answer
 
 - name: overlap-count
   domain: logic
@@ -65,8 +68,7 @@
   keys:
     - when exactly one of many items has a hidden property and you can weigh once
     - one defective batch among many, one weighing to find it
-    - 12 bags of coins, one heavier, one weighing on a scale
-    - find the odd bag with coins weighing more, one digital scale
+    - bags of identical items where one batch is heavier or lighter
     - number the items and take a different count from each to identify
 
 - name: decomposition
@@ -74,13 +76,16 @@
   difficulty: easy
   pattern: decomposition
   content: |
-    SKILL decompose-sum: Split the quantity into its independent parts, compute
+    SKILL decomposition: Split the quantity into its independent parts, compute
     each part separately, then add. Name each part before computing.
   keys:
     - when the cost or amount is the sum of two independent parts
     - total cost of several items at given prices, buy multiple of each
     - combined weight or cost of different things together
     - separate the components and add them up
+    - pen costs and notebook costs, buy several of each
+    - taxi base fare plus per mile rate, total for a trip
+    - base fee plus rate times quantity, compute the total
 
 - name: binary-search-bug
   domain: debugging
@@ -109,3 +114,6 @@
     - what stays the same across all operations or steps
     - find a quantity that is conserved or preserved
     - invariant proof technique
+    - pigeonhole principle, why a streak or pattern must appear
+    - coin flips in a row, is the coin biased, randomness streaks
+    - counting argument about why something is noteworthy or expected

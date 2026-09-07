@@ -1,0 +1,406 @@
+# Coding Skill Pack — 25 patterns for SQAC skill store
+# All content = pure procedure. All keys = concrete situation triggers.
+
+# ── DESIGN PATTERNS ──────────────────────────────────────────────────────────
+
+- name: strategy-pattern
+  domain: coding
+  difficulty: medium
+  pattern: polymorphism
+  content: |
+    SKILL strategy-pattern: Define a common interface for the varying behavior.
+    Implement each behavior as a separate class/function. Pass the chosen
+    implementation as a parameter. Callers use the interface, not a specific impl.
+  keys:
+    - when different objects need the same operation but with different algorithms
+    - when an if-else or switch selects behavior based on a type or mode
+    - when you want to swap algorithms at runtime without changing the caller
+    - when you have multiple sorting, validation, or pricing strategies
+    - support multiple authentication methods like JWT, API key, or OAuth
+    - one of several interchangeable methods is picked per user preference or config
+    - email SMS push each channel is a different implementation of send
+
+- name: observer-pattern
+  domain: coding
+  difficulty: medium
+  pattern: event-driven
+  content: |
+    SKILL observer-pattern: Define a subscribe/unsubscribe interface on the subject.
+    Observers register callbacks. When state changes, the subject iterates
+    its observer list and notifies each. Decouple event source from consumers.
+  keys:
+    - when one event must trigger reactions in many unrelated components
+    - when the emitter should not know who listens or what they do
+    - publish subscribe, event listener, callback registration
+    - when components need to react to state changes without polling
+    - a cell value changes and charts elsewhere must refresh
+    - UI widgets update when the data they display changes
+    - subject state change notifies all registered listeners automatically
+
+- name: factory-pattern
+  domain: coding
+  difficulty: medium
+  pattern: creation
+  content: |
+    SKILL factory-pattern: Replace direct construction (new/class()) with a
+    factory function or method. The factory decides which concrete class to
+    create based on input. Callers depend only on the base type.
+  keys:
+    - when the exact class to instantiate depends on runtime input
+    - when creation logic is complex and should be centralized
+    - when you want to decouple object creation from usage
+    - object creation based on type string, config, or enum
+
+- name: decorator-pattern
+  domain: coding
+  difficulty: medium
+  pattern: composition
+  content: |
+    SKILL decorator-pattern: Wrap an object with another that adds behavior
+    before or after delegating to the inner object. Stack multiple decorators
+    for combinable responsibilities. Each decorator implements the same interface.
+  keys:
+    - when you want to add logging, caching, or auth around existing calls
+    - when inheritance would create a combinatorial explosion of subclasses
+    - when responsibilities stack and can be applied independently
+    - wrap function with pre and post processing steps
+
+- name: command-pattern
+  domain: coding
+  difficulty: medium
+  pattern: encapsulation
+  content: |
+    SKILL command-pattern: Encapsulate a request as an object with execute() and
+    undo() methods. Store commands in a queue or history. Enables undo/redo,
+    queuing, and deferred execution without coupling caller to implementation.
+  keys:
+    - when you need undo redo functionality or operation history
+    - when operations must be queued, logged, or deferred
+    - when you want to decouple the invoker from the operation implementation
+    - reversible operations, transaction log, operation replay
+    - save and replay a sequence of player or user actions
+    - record operations as objects for playback, macro, or replay
+    - each action stored so it can be undone, redone, or replayed later
+
+# ── DEBUGGING ────────────────────────────────────────────────────────────────
+
+- name: binary-search-bug
+  domain: debugging
+  difficulty: medium
+  pattern: elimination
+  content: |
+    SKILL binary-search-bug: Halve the code region. Add a print or assertion
+    at the midpoint. If the bug appears in the first half, discard the second,
+    and vice versa. Repeat until the bug is in a single function.
+  keys:
+    - when you cannot find where the bug is but know it exists
+    - narrowing down a defect, halving the suspect code region
+    - print at midpoint to isolate which half contains the bug
+    - divide the codebase to find where behavior changes
+    - one of thousands of records fails inside a loop, halve the input
+    - works on small inputs fails on large ones, find the threshold by bisection
+    - slow query with several joins, disable half the joins to find the slow one
+    - comment out half the steps to see if the failure persists
+
+- name: reproduce-then-isolate
+  domain: debugging
+  difficulty: easy
+  pattern: reduction
+  content: |
+    SKILL reproduce-then-isolate: First make the bug happen reliably on demand.
+    Then remove code one piece at a time until the bug disappears. The last
+    removal is the cause. Keep a minimal reproduction case.
+  keys:
+    - when a bug happens intermittently and you need a reliable reproduction
+    - first make it fail every time, then strip code until it stops failing
+    - reduce the test case to the smallest input that triggers the bug
+    - intermittent failure, flaky test, hard to reproduce
+    - works in one browser fails in another, reproduce the user environment
+    - correct most of the time but occasionally wrong, catch a failing case
+    - cannot reproduce the bug the user reported
+    - sometimes returns a wrong result, find and pin down one failing input
+    - random rare failure, sample many runs and save any failing case
+    - nondeterministic output, build a minimal repro you can rerun
+    - occasionally returns null or an invalid value, cannot predict when
+    - rare bad output, save the input whenever the result is wrong
+
+- name: check-assumptions-first
+  domain: debugging
+  difficulty: easy
+  pattern: verification
+  content: |
+    SKILL check-assumptions-first: List every assumption the code makes about
+    its inputs, environment, and state. Write an assertion for each. The first
+    assertion that fails reveals the root cause. Most bugs are violated assumptions.
+  keys:
+    - when you cannot figure out why the code is wrong despite it looking correct
+    - assert your assumptions about inputs, config, and state
+    - the code looks right but produces wrong output
+    - verify precondition, invariant, and postcondition assumptions
+    - third-party library throws a cryptic error with no clue
+    - crash inside a dependency, verify what your code passes in
+    - error message gives no clue about the actual cause
+    - works on my machine but fails in production, check the environment and config
+    - same code different environment, verify your assumptions about settings
+    - config differs between dev and prod, assert every environment assumption
+
+- name: rubber-duck
+  domain: debugging
+  difficulty: easy
+  pattern: articulation
+  content: |
+    SKILL rubber-duck: Explain the code line by line to an imaginary listener.
+    Describe what each line is supposed to do. The act of articulating forces
+    you to notice mismatches between intent and implementation.
+  keys:
+    - when you have been staring at the same bug for too long
+    - explain the code out loud to find the logical error
+    - describe each line of code to someone who knows nothing about it
+    - stuck on a bug that should be obvious
+
+- name: diff-based-debugging
+  domain: debugging
+  difficulty: medium
+  pattern: regression
+  content: |
+    SKILL diff-based-debugging: Find the last commit where the feature worked.
+    Diff that commit against the current code. The regression is in the changed
+    lines. Use git bisect for automated binary search over commits.
+  keys:
+    - when a feature stopped working and you do not know when or why
+    - git bisect, find the commit that introduced the regression
+    - it worked before, something changed, which change broke it
+    - regression, last known good version, commit search
+
+- name: logging-boundaries
+  domain: debugging
+  difficulty: medium
+  pattern: observation
+  content: |
+    SKILL logging-boundaries: Add logging at every system boundary: function
+    entry/exit, API calls, file reads, database queries. Log inputs and outputs.
+    The boundary where data first diverges from expectation is the bug location.
+  keys:
+    - when the bug is somewhere in a pipeline of transformations
+    - add print or log statements at function boundaries to trace data flow
+    - log input output at each stage to find where values go wrong
+    - data pipeline debugging, transformation tracing
+    - NullPointerException in the log but cannot tell which field is null
+    - log the payload at each service hop to find where data corrupts
+    - add temporary logging at each step to see the values between services
+    - wrong data arrives from upstream, instrument the path
+    - microservice receives from one service and sends to another, trace the data
+    - add request id logging across services to follow one request
+    - instrument every hop between services to see where values diverge
+
+# ── REFACTORING ──────────────────────────────────────────────────────────────
+
+- name: extract-function
+  domain: refactoring
+  difficulty: easy
+  pattern: decomposition
+  content: |
+    SKILL extract-function: Identify a coherent block of code (3+ lines doing
+    one thing). Move it to a new function with a descriptive name. Replace the
+    original block with a call to the new function. Pass needed data as params.
+  keys:
+    - when a function is too long and does too many things
+    - a block of code that could be its own named operation
+    - extract a repeated code block into a reusable function
+    - break a long function into smaller named pieces
+
+- name: single-responsibility
+  domain: refactoring
+  difficulty: medium
+  pattern: separation
+  content: |
+    SKILL single-responsibility: Check if a class or function has more than one
+    reason to change. If so, split it. Each module should have one job. Ask:
+    can I describe what this does without using "and"? If not, it does two things.
+  keys:
+    - when a class handles multiple concerns: parsing and validation and saving
+    - when a function does two unrelated things joined by and
+    - split a module so each part has one reason to change
+    - separation of concerns, one job per function
+
+- name: guard-clause
+  domain: refactoring
+  difficulty: easy
+  pattern: early-return
+  content: |
+    SKILL guard-clause: Replace nested if-else with early returns. Check invalid
+    conditions at the top of the function and return immediately. This flattens
+    nesting and makes the happy path the main code flow.
+  keys:
+    - when a function has deeply nested if-else blocks
+    - replace indentation hell with early return statements
+    - flatten nested conditionals by returning early on error
+    - guard clause pattern, check precondition and return
+
+- name: replace-magic-number
+  domain: refactoring
+  difficulty: easy
+  pattern: naming
+  content: |
+    SKILL replace-magic-number: Find unexplained numeric or string literals in
+    code. Give them a descriptive name as a constant. The name documents intent;
+    the value is an implementation detail.
+  keys:
+    - when code contains unexplained numbers or string literals
+    - extract magic numbers into named constants
+    - unnamed literals should become descriptive constant names
+    - hardcoded values that appear in logic without explanation
+    - the same literal like 86400 appears in several places
+    - seconds in a day, repeated numeric literal used in multiple spots
+    - one number used many times should become a named constant
+
+- name: clarify-naming
+  domain: refactoring
+  difficulty: easy
+  pattern: naming
+  content: |
+    SKILL clarify-naming: Rename variables, functions, and classes so the name
+    says what the thing does or represents. A reader should understand the
+    purpose from the name alone without reading the body.
+  keys:
+    - when variable or function names are vague like data, result, or temp
+    - rename to describe what the code does, not how it does it
+    - names should communicate purpose without reading the implementation
+    - unclear naming, abbreviations, single-letter names in non-loop context
+
+# ── ARCHITECTURE ─────────────────────────────────────────────────────────────
+
+- name: dependency-inversion
+  domain: architecture
+  difficulty: hard
+  pattern: abstraction
+  content: |
+    SKILL dependency-inversion: High-level modules should not depend on
+    low-level modules. Both should depend on abstractions. Define an interface
+    that the high-level code uses; the low-level code implements it.
+  keys:
+    - when the core business logic depends directly on a database or API
+    - invert the dependency so the database implements a service interface
+    - depend on abstractions not concrete implementations
+    - high level module imports low level module, break the coupling
+
+- name: caching-layer
+  domain: architecture
+  difficulty: medium
+  pattern: performance
+  content: |
+    SKILL caching-layer: Identify a function that is called repeatedly with
+    the same inputs. Add a dictionary cache keyed by arguments. On first call,
+    compute and store. On subsequent calls, return cached result. Use a max
+    size or TTL to prevent unbounded growth.
+  keys:
+    - when the same expensive computation runs many times with same inputs
+    - add memoization or a cache dictionary to avoid recomputation
+    - repeated function calls with identical arguments waste time
+    - cache results, memoize expensive operations, avoid recalculation
+
+- name: circuit-breaker
+  domain: architecture
+  difficulty: hard
+  pattern: resilience
+  content: |
+    SKILL circuit-breaker: Wrap external calls with a state machine: closed
+    (normal), open (failing, skip call), half-open (retry after cooldown). On
+    failure, increment counter. When threshold hit, open the circuit. After
+    timeout, try one request. If it succeeds, close; if it fails, stay open.
+  keys:
+    - when an external service fails and you need to fail fast instead of retrying
+    - wrap API calls with a state machine that opens on repeated failures
+    - stop hammering a down service, wait and periodically check if it recovered
+    - fault tolerance, graceful degradation, downstream failure handling
+
+- name: feature-flag
+  domain: architecture
+  difficulty: medium
+  pattern: controlled-rollout
+  content: |
+    SKILL feature-flag: Wrap new behavior behind a boolean config or environment
+    variable. Default to off. Deploy with flag off, then enable per user/region.
+    Removes long-lived branches and enables safe production testing.
+  keys:
+    - when you want to deploy code to production without enabling it yet
+    - wrap new behavior behind a config toggle for safe rollout
+    - deploy behind a flag, enable gradually, kill switch for new features
+    - controlled rollout, gradual enablement, production feature toggle
+
+- name: repository-pattern
+  domain: architecture
+  difficulty: medium
+  pattern: abstraction
+  content: |
+    SKILL repository-pattern: Define a data access interface (find, save, delete)
+    that the business logic calls. Implement it once per storage backend (SQL,
+    file, API). The business logic never imports database drivers directly.
+  keys:
+    - when business logic directly imports and calls database functions
+    - abstract data access behind an interface, swap storage without changing business code
+    - when you want to switch from SQLite to Postgres without rewriting queries
+    - decouple business logic from the persistence layer
+
+# ── TESTING ──────────────────────────────────────────────────────────────────
+
+- name: edge-cases-first
+  domain: testing
+  difficulty: easy
+  pattern: boundary
+  content: |
+    SKILL edge-cases-first: Before testing the happy path, list boundary values:
+    zero, one, max, empty, null, negative, overflow. Write tests for these first.
+    Most bugs live at boundaries, not in the middle of ranges.
+  keys:
+    - when writing tests and need to know which cases matter most
+    - test zero, one, max, empty, null, negative, and overflow values first
+    - boundary values catch more bugs than middle-of-range tests
+    - test the edges of input ranges, not just the typical case
+
+- name: test-the-contract
+  domain: testing
+  difficulty: medium
+  pattern: specification
+  content: |
+    SKILL test-the-contract: Write tests that verify what the function PROMISES
+    to do (its contract), not how it does it internally. Test inputs/outputs
+    only. Never test implementation details. This lets you refactor freely.
+  keys:
+    - when tests break after a refactor even though behavior is unchanged
+    - test the interface not the implementation, inputs and outputs only
+    - tests should survive internal refactoring as long as behavior is preserved
+    - black box testing, contract testing, API testing
+
+- name: property-based-testing
+  domain: testing
+  difficulty: hard
+  pattern: invariant
+  content: |
+    SKILL property-based-testing: Instead of testing specific examples, test a
+    property that holds for ALL valid inputs. Define the property as a function.
+    Use a library to generate random inputs. The property should be true for
+    every generated input.
+  keys:
+    - when you cannot enumerate all test cases for a function
+    - define a property that is true for all inputs, test with random data
+    - when example-based tests miss edge cases in the input space
+    - generative testing, fuzzing, law-based testing, for all inputs
+    - assert output is a permutation of input and sorted for any input
+    - check a property holds for generated inputs instead of fixed examples
+    - describe the invariant all valid outputs must satisfy
+
+- name: test-isolation
+  domain: testing
+  difficulty: easy
+  pattern: independence
+  content: |
+    SKILL test-isolation: Each test must set up its own state, use its own
+    data, and clean up after itself. Tests must not depend on execution order
+    or shared mutable state. If test B fails only when test A runs first, the
+    tests are coupled — fix the shared state.
+  keys:
+    - when tests pass alone but fail when run with other tests
+    - each test sets up its own data and cleans up after itself
+    - tests must not depend on other tests or shared state
+    - test order dependency, shared mutable state between tests
