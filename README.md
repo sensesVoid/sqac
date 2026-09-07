@@ -13,63 +13,75 @@ A: "The Federal Reserve Bank of       A: "Team Atlas maintains the
     system."                      ❌
 ```
 
-A frozen, never-trained model answered private questions correctly — because we handed it a 2.5KB memory file at runtime. Without it, it confidently made things up. That gap is the entire product.
+A frozen, never-trained model answered private questions correctly — because we handed it a 2.5KB memory file at runtime. Without it, it confidently made things up. **That gap is the entire product.**
 
 ---
 
-## The problem
+## Table of Contents
 
-Every LLM you use is amnesiac. It forgets your team's conventions, your product's rules, your customer's context — the moment the session ends. The existing fixes all cost you something:
+- [Quick Start (30 seconds)](#quick-start-30-seconds)
+- [What SQAC Actually Does](#what-sqac-actually-does)
+- [Core Concepts](#core-concepts)
+- [CLI Reference](#cli-reference)
+- [Python API](#python-api)
+- [Auto-Build & Realtime Tracking](#auto-build--realtime-tracking)
+- [Fact Store](#fact-store)
+- [Skill Store](#skill-store)
+- [Context Offloader](#context-offloader)
+- [Cartridge Rack](#cartridge-rack)
+- [MCP Server](#mcp-server)
+- [Performance](#performance)
+- [Research](#research)
 
-| Approach | What it costs you |
-|---|---|
-| Fine-tuning | Weeks of work, per model, redone on every update |
-| RAG stack | A vector database, an embedding service, infra to babysit |
-| Bigger context window | Money per token, and still resets between sessions |
+---
 
-**SQAC takes none of those.** Your LLM's memory becomes a single file you own: back it up, diff it, version it, email it, swap it per conversation.
+## Quick Start (30 seconds)
 
-## What a cartridge actually is
-
-A `.sqac` file is self-contained portable memory:
-
-- **Plaintext payloads** — the LLM reads text and confidence scores. It never sees a vector.
-- **Hyperdimensional addresses** — binary 1024-bit keys, matched by XOR + popcount. No float math in the hot path.
-- **Zero training, ever** — write a fact, it's stored in O(1). No embedding pipeline, no index rebuild.
-- **Hot-swappable** — load a different cartridge mid-conversation. Team A's knowledge, then Team B's, then your personal notes.
-
-Three retrieval tiers run on every query, sharing one calibrated confidence scale:
-
-| Tier | Catches | Example |
-|---|---|---|
-| **Exact** | verbatim keys | `deployment-target` → 1.0, in **5 μs** |
-| **Lexical** | typos, shared words | "auth midleware" → the auth rule @ 0.72 |
-| **Semantic** | paraphrase, synonyms | "can we deploy on **x86**?" → the **ARM64** rule @ 0.64 |
-
-No confident garbage: if nothing matches, SQAC returns empty and the LLM says "I don't know." It fails safe by design.
-
-## Quick start
+### Install
 
 ```bash
-pip install -e .                   # core: numpy only
-pip install -e ".[mcp]"            # + the MCP server
-
-# teach it something
-python -m sqac.cli teach "our deploys are ARM64 only" --key deployment --db team.sqac
-
-# ask it back (try paraphrasing — "can we ship x86 images?")
-python -m sqac.cli search "what do we deploy?" --db team.sqac
-
-# compile a whole rulebook into a cartridge
-python -m sqac.ingest knowledge.jsonl -o company.sqac --semantic
+pip install -e .                  # core: numpy only
+pip install -e ".[mcp]"           # + the MCP server for LLM integration
 ```
 
-```python
-from sqac.store import SqacStore
+### Option A: Auto-build from your project (recommended)
 
-store = SqacStore(semantic=True)
+Point SQAC at any project directory. It walks the files, extracts knowledge, and builds a searchable cartridge:
+
+```bash
+# Build a cartridge from your project
+sqac init .
+
+# Search it
+sqac search "how does authentication work"
+sqac search "what are the deploy targets"
+sqac search "coding standards"
+
+# Track changes in realtime
+sqac track . --interval 5
+```
+
+### Option B: Manual (teach individual facts)
+
+```bash
+# Teach it something
+sqac teach "our deploys are ARM64 only" --key deployment --db team.sqac
+
+# Ask it back (try paraphrasing — "can we ship x86 images?")
+sqac search "what do we deploy?" --db team.sqac
+
+# Pack a whole rulebook from a text file
+sqac pack rules.txt -o rules.sqac
+```
+
+### Option C: Python API
+
+```python
+from sqac import SqacStore
+
+store = SqacStore()
 store.add("Team Atlas maintains the payments service", key="payments ownership")
-store.save("team.sqac")          # memory is now a file on disk
+store.save("team.sqac")
 
 # ...restart, reload, and it still knows
 store = SqacStore.load("team.sqac")
@@ -77,15 +89,287 @@ store.search("who owns the payments system?")
 # → ["Team Atlas maintains the payments service"]  confidence 1.0
 ```
 
-The semantic tier ships as a **9.8MB int8 model running in pure numpy** — no torch, no vector DB, no GPU. The whole stack fits comfortably in **146MB of RAM with 10,000 rules loaded**.
+---
 
-## Two modes, one file
+## What SQAC Actually Does
 
-### 📚 Fact store — *what your team knows*
+SQAC turns **knowledge into a portable file** that any LLM can read at runtime.
 
-Point it at your handbook, your runbook, your decisions log. Every LLM you use — Claude, GPT, a local Qwen — answers from *your* knowledge instead of confabulating. Proven across three model families with the same cartridge file, zero changes.
+Think of it as a USB drive for your LLM's brain:
 
-### 🛠️ Skill store — *how your team thinks*
+1. **You put knowledge in** — teach facts, pack rulebooks, or auto-extract from code
+2. **SQAC stores it** — in a binary cartridge with hyperdimensional addresses (XOR + popcount, no floats)
+3. **LLM reads it at query time** — SQAC retrieves the relevant facts, injects them into the prompt
+4. **The LLM answers from YOUR knowledge** — not from its training data, not from confabulation
+
+The cartridge is **one file you own**: back it up, diff it, version it, email it, swap it per conversation.
+
+---
+
+## Core Concepts
+
+### Cartridge
+
+A `.sqac` file is self-contained portable memory:
+
+- **Plaintext payloads** — the LLM reads text and confidence scores. It never sees a vector.
+- **Hyperdimensional addresses** — binary 1024-bit keys, matched by XOR + popcount. No float math in the hot path.
+- **Zero training, ever** — write a fact, it's stored in O(1). No embedding pipeline, no index rebuild.
+- **Hot-swappable** — load a different cartridge mid-conversation. Team A's knowledge, then Team B's.
+
+### Three Retrieval Tiers
+
+Every query runs through three tiers, sharing one calibrated confidence scale:
+
+| Tier | Catches | Example |
+|---|---|---|
+| **Exact** | verbatim keys | `deployment-target` → 1.0, in **5 μs** |
+| **Lexical** | typos, shared words | "auth midleware" → the auth rule @ 0.72 |
+| **Semantic** | paraphrase, synonyms | "can we deploy on **x86**?" → the **ARM64** rule @ 0.64 |
+
+**Fail-safe by design:** if nothing matches, SQAC returns empty and the LLM says "I don't know." It never confidently injects the wrong context.
+
+### Knowledge Kinds
+
+Every entry is stamped with a **kind** — what sort of knowledge it carries:
+
+| Kind | What it is | Example |
+|---|---|---|
+| `fact` | A rule, decision, or piece of knowledge | "We deploy only to ARM64" |
+| `skill` | A reasoning procedure with trigger phrases | "When you need to find the odd coin..." |
+| `doc` | Documentation or reference material | "The API accepts JSON payloads..." |
+| `turn` | A conversation exchange (offloaded) | "Q: what was that bug? A: The 504 was..." |
+
+Kinds enable filtered retrieval: search only facts, only skills, or everything.
+
+---
+
+## CLI Reference
+
+### `sqac init` — Auto-build from a project
+
+Walks a directory and extracts knowledge into a `.sqac` cartridge. Zero configuration.
+
+```bash
+sqac init [root] [-o .sqac] [--semantic]
+```
+
+**What it extracts:**
+
+| File type | What's extracted |
+|---|---|
+| `README.md` / docs | Section headings + bodies as facts |
+| `*.py` | Module docstrings |
+| `pyproject.toml` | Name, version, description, dependencies, scripts |
+| `package.json` | Name, description, scripts, dependencies |
+| `requirements.txt` | Pinned dependencies |
+| `Makefile` | Make targets |
+| `.github/workflows/*.yml` | CI job names |
+| `Dockerfile` | Base image |
+| `docker-compose.yml` | Service names |
+| `.env.example` | Environment variable names |
+| `AGENTS.md` / `CLAUDE.md` | Coding conventions |
+| `skills.yaml` | Validated skill cards |
+
+**Example:**
+
+```bash
+$ sqac init myproject
+scanning /path/to/myproject ...
+built .sqac/project.sqac (40 entries, 22.1 KB)
+  kinds: fact=40
+  state: .sqac/state.json
+```
+
+### `sqac search` — Query the memory
+
+```bash
+sqac search "query" [--db memory.sqac] [--k 3] [--kind fact] [--threshold 0.6]
+```
+
+**Options:**
+- `--k N` — number of results (default: 3)
+- `--kind fact|skill|doc|turn` — filter by knowledge kind
+- `--threshold 0.7` — minimum confidence (default: 0.6)
+
+**Example:**
+
+```bash
+$ sqac search "deploy target" --db team.sqac
+[EXACT 1.000] Deploy only to ARM64; AMD64 images are not supported
+          source: ops#deployment-target
+```
+
+### `sqac track` — Realtime project tracking
+
+Polls the project directory, diffs against the previous state, and rebuilds the cartridge only when something changes.
+
+```bash
+sqac track [root] [-o .sqac] [--interval 5] [--log audit.jsonl] [--rack .rack]
+```
+
+**Options:**
+- `--interval N` — poll interval in seconds (default: 5)
+- `--log FILE` — append JSONL audit log (one event per line)
+- `--rack DIR` — auto-register cartridge into a CartridgeRack directory
+- `--rack-name NAME` — name for the cartridge in the rack (default: project dir name)
+
+**Example:**
+
+```bash
+$ sqac track . --interval 2 --log audit.jsonl --rack .rack --rack-name myproject
+audit log: audit.jsonl
+tracking /path/to/project -> .sqac/project.sqac (every 2s)
+rack: .rack (cartridge name: myproject)
+  synced 14:30:01 (no change)
+  + API.md#new-endpoints
+  synced 14:30:03 (changed (1 source(s)))
+  synced 14:30:05 (no change)
+```
+
+**Audit log format** (JSONL, one line per sync):
+
+```json
+{"ts": "2026-09-07T14:30:03", "added": ["API.md#new-endpoints"], "changed": [], "removed": [], "total_sources": 41, "dirty": true}
+```
+
+### `sqac teach` — Teach one fact
+
+```bash
+sqac teach "content" [--key "lookup key"] [--kind fact] [--db memory.sqac]
+```
+
+### `sqac pack` — Build from a text file
+
+```bash
+sqac pack rules.txt -o rules.sqac [--kind fact] [--name "my-rules"]
+```
+
+### `sqac stats` — Show cartridge stats
+
+```bash
+sqac stats --db memory.sqac
+```
+
+---
+
+## Python API
+
+### SqacStore — The core
+
+```python
+from sqac import SqacStore
+
+# Create and populate
+store = SqacStore(semantic=True)  # enable paraphrase matching
+store.add("Use pytest for all tests", key="testing framework", kind="fact")
+store.add("Deploy only to ARM64", key="deployment target", kind="fact")
+store.save("team.sqac")
+
+# Load and search
+store = SqacStore.load("team.sqac")
+hits = store.search("what testing framework do we use", top_k=3)
+for hit in hits:
+    print(f"[{hit.confidence:.3f}] {hit.content}")
+    print(f"  source: {hit.source}, mode: {hit.mode}")
+```
+
+### CartridgeRack — Multi-cartridge management
+
+```python
+from sqac import CartridgeRack
+
+# Open a directory of cartridges
+rack = CartridgeRack("memory/", routes={"fact": "team", "skill": "skills"})
+
+# Write with automatic routing
+rack.write_routed("Deploy only to ARM64", kind="fact")    # -> memory/team.sqac
+rack.write_routed("SKILL weighted-index ...", kind="skill") # -> memory/skills.sqac
+
+# Search across all cartridges
+hits = rack.search("deployment target", top_k=5)
+```
+
+### ContextOffloader — Session memory
+
+```python
+from sqac import ContextOffloader
+
+off = ContextOffloader("session.sqac", window=8)
+off.observe("user", "Our CI fails with a 504 on deploy")
+off.observe("assistant", "The 504 is the docker build timing out ...")
+
+# After window overflows, exchanges are auto-distilled and offloaded
+text = off.recall("what was that 504 about?")
+# → "[0.76] [turns 0-1] Q: our ci is failing with a 504 ... A: The 504 comes ..."
+```
+
+---
+
+## Auto-Build & Realtime Tracking
+
+This is the **killer workflow** for teams: point SQAC at your project, and it stays in sync automatically.
+
+### How it works
+
+1. **`sqac init .`** — Scans your project, extracts knowledge from every file type, builds a `.sqac` cartridge. Writes a `state.json` to remember what it saw.
+
+2. **`sqac track .`** — Polls the project every N seconds. When a file changes, it re-extracts only that file and rebuilds the cartridge. When a file is deleted, its entries are removed. The cartridge is always a faithful reflection of the project.
+
+3. **`--log audit.jsonl`** — Every sync appends a timestamped record: what was added, changed, or removed. You get a complete audit trail of how your project's knowledge evolved.
+
+4. **`--rack .rack`** — The built cartridge is also registered into a CartridgeRack directory, making it searchable alongside other cartridges (team knowledge, personal notes, session memory).
+
+### What gets extracted
+
+SQAC's extractors are designed to capture **what an LLM needs to know about your project**:
+
+- **Architecture** from README headings and section bodies
+- **API contracts** from docstrings and endpoint documentation
+- **Dependencies** from pyproject.toml, package.json, requirements.txt
+- **Build/deploy commands** from Makefile targets, CI workflows
+- **Coding standards** from AGENTS.md, CLAUDE.md
+- **Environment config** from .env.example (names only, never secrets)
+- **Infrastructure** from Dockerfile, docker-compose.yml
+- **Procedures** from skill YAML files
+
+### Stress test results
+
+On a realistic 25-file Python project (FastAPI + Celery + Redis):
+
+| Metric | Result |
+|---|---|
+| Files scanned | 25 |
+| Units extracted | 40 |
+| Cartridge size | 22.1 KB |
+| Search accuracy | 9/12 queries returned relevant results |
+| File add detected | ✅ (4 new sources in SECURITY.md) |
+| File modify detected | ✅ (1 added, 1 changed, 6 removed in README) |
+| File delete detected | ✅ (base.html removed) |
+| Audit log entries | Correct timestamp, source list, dirty flag |
+| Rack sync | Cartridge copied, manifest updated, searchable |
+
+---
+
+## Fact Store
+
+Point SQAC at your handbook, your runbook, your decisions log. Every LLM you use — Claude, GPT, a local Qwen — answers from *your* knowledge instead of confabulating.
+
+```bash
+# Pack a JSONL knowledge base
+python -m sqac.ingest knowledge.jsonl -o company.sqac --semantic
+
+# Or teach facts one by one
+sqac teach "Payment processor is Stripe" --key payment-provider
+sqac teach "Error budget is 0.1%" --key sli-slo
+sqac teach "On-call rotates weekly, Team Alpha first" --key oncall
+```
+
+The semantic tier ships as a **9.8MB int8 model running in pure numpy** — no torch, no vector DB, no GPU.
+
+---
+
+## Skill Store
 
 Store **procedures, not answers**. Skill cards pair concrete trigger phrases with pure reasoning patterns:
 
@@ -100,69 +384,107 @@ Store **procedures, not answers**. Skill cards pair concrete trigger phrases wit
     - bags of identical items where one batch is heavier or lighter
 ```
 
-The stored skill contains **zero answers** — so when a frozen model solves the novel "12 bags of coins" puzzle after retrieving it, that's proof of *application*, not recitation. Measured on a 50-problem benchmark:
+The stored skill contains **zero answers** — so when a frozen model solves a novel puzzle after retrieving it, that's proof of *application*, not recitation.
+
+```bash
+# Validate skill cards
+python -m sqac.skills validate examples/logic_skills.yaml
+
+# Pack into a cartridge (multi-key routing: one skill, many triggers)
+python -m sqac.skills pack examples/logic_skills.yaml -o skills.sqac --semantic
+```
+
+Measured on a 50-problem benchmark:
 
 | | Baseline | With skill store |
 |---|---|---|
 | 0.5B model | 23/50 | **31/50** |
 | Architecture-domain problems | 1/4 | **4/4** |
-| Hard problems (1.5B model) | 2/7 | **4/7** |
 
-Skills add value exactly at the model's failure boundary — and the bigger the consumer model, the more it gets out of the same cartridge.
+---
 
-### 🧠 Context offloader — *what you talked about*
+## Context Offloader
 
 Conversations outgrow the window; re-deriving lost context costs thousands of reasoning tokens. The offloader flips the economics: **recall is ~100 tokens of input, re-derivation is thousands of tokens of compute.**
 
 ```python
-from sqac.offloader import ContextOffloader
+from sqac import ContextOffloader
 
 off = ContextOffloader("session.sqac", window=8)
 off.observe("user", "Our CI fails with a 504 on deploy")
 off.observe("assistant", "The 504 is the docker build timing out ...")
-# ... window overflows -> exchanges are distilled & offloaded automatically
 
-off.recall("what was that 504 about?")
-# '[0.76] [turns 0-1] Q: our ci is failing with a 504 ... A: The 504 comes ...'
+# Window overflows → exchanges are distilled & offloaded automatically
+text = off.recall("what was that 504 about?")
 ```
 
-Design rules that came out of measured failure, not intuition:
-- **Offload exchanges, not turns** — verbatim turn indexing recalls the *user's question* and shadows the answer (2/8 recall). Exchange indexing: 6/8. Denyxised keys: **8/8**.
-- **Denyxis at write time** — "that", "earlier", "you mentioned" appear in *every* back-reference and create ties. Keys carry entity anchors; temporal pointers get resolved, never stored.
-- **Fail safe** — no confident hit returns `""`: the model says "I don't have that in memory" instead of acting on a plausible-but-wrong exchange.
+**Design rules from measured failure:**
 
-The session bucket is a separate `.sqac` (entries stamped `kind=turn`), so it hot-swaps independently of durable knowledge: drop the bucket at session end, graduate the facts worth keeping.
+1. **Offload exchanges, not turns** — verbatim turn indexing recalls the user's question and shadows the answer (2/8 recall). Exchange indexing: 6/8. Denyxised keys: **8/8**.
 
-Bulk mode:
+2. **Denyxis at write time** — "that", "earlier", "you mentioned" appear in every back-reference and create ties. Keys carry entity anchors; temporal pointers get resolved, never stored.
+
+3. **Fail safe** — no confident hit returns `""`: the model says "I don't have that in memory" instead of acting on a plausible-but-wrong exchange.
 
 ```bash
-python -m sqac.offloader transcript.jsonl -o session.sqac   # JSONL: role/content per line
+# Bulk: turn a transcript into a bucket
+python -m sqac.offloader transcript.jsonl -o session.sqac
+
+# Query
 python -m sqac.offloader --recall "that flaky test fix" --db session.sqac
 ```
 
-The heuristic distiller is zero-dependency and measured at 8/8 top-1 back-reference recall; an LLM-backed distiller drops in via `ContextOffloader(distiller=...)` for harder conversations.
+---
 
-Resumed sessions keep their exact counters: the bucket header stores the exchange and turn totals, so a reloaded offloader continues numbering turns correctly instead of approximating from entry counts. An explicit `save(path)` is adopted as the bucket's home for later saves.
+## Cartridge Rack
 
-### 📦 Cartridge rack — *knows what it owns, and routes it*
-
-A rack owns several `.sqac` files by name and decides where each fact lands. Open a directory and every cartridge in it is mounted automatically; write once and a routed cartridge is created on demand:
+A rack owns several `.sqac` files by name and decides where each fact lands:
 
 ```python
-from sqac.rack import CartridgeRack
+from sqac import CartridgeRack
 
-rack = CartridgeRack("memory/", routes={"fact": "facts", "skill": "skills"}, default="facts")
-rack.write_routed("The deploy is ARM64 only", kind="fact")   # -> memory/facts.sqac
-rack.write_routed("SKILL weighted-index ...", kind="skill")  # -> memory/skills.sqac
+rack = CartridgeRack("memory/", routes={"fact": "team", "skill": "skills"}, default="facts")
+rack.write_routed("Deploy only to ARM64", kind="fact")    # -> memory/team.sqac
+rack.write_routed("SKILL weighted-index ...", kind="skill") # -> memory/skills.sqac
+
+# Search across all cartridges
+hits = rack.search("deployment target")
 ```
 
-- `write_routed` auto-creates the routed (or default) cartridge — "which file?" is the rack's decision, not yours.
-- `create()` never wipes: an existing cartridge is **loaded**, reset only with `overwrite=True`.
-- Reopen the directory later and the same rack answers from disk — the demo promise at the rack level.
-- The reserved `session` bucket is never auto-mounted, so durable search stays free of turn memory and one file isn't double-managed.
-- The rack powers the MCP server and the graduation pass (promote stable session memories into a durable facts cartridge).
+**Features:**
+- Auto-mounts all `.sqac` files in a directory on open
+- `write_routed` auto-creates routed cartridges on demand
+- `create()` never wipes — loads existing cartridges, reset only with `overwrite=True`
+- Reserved `session` bucket is never auto-mounted (keeps durable search clean)
+- Powers the graduation pass (promote stable session memories into durable facts)
 
-## The numbers
+---
+
+## MCP Server
+
+The MCP server exposes SQAC as native tools for Claude Desktop, Cursor, Zed, and any MCP-compatible client:
+
+```bash
+# Install with MCP support
+pip install -e ".[mcp]"
+
+# Run the server
+sqac-mcp
+```
+
+**Available tools:**
+- `mem_search` — search the memory store
+- `mem_write` — teach a new fact
+- `mem_swap` — hot-swap to a different cartridge
+- `mem_stats` — show cartridge statistics
+- `session_recall` — recall from session memory
+- `session_observe` — feed a turn into the offloader
+- `rack_search` — search across the rack
+- `rack_write` — write with automatic routing
+
+---
+
+## Performance
 
 | Metric | Value |
 |---|---|
@@ -171,83 +493,58 @@ rack.write_routed("SKILL weighted-index ...", kind="skill")  # -> memory/skills.
 | Semantic encode | **~0.1 ms**/query |
 | Write (teach) | O(1), ~4 ms/fact |
 | Cartridge @ 10K rules | 6.5 MB with semantic vectors |
-| Recall scaling | 100% exact, flat 100 → 10,000 rules |
-| Retrieval routing | **50/50** top-3 on the skill benchmark |
-| Runtime deps | numpy. That's it. |
 | Memory (RAM) @ 10K rules | 146 MB |
+| Runtime deps | numpy. That's it. |
 
-**Whole-system stress** (`python tests/bench_rack.py`, semantic tier) runs the
-full lifecycle at every scale — kind-routed fact/doc teaching, YAML→validated
-skill packing, live offloader session, graduation, cross-cartridge recall,
-save, reload into a fresh rack, re-answer from disk — and gates correctness:
+**Whole-system stress** (`tests/bench_rack.py`):
 
 | Gate | Result |
 |---|---|
 | Exact recall (conf 1.0, correct content) | **445/445** across scales |
-| Skill grouped top-1 (dedupe to best hit per skill) | **50/50** |
-| Back-reference recall (top-1 right exchange, re-opened session) | **40/40** |
+| Skill grouped top-1 | **50/50** |
+| Back-reference recall (re-opened session) | **40/40** |
 | Fail-safe: garbage query → no confident hit | held |
-| Graduation | promotes ≥667, rerun idempotent (0 on 2nd pass) |
-| Durability | facts + session both re-answer from disk after reload |
-
-Measured growth (1K → 2K): teach write, session observe/offload, and
-kind-hinted exact recall are all O(1) flat; rack-wide exact, fuzzy, graduation,
-and cartridge bytes grow linear as designed and disclosed above. Reproduce
-with `python tests/bench_rack.py --quick`.
-
-## What SQAC is honestly *not*
-
-- **Not an unlimited context window.** Unlimited *storage* with constant-cost lookup: proven. Joint reasoning over every stored fact at once: not possible, by design — the model sees what retrieval surfaces.
-- **Not magic semantics.** Deep synonym gaps exist per encoder ("db" vs "repository"-level). The system fails safe when it can't bridge them.
-- **Not distributed.** Fuzzy tiers are O(n); a Rust SIMD engine exists for when 100K+ rules matter.
-
-We publish our negative results too — they're part of the record (see Research, below).
-
-## Roadmap
-
-1. ✅ **MCP server** — done. `mem_search` / `mem_write` / `mem_swap` and eight siblings are native tools over the tested store for Claude Desktop, Cursor, Zed. The demo *teach a fact → quit → reopen → still knows* is verified over live stdio; every tool is serialized against concurrent MCP v2 calls.
-2. **Rust XOR+POPCNT engine** — sub-5ms scans at 100K+ rules.
-3. **KV-cache precompute** — per-model injection as the performance moat.
-
-## Research sources
-
-SQAC stands on published work. Every link verified; no folklore citations.
-
-**Core HDC / VSA theory**
-
-- P. Kanerva, *Binary Spatter-Coding of Ordered K-tuples*, ICANN 1996 — BSC operators: XOR binding, majority-vote bundling, Hamming similarity
-- P. Kanerva, *Hyperdimensional Computing: An Introduction to Computing in Distributed Representations*, Adaptive Behavior 17(3), 2009 — quasi-orthogonality in high dimensions
-- K. Schlegel, P. Neubert, P. Protzel, *A Comparison of Vector Symbolic Architectures*, arXiv:[2001.11797](https://arxiv.org/abs/2001.11797) — BSC vs FHRR vs HRR trade-offs
-- D. Kleyko, M. Davies, E.P. Frady, P. Kanerva et al., *Vector Symbolic Architectures as a Computing Framework for Emerging Hardware*, Proc. IEEE 110(10), 2022 — VSA on non-GPU hardware
-- K.L. Clarkson, S. Ubaru, E. Yang, *Capacity Analysis of Vector Symbolic Architectures*, arXiv:[2301.10352](https://arxiv.org/abs/2301.10352) (JAIR 2026) — bundle capacity bound D ≥ 2n·ln(1/ε)
-- D. Kleyko, A. Rachkovskij, E. Osipov, A. Rahimi, *A Survey on Hyperdimensional Computing aka VSA*, Part I arXiv:[2111.06077](https://arxiv.org/abs/2111.06077), Part II arXiv:[2112.15424](https://arxiv.org/abs/2112.15424)
-
-**VSA memory & LLM integration**
-
-- C.J. Augeri, *Hypertokens: Holographic Associative Memory in Tokenized LLMs*, arXiv:[2507.00002](https://arxiv.org/abs/2507.00002) — VSA in transformer latent space; SQAC deliberately operates *outside* the model
-- M. Charikar, *Similarity Estimation Techniques from Rounding Algorithms*, STOC 2002; Goemans & Williamson, JACM 1995 — SimHash: P[bit agrees] = 1 − θ/π
-- Liu et al., *Linearithmic Clean-up for Vector-Symbolic Key-Value Memory*, 2025 — evaluated and **rejected** at our scale (plain Hamming matched it)
-
-**Neural components**
-
-- W. Wang et al., *MiniLM: Deep Self-Attention Distillation for Task-Agnostic Compression of Pre-Trained Transformers*, arXiv:[2002.10957](https://arxiv.org/abs/2002.10957) (NeurIPS 2020) — the opt-in high-fidelity semantic tier
-- Minish Lab, [Model2Vec](https://github.com/MinishLab/model2vec) & the `potion-base-8M` model — the default semantic tier: static embeddings distilled from transformer teachers
-- Tomaarsen & Minish Lab, [*Train 400x Faster Static Embedding Models with Sentence Transformers*](https://huggingface.co/blog/static-embeddings), Hugging Face blog, 2025 — the static-embedding recipe
-- A. Zandieh et al. (Google), *TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate*, arXiv:[2504.19874](https://arxiv.org/abs/2504.19874) (ICLR 2026) — quantized-retrieval direction
-
-**Libraries & prior art**
-
-- M. Heddes et al., *Torchhd: An Open Source Python Library for Hyperdimensional Computing*, JMLR 24 (2023), arXiv:[2205.09208](https://arxiv.org/abs/2205.09208) — reference BSC implementation used in early experiments
-- [hd-computing.com](https://www.hd-computing.com/) — community hub and software index
-
-**Where the novelty sits** — and where prior art ends:
-
-1. VSA as an *external* RAG-alternative (Hypertokens works inside latent space; SQAC works outside the model — no published precedent found)
-2. A cartridge format where the VSA item memory is self-contained and portable (seeded atoms ⇒ vocabulary-as-ABI ⇒ one hot-swappable file)
-3. An empirical honesty record: positional permutation kills paraphrase recall, bundling reconstruction collapses, PQ fails on binary vectors — all documented in `docs/THESIS.md` and reproducible from `tests/`
+| Graduation | promotes, rerun idempotent |
+| Durability | facts + session re-answer from disk after reload |
 
 ---
 
-**License & status:** research-grade, under active development. The core is stable and tested (85/85); the MCP server ships as native tools over the same store.
+## What SQAC is honestly *not*
 
-*Built as an implementation of the SQ thesis — see `docs/THESIS.md` for the full research narrative and `sqac/RESEARCH.md` for claim-by-claim sourcing.*
+- **Not an unlimited context window.** Unlimited *storage* with constant-cost lookup: proven. Joint reasoning over every stored fact at once: not possible — the model sees what retrieval surfaces.
+- **Not magic semantics.** Deep synonym gaps exist per encoder. The system fails safe when it can't bridge them.
+- **Not distributed.** Fuzzy tiers are O(n); a Rust SIMD engine exists for 100K+ rules.
+
+We publish our negative results too — they're part of the record.
+
+---
+
+## Research
+
+SQAC stands on published work. Every link verified; no folklore citations.
+
+**Core HDC / VSA theory:**
+- Kanerva, *Binary Spatter-Coding of Ordered K-tuples*, ICANN 1996
+- Kanerva, *Hyperdimensional Computing*, Adaptive Behavior 17(3), 2009
+- Schlegel et al., *A Comparison of Vector Symbolic Architectures*, arXiv:2001.11797
+- Kleyko et al., *Vector Symbolic Architectures as a Computing Framework*, Proc. IEEE 110(10), 2022
+- Clarkson et al., *Capacity Analysis of VSA*, arXiv:2301.10352 (JAIR 2026)
+
+**VSA memory & LLM integration:**
+- Augeri, *Hypertokens: Holographic Associative Memory in Tokenized LLMs*, arXiv:2507.00002
+- Charikar, *Similarity Estimation Techniques from Rounding Algorithms*, STOC 2002
+
+**Neural components:**
+- Wang et al., *MiniLM: Deep Self-Attention Distillation*, arXiv:2002.10957 (NeurIPS 2020)
+- Minish Lab, [Model2Vec](https://github.com/MinishLab/model2vec) & `potion-base-8M`
+
+**Where the novelty sits:**
+1. VSA as an *external* RAG-alternative (Hypertokens works inside latent space; SQAC works outside the model)
+2. A cartridge format where the VSA item memory is self-contained and portable
+3. An empirical honesty record: all negative results documented in `docs/THESIS.md`
+
+---
+
+**Status:** research-grade, under active development. Core stable and tested (75/75 tests passing).
+
+*Built as an implementation of the SQ thesis — see `docs/THESIS.md` for the full research narrative.*
