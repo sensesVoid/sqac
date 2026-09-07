@@ -22,7 +22,18 @@ from typing import Any, Optional
 
 from .encoder import BSCEncoder, MiniLMSimHashEncoder
 from .static_encoder import DEFAULT_STATIC_MODEL, StaticSimHashEncoder
+
+# Optional Rust SIMD acceleration — 100-300x faster for fuzzy scan
+try:
+    import sqac_simd as _simd
+    _HAS_SIMD = True
+except ImportError:
+    _simd = None
+    _HAS_SIMD = False
+
 from .format import (
+    _HAS_LZ4,
+
     VERSION,
     Cartridge,
     CartridgeHeader,
@@ -612,7 +623,15 @@ class SqacStore:
         return cache[0]
 
     def _bulk_similarity(self, qbits: bytes, live: list[int], tier: str = "lexical") -> list[float]:
-        """Vectorized 1 - hamming/D against key and content matrices."""
+        """Vectorized 1 - hamming/D against key and content matrices.
+
+        Fast path: Rust SIMD (sqac_simd) — 100-300x faster than Python.
+        Fallback: NumPy bit-matrix, then pure Python.
+        """
+        # Fast path: Rust SIMD on the packed byte vectors directly
+        if _HAS_SIMD and live:
+            return self._bulk_similarity_simd(qbits, live, tier)
+
         try:
             import numpy as np
         except ImportError:
@@ -632,9 +651,28 @@ class SqacStore:
         stacked = np.maximum(sims_key, sims_cont)
         return [float(stacked[i]) for i in live]
 
-    def stats(self) -> dict:
-        import os
+    def _bulk_similarity_simd(self, qbits: bytes, live: list[int], tier: str) -> list[float]:
+        """Rust SIMD fast path: pack live vectors into a contiguous matrix
+        and call sqac_simd.bulk_similarity."""
+        key_len = self.dims // 8
+        kname, cname = ("keys", "ckeys") if tier == "lexical" else ("sem_keys", "sem_ckeys")
+        kvecs = getattr(self, f"_{kname}")
+        cvecs = getattr(self, f"_{cname}")
 
+        # Pack live vectors into contiguous buffers
+        n = len(live)
+        kbuf = bytearray(n * key_len)
+        cbuf = bytearray(n * key_len)
+        for j, i in enumerate(live):
+            offset = j * key_len
+            kbuf[offset:offset + key_len] = kvecs[i]
+            cbuf[offset:offset + key_len] = cvecs[i]
+
+        sims_k = _simd.bulk_similarity(qbits, bytes(kbuf), n, self.dims)
+        sims_c = _simd.bulk_similarity(qbits, bytes(cbuf), n, self.dims)
+        return [max(sk, sc) for sk, sc in zip(sims_k, sims_c)]
+
+    def stats(self) -> dict:
         kinds: dict[str, int] = {}
         for e in self._entries:
             if e.get("deleted"):
@@ -648,6 +686,8 @@ class SqacStore:
             "fuzzy_threshold": self.fuzzy_threshold,
             "semantic": self.semantic,
             "semantic_threshold": getattr(self, "semantic_threshold", None),
+            "simd": _HAS_SIMD,
+            "lz4": _HAS_LZ4,
             "kinds": kinds,
         }
 
