@@ -21,6 +21,7 @@ from typing import Any, Optional
 from .encoder import BSCEncoder, MiniLMSimHashEncoder
 from .static_encoder import DEFAULT_STATIC_MODEL, StaticSimHashEncoder
 from .format import (
+    VERSION,
     Cartridge,
     CartridgeHeader,
     Entry,
@@ -100,6 +101,7 @@ class SqacStore:
         self.semantic_threshold = self.DEFAULT_SEMANTIC_THRESHOLD
         self.semantic = False
         self._sem_encoder = None
+        self.format_version = VERSION  # v2 writes raw binary vectors; 1 = legacy hex
         if semantic:
             if semantic_model and semantic_model.startswith("static"):
                 self._sem_encoder = StaticSimHashEncoder(dims=self.dims)
@@ -239,24 +241,38 @@ class SqacStore:
     # ── persistence ──────────────────────────────────────────────────────
 
     def save(self, path: str | Path, name: str = "", description: str = "") -> None:
-        """Write the store as a .sqac cartridge (atomic replace)."""
+        """Write the store as a .sqac cartridge (atomic replace).
+
+        v2 layout: auxiliary packed vectors (content, semantic key/content)
+        go into a per-entry raw binary block — ~2x smaller than the v1
+        hex-in-JSON encoding. Use format_version=1 to emit the legacy
+        layout (readable by pre-v2 runtimes).
+        """
+        key_len = self.dims // 8
         entries = []
         for idx, (e, kbits, ckbits) in enumerate(zip(self._entries, self._keys, self._ckeys)):
             payload = {
                 "content": e["content"],
                 "key_norm": e["key_norm"],
                 "source": e["source"],
-                "content_key": ckbits.hex(),
                 **({"meta": e["meta"]} if e["meta"] else {}),
             }
-            if self.semantic:
-                payload["sem_key"] = self._sem_keys[idx].hex()
-                payload["sem_content_key"] = self._sem_ckeys[idx].hex()
+            if self.format_version >= 2:
+                binvec = bytes(ckbits)
+                if self.semantic:
+                    binvec += bytes(self._sem_keys[idx]) + bytes(self._sem_ckeys[idx])
+            else:
+                binvec = b""
+                payload["content_key"] = ckbits.hex()
+                if self.semantic:
+                    payload["sem_key"] = self._sem_keys[idx].hex()
+                    payload["sem_content_key"] = self._sem_ckeys[idx].hex()
             entries.append(
                 Entry(
                     key_bits=bytearray(kbits),
                     payload=payload,
                     deleted=bool(e.get("deleted")),
+                    binvec=binvec,
                 )
             )
         enc_name = f"bsc-ngram-v1:{self.encoder.seed}:{self.encoder.ngram}"
@@ -303,16 +319,32 @@ class SqacStore:
                 }
             )
             store._keys.append(bytes(e.key_bits))
-            # content_key arrived later than the original format: tolerate absence
-            ck = e.payload.get("content_key", "")
-            store._ckeys.append(bytes.fromhex(ck) if ck else bytes(e.key_bits))
-            # semantic vectors arrived in v1.1: recompute if absent (lazy
-            # batch embed at load end keeps this cheap when needed)
-            if store.semantic:
-                sk = e.payload.get("sem_key", "")
-                sck = e.payload.get("sem_content_key", "")
-                store._sem_keys.append(bytes.fromhex(sk) if sk else None)
-                store._sem_ckeys.append(bytes.fromhex(sck) if sck else None)
+            # v2: auxiliary vectors in the raw binary block; v1: hex in payload.
+            # Lexical content vector falls back to the key vector when absent.
+            if e.binvec:
+                kl = h.dims // 8
+                # layout: [ckey][sem_key][sem_ckeys] — key_bits travels separately
+                store._ckeys.append(e.binvec[0:kl] or bytes(e.key_bits))
+                # sem lists stay EMPTY when semantic is off — add() only
+                # appends to them on the semantic path; keep that invariant
+                if store.semantic:
+                    store._sem_keys.append(
+                        e.binvec[kl : 2 * kl] if len(e.binvec) >= 2 * kl else None
+                    )
+                    store._sem_ckeys.append(
+                        e.binvec[2 * kl : 3 * kl] if len(e.binvec) >= 3 * kl else None
+                    )
+            else:
+                store._ckeys.append(
+                    bytes.fromhex(e.payload["content_key"])
+                    if e.payload.get("content_key")
+                    else bytes(e.key_bits)
+                )
+                if store.semantic:
+                    sk = e.payload.get("sem_key", "")
+                    sck = e.payload.get("sem_content_key", "")
+                    store._sem_keys.append(bytes.fromhex(sk) if sk else None)
+                    store._sem_ckeys.append(bytes.fromhex(sck) if sck else None)
             if norm and not e.deleted:
                 store._exact[norm] = idx
         if store.semantic:

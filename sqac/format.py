@@ -1,4 +1,4 @@
-"""SQAC binary format v1.
+"""SQAC binary format.
 
 A .sqac file is a self-contained, portable, hot-swappable memory cartridge:
 
@@ -19,6 +19,12 @@ Design rules (from docs/THESIS.md Part VI):
   - Unknown extension blocks MUST be skipped by readers, giving forward
     compatibility (a v1 reader can read a v2 file that only appends ext
     blocks; if the entry layout itself changes, bump VERSION).
+
+Version history:
+  v1: auxiliary vectors (content/semantic keys) hex-encoded in payload JSON.
+  v2: auxiliary vectors moved into a per-entry raw binary block (FLAG_BINVEC),
+      ~2x smaller than hex. v1 files remain fully readable; v2 files are
+      refused by v1 readers via the version check (entry layout changed).
 """
 
 from __future__ import annotations
@@ -31,10 +37,11 @@ from pathlib import Path
 from typing import Any
 
 MAGIC = b"SQAC"
-VERSION = 1
+VERSION = 2
 
 # Entry flag bits
 FLAG_DELETED = 0x0001  # tombstone: entry ignored by reads
+FLAG_BINVEC = 0x0002   # raw binary vector block present (v2+)
 
 
 class FormatError(ValueError):
@@ -113,11 +120,18 @@ class CartridgeHeader:
 
 @dataclass
 class Entry:
-    """One memory record: packed key bits + plaintext payload."""
+    """One memory record: packed key bits + plaintext payload.
+
+    binvec carries auxiliary packed vectors (content vector, semantic key
+    and content vectors) as raw bytes instead of hex-in-JSON. Layout is
+    decided by the store (sizes derive from dims and tier flags); the
+    format layer treats it as opaque. Empty for v1 files.
+    """
 
     key_bits: bytearray  # dims // 8 bytes
     payload: dict[str, Any]
     deleted: bool = False
+    binvec: bytes = b""
 
 
 def pack_bits(bits) -> bytearray:
@@ -182,9 +196,14 @@ def write_cartridge(
                 f"key is {len(e.key_bits)} bytes, expected {key_len} (dims={dims})"
             )
         flags = FLAG_DELETED if e.deleted else 0
+        if e.binvec:
+            flags |= FLAG_BINVEC
         pb = json.dumps(e.payload, ensure_ascii=False).encode("utf-8")
         parts.append(struct.pack("<HI", flags, len(pb)))
         parts.append(bytes(e.key_bits))
+        if e.binvec:
+            parts.append(struct.pack("<I", len(e.binvec)))
+            parts.append(e.binvec)
         parts.append(pb)
 
     parts.append(struct.pack("<I", len(ext_blocks or [])))
@@ -248,9 +267,18 @@ def read_cartridge(path: str | Path) -> Cartridge:
     for _ in range(n_entries):
         flags, pb_len = struct.unpack("<HI", take(6))
         key_bits = bytearray(take(key_len))
+        binvec = b""
+        if flags & FLAG_BINVEC:
+            (bv_len,) = struct.unpack("<I", take(4))
+            binvec = take(bv_len)
         payload = json.loads(take(pb_len).decode("utf-8"))
         entries.append(
-            Entry(key_bits=key_bits, payload=payload, deleted=bool(flags & FLAG_DELETED))
+            Entry(
+                key_bits=key_bits,
+                payload=payload,
+                deleted=bool(flags & FLAG_DELETED),
+                binvec=binvec,
+            )
         )
 
     (n_ext,) = struct.unpack("<I", take(4))

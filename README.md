@@ -69,7 +69,7 @@ for maximum ranking fidelity (~+10% top-3 routing on large packs).
 | Exact lookup | **5 μs** (O(1), constant) |
 | Fuzzy scan @ 10K rules | **21 ms** (numpy XOR; was 142 ms pre-fast-path) |
 | Write throughput | ~3.8 ms/fact |
-| Cartridge size @ 10K rules | 5.5 MB |
+| Cartridge size @ 10K rules | **3.97 MB** lexical-only · **6.53 MB** with semantic (v2 binary layout; was 5.4/10.9 MB in v1) |
 | Semantic tier (static int8) | 9.8MB model, ~0.1ms encode, 118MB total process RSS |
 | Skill routing (50-problem bench) | retrieval 50/50 (MiniLM) / 45/50 (static) · application 31/50 vs 23/50 baseline |
 | Qwen2.5-0.5B + memory | 4/4 correct on private facts |
@@ -112,8 +112,10 @@ for maximum ranking fidelity (~+10% top-3 routing on large packs).
   packs; MiniLM remains selectable for maximum fidelity.
 - MiniLM-level synonym gaps remain ("db" vs "database" content-side similarity
   ~0.56); the dual key+content scan rescues most such cases via the key side.
-- Fuzzy tiers are O(n): ~21ms @ 10K; Rust engine in `archive/rust/` when
-  100K+ matters.
+- Fuzzy is O(n): ~21ms @ 10K per tier scanned; Rust engine in `archive/rust/`
+  when 100K+ matters.
+- Cartridge weight at scale: ~653 B/rule with semantic tier on (v2 binary
+  vectors; the plaintext payload itself dominates). ~65 MB @ 100K rules.
 - Superposition capacity per bundle not yet stressed beyond smoke scale.
 
 ## Next steps
