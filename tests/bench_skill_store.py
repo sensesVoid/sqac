@@ -42,17 +42,26 @@ def load_problems(path: str) -> list[dict]:
 
 
 def load_all_skills() -> list[dict]:
+    """Load skill packs, merging cross-pack duplicates by name (union of keys)."""
     try:
         import yaml
     except ImportError:
         raise ImportError("pip install pyyaml")
-    skills = []
+    by_name: dict[str, dict] = {}
     for sp in SKILL_PATHS:
         raw = yaml.safe_load(open(sp))
         for s in raw:
             if isinstance(s, dict) and "name" in s:
-                skills.append(s)
-    return skills
+                if s["name"] in by_name:
+                    # merge: one identity, union of trigger keys
+                    merged = dict(by_name[s["name"]])
+                    merged["keys"] = list(dict.fromkeys(
+                        merged.get("keys", []) + s.get("keys", [])
+                    ))
+                    by_name[s["name"]] = merged
+                else:
+                    by_name[s["name"]] = s
+    return list(by_name.values())
 
 
 def build_store(skills: list[dict]) -> SqacStore:

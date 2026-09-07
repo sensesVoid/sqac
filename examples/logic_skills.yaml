@@ -87,20 +87,6 @@
     - taxi base fare plus per mile rate, total for a trip
     - base fee plus rate times quantity, compute the total
 
-- name: binary-search-bug
-  domain: debugging
-  difficulty: medium
-  pattern: elimination
-  content: |
-    SKILL binary-search-bug: Halve the code region. Add a print or assertion
-    at the midpoint. If the bug appears in the first half, discard the second,
-    and vice versa. Repeat until the bug is in a single function.
-  keys:
-    - when you cannot find where the bug is but know it exists
-    - narrowing down a defect, halving the suspect code region
-    - print at midpoint to isolate which half contains the bug
-    - divide the codebase to find where behavior changes
-
 - name: invariant-finding
   domain: logic
   difficulty: hard

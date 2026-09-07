@@ -99,6 +99,9 @@
     - divide the codebase to find where behavior changes
     - one of thousands of records fails inside a loop, halve the input
     - works on small inputs fails on large ones, find the threshold by bisection
+    - script works on small files but crashes on large files, find the size threshold
+    - program crashes only on large inputs, bisect the input to find where it breaks
+    - works fine on test data but fails at production scale, narrow the breaking size
     - slow query with several joins, disable half the joins to find the slow one
     - comment out half the steps to see if the failure persists
 

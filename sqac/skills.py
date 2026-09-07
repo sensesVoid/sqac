@@ -85,6 +85,14 @@ def load_yaml(path: str | Path) -> list[Skill]:
         keys = item.get("keys", [])
         if isinstance(keys, str):
             keys = [k.strip() for k in keys.split("\n") if k.strip()]
+        # YAML colons in trigger phrases produce dicts; flatten them
+        flat_keys = []
+        for k in keys:
+            if isinstance(k, dict):
+                flat_keys.append(" ".join(f"{vk} {vv}" for vk, vv in k.items()))
+            elif isinstance(k, str):
+                flat_keys.append(k)
+        keys = flat_keys
         skills.append(
             Skill(
                 name=item.get("name", ""),
@@ -308,23 +316,58 @@ DOMAINS = {
 }
 
 
-def suggest_keys(skill: Skill) -> list[str]:
-    """Suggest additional trigger keys based on the skill's content and domain.
+def generate_triggers(skill: Skill, max_triggers: int = 5) -> list[str]:
+    """Generate concrete situation triggers from skill content + domain.
 
-    Returns suggestions the user can accept or edit.
+    Strategy:
+      1. Extract action verbs and domain nouns from the content.
+      2. Combine with domain-specific situation templates.
+      3. Return concrete phrases the user can accept or edit.
     """
+    stop = {
+        "a", "an", "the", "is", "are", "was", "were", "be", "been",
+        "being", "have", "has", "had", "do", "does", "did", "will",
+        "would", "could", "should", "may", "might", "shall", "can",
+        "to", "of", "in", "for", "on", "with", "at", "by", "from",
+        "as", "into", "through", "during", "before", "after", "and",
+        "or", "but", "not", "if", "then", "else", "when", "each",
+        "every", "all", "both", "few", "more", "most", "other", "some",
+        "such", "no", "nor", "so", "up", "out", "about", "that",
+        "this", "which", "what", "who", "whom", "it", "its", "each",
+    }
+    words = [w.strip(".,;:!?()[]{}'") for w in skill.content.lower().split()]
+    verbs = [w for w in words if len(w) > 4 and w.isalpha() and w not in stop]
+    nouns = verbs[:6]  # top meaningful words
+
     suggestions = []
-    content_words = set(skill.content.lower().split())
-    # domain-specific triggers
+
+    # template 1: "when you need to <verb>..."
+    if nouns:
+        suggestions.append(f"when you need to {nouns[0]}")
+
+    # template 2: "<noun> problem, <noun> issue, <noun> question"
+    if nouns[:2]:
+        suggestions.append(f"{nouns[0]} problem, {nouns[0]} issue")
+
+    # template 3: domain-specific triggers from DOMAINS
     if skill.domain in DOMAINS:
         for pattern in DOMAINS[skill.domain]:
-            if any(w in content_words for w in pattern.split()):
-                suggestions.append(f"when you need {pattern}")
-    # content-derived triggers
-    keywords = [w for w in content_words if len(w) > 5 and w.isalpha()]
-    if keywords:
-        suggestions.append(f"using {' or '.join(keywords[:3])}")
-    return [s for s in suggestions if s not in skill.keys][:5]
+            pattern_words = set(pattern.split())
+            if len(pattern_words & set(nouns)) >= 1:
+                suggestions.append(f"when the situation calls for {pattern}")
+
+    # template 4: content-derived situation phrases
+    if len(nouns) >= 2:
+        suggestions.append(f"dealing with {nouns[0]} and {nouns[1]}")
+
+    # deduplicate, remove existing keys, cap
+    seen = set(skill.keys)
+    out = []
+    for s in suggestions:
+        if s not in seen and s not in out:
+            seen.add(s)
+            out.append(s)
+    return out[:max_triggers]
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────
@@ -335,18 +378,18 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="sqac.skills", description="Universal skill formatter")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    p_val = sub.add_parser("validate", help="validate skill YAML file")
-    p_val.add_argument("input", help=".yaml or .json skill file")
+    p_val = sub.add_parser("validate", help="validate skill YAML file(s)")
+    p_val.add_argument("input", nargs="+", help=".yaml or .json skill file(s) — validated together")
     p_val.add_argument("--strict", action="store_true", help="treat warnings as errors")
 
     p_pack = sub.add_parser("pack", help="pack skills into .sqac cartridge")
-    p_pack.add_argument("input", help=".yaml or .json skill file")
+    p_pack.add_argument("input", nargs="+", help=".yaml or .json skill file(s), merged in order")
     p_pack.add_argument("-o", "--out", required=True)
     p_pack.add_argument("--name", default="skill-library")
-    p_pack.add_argument("--semantic", action="store_true", help="enable MiniLM semantic tier")
+    p_pack.add_argument("--semantic", action="store_true", help="enable semantic tier (static int8 by default)")
 
     p_suggest = sub.add_parser("suggest", help="suggest additional trigger keys")
-    p_suggest.add_argument("input", help=".yaml or .json skill file")
+    p_suggest.add_argument("input", nargs="+", help=".yaml or .json skill file(s)")
 
     p_template = sub.add_parser("template", help="show skill template or domain list")
     p_template.add_argument("--domain", default=None, help="show triggers for this domain")
@@ -363,7 +406,9 @@ def main(argv: list[str] | None = None) -> int:
             print("available domains:", ", ".join(DOMAINS.keys()))
         return 0
 
-    skills = load_skills(args.input)
+    skills = []
+    for path in args.input:
+        skills += load_skills(path)
 
     if args.cmd == "validate":
         issues = validate(skills)
@@ -374,7 +419,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "suggest":
         for s in skills:
-            suggestions = suggest_keys(s)
+            suggestions = generate_triggers(s)
             if suggestions:
                 print(f"\n{s.name} — suggested triggers:")
                 for k in suggestions:
