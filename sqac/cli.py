@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SQAC CLI — teach, search, pack, stats, init, track.
+"""SQAC CLI — teach, search, pack, stats, init, track, compact.
 
     python -m sqac.cli teach "our deploys are ARM64 only" [--key deployment] [--db memory.sqac]
     python -m sqac.cli search "deployment target?" [--db memory.sqac] [--k 3]
@@ -7,6 +7,7 @@
     python -m sqac.cli stats --db memory.sqac
     python -m sqac.cli init .                           # auto-build cartridge from project
     python -m sqac.cli track . --interval 5             # realtime tracking (Ctrl-C to stop)
+    python -m sqac.cli compact --db memory.sqac         # remove tombstoned entries
 """
 
 from __future__ import annotations
@@ -56,6 +57,9 @@ def main(argv: list[str] | None = None) -> int:
 
     p_stats = sub.add_parser("stats", help="show cartridge stats")
     add_db(p_stats)
+
+    p_compact = sub.add_parser("compact", help="remove tombstoned entries and reclaim space")
+    add_db(p_compact)
 
     p_init = sub.add_parser("init", help="auto-build a project cartridge from a directory")
     p_init.add_argument("root", nargs="?", default=".", help="project root (default: .)")
@@ -122,6 +126,18 @@ def main(argv: list[str] | None = None) -> int:
                         print(f"  {kk}: {vv}")
             else:
                 print(f"{k}: {v}")
+
+    elif args.cmd == "compact":
+        from .format import compact_cartridge
+        p = Path(args.db)
+        if not p.exists():
+            print(f"cartridge not found: {p}")
+            return 1
+        report = compact_cartridge(p)
+        if report["compacted"]:
+            print(f"compacted: {report['original']} -> {report['alive']} entries ({report['removed']} removed)")
+        else:
+            print(f"no tombstones to compact ({report['original']} entries)")
 
     elif args.cmd == "init":
         from .autobuild import extract_project_units, build_store

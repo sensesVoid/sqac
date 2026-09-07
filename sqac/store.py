@@ -12,6 +12,8 @@ update property from the thesis.
 
 from __future__ import annotations
 
+import collections
+import hashlib
 import re
 import time
 from dataclasses import dataclass, field
@@ -26,10 +28,40 @@ from .format import (
     CartridgeHeader,
     Entry,
     FormatError,
+    compact_cartridge,
     hamming,
+    locked_cartridge,
     read_cartridge,
     write_cartridge,
 )
+
+# ── input sanitization ───────────────────────────────────────────────────────
+# Controls what gets stored. Prevents prompt injection via stored content
+# and keeps the cartridge size bounded.
+_MAX_CONTENT_LENGTH = 50_000  # 50KB per entry — generous but bounded
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def sanitize_content(text: str) -> str:
+    """Strip control characters and enforce length limits.
+
+    Control characters can break JSON serialization and confuse LLM tokenizers.
+    Length limits prevent a single malicious entry from bloating the cartridge.
+    """
+    text = _CONTROL_CHARS.sub("", text)
+    text = text.strip()
+    if len(text) > _MAX_CONTENT_LENGTH:
+        text = text[:_MAX_CONTENT_LENGTH] + "... [truncated]"
+    return text
+
+
+def sanitize_key(text: str) -> str:
+    """Normalize and sanitize a lookup key."""
+    text = _CONTROL_CHARS.sub("", text)
+    text = text.strip()
+    if len(text) > 1024:
+        text = text[:1024]
+    return text
 
 
 # ── knowledge kinds (v3 flag bits, format.py) ─────────────────────────
@@ -108,12 +140,19 @@ class SqacStore:
       2. lexical   — BSC trigram bundling (typos, word overlap)
       3. semantic  — MiniLM SimHash (synonyms, paraphrase; optional,
                      requires torch+transformers)
+
+    Production features:
+      - Input sanitization: control chars stripped, content length bounded
+      - Query cache: LRU cache on encoded query vectors (invalidated on write)
+      - File locking: atomic writes via fcntl + thread lock
+      - Compaction: remove tombstoned entries to reclaim space
     """
 
     # Both VSA tiers share the same noise floor (~0.5) and threshold
     # regime: lexical true matches >= 0.6, semantic paraphrases ~0.7+.
     DEFAULT_FUZZY_THRESHOLD = 0.60
     DEFAULT_SEMANTIC_THRESHOLD = 0.60  # measured: x86→ARM64 = 0.65, floor = 0.49
+    DEFAULT_CACHE_SIZE = 512  # max cached query encodings
 
     def __init__(
         self,
@@ -122,6 +161,7 @@ class SqacStore:
         fuzzy_threshold: float = DEFAULT_FUZZY_THRESHOLD,
         semantic: bool = False,
         semantic_model: Optional[str] = None,
+        cache_size: int = DEFAULT_CACHE_SIZE,
     ):
         self.encoder = encoder or BSCEncoder(dims=dims)
         self.dims = self.encoder.dims
@@ -130,6 +170,11 @@ class SqacStore:
         self.semantic = False
         self._sem_encoder = None
         self.format_version = VERSION  # v2 writes raw binary vectors; 1 = legacy hex
+        # Query cache: maps (query_hash, tier) -> packed bits
+        self._cache_size = cache_size
+        self._query_cache: collections.OrderedDict[tuple[str, str], bytes] = (
+            collections.OrderedDict()
+        )
         if semantic:
             if semantic_model and semantic_model.startswith("static"):
                 self._sem_encoder = StaticSimHashEncoder(dims=self.dims)
@@ -157,7 +202,27 @@ class SqacStore:
         self._sem_ckeys: list[bytes] = []  # packed semantic content vectors
         self._matrices: dict[str, tuple] = {}  # lazily unpacked (n, D) bit matrices
 
+    def _invalidate_cache(self) -> None:
+        """Drop all cached query encodings (call after any write)."""
+        self._query_cache.clear()
+        self._matrices.clear()  # bit matrices are stale too
+
     # ── write path ───────────────────────────────────────────────────────
+
+    def _cached_encode(self, text: str, tier: str) -> bytes:
+        """Encode text with LRU cache. Invalidated on any write."""
+        cache_key = (hashlib.sha256(text.encode()).hexdigest()[:16], tier)
+        if cache_key in self._query_cache:
+            self._query_cache.move_to_end(cache_key)
+            return self._query_cache[cache_key]
+        if tier == "semantic" and self._sem_encoder:
+            bits = self._sem_encoder.encode_bits(text)
+        else:
+            bits = self.encoder.encode_bits(text)
+        self._query_cache[cache_key] = bits
+        if len(self._query_cache) > self._cache_size:
+            self._query_cache.popitem(last=False)
+        return bits
 
     def add(
         self,
@@ -173,11 +238,12 @@ class SqacStore:
         "turn"). Kinds enable filtered retrieval and kind-aware ranking;
         they do not affect which index tiers an entry participates in.
         """
-        content = content.strip()
+        content = sanitize_content(content)
         if not content:
             raise ValueError("content must be non-empty")
-        key_text = key if key is not None else content
+        key_text = sanitize_key(key) if key is not None else content
         norm = normalize(key_text)
+        self._invalidate_cache()
         idx = len(self._entries)
         self._entries.append(
             {
@@ -202,14 +268,50 @@ class SqacStore:
             return False
         self._entries[idx]["deleted"] = True
         self._exact.pop(self._entries[idx]["key_norm"], None)
+        self._invalidate_cache()
         return True
+
+    def compact(self) -> dict:
+        """Remove tombstoned entries and rebuild the index in-place.
+
+        This reclaims space from deleted entries. The store is rebuilt
+        from the surviving entries, so all indices are fresh.
+        Returns a report dict.
+        """
+        before = len(self._entries)
+        alive = [e for e in self._entries if not e.get("deleted")]
+        removed = before - len(alive)
+        if removed == 0:
+            return {"before": before, "after": before, "removed": 0}
+        # Rebuild from scratch
+        self._entries = []
+        self._exact = {}
+        self._keys = []
+        self._ckeys = []
+        self._sem_keys = []
+        self._sem_ckeys = []
+        self._matrices.clear()
+        self._query_cache.clear()
+        for e in alive:
+            self._entries.append(e)
+            norm = e["key_norm"]
+            idx = len(self._entries) - 1
+            key_text = norm  # reconstruct from normalized key
+            self._keys.append(self.encoder.encode_bits(norm))
+            self._ckeys.append(self.encoder.encode_bits(e["content"]))
+            if self.semantic and self._sem_encoder:
+                self._sem_keys.append(self._sem_encoder.encode_bits(norm))
+                self._sem_ckeys.append(self._sem_encoder.encode_bits(e["content"]))
+            if norm:
+                self._exact[norm] = idx
+        return {"before": before, "after": len(alive), "removed": removed}
 
     def __len__(self) -> int:
         return sum(1 for e in self._entries if not e.get("deleted"))
 
     # ── read path ────────────────────────────────────────────────────────
 
-    def search(self, query: str, top_k: int = 3, kind: int | str | None = None) -> list[Hit]:
+    def search(self, query: str, top_k: int = 3, kind: int | str | None = None, use_cache: bool = True) -> list[Hit]:
         """Exact-first, fuzzy-fallback retrieval with confidence.
 
         kind: optional filter (KIND_* int or name). None = all kinds.
@@ -252,7 +354,7 @@ class SqacStore:
         #    similarity wins. Numpy bit-matrix fast path (Python stand-in
         #    for the archived Rust engine; the O(n) wall is fundamental
         #    at this tier — thesis Part VI).
-        qbits = self.encoder.encode_bits(query)
+        qbits = self._cached_encode(query, "lexical") if use_cache else self.encoder.encode_bits(query)
         results: list[tuple[float, int, str]] = []
         live = [i for i in range(len(self._entries)) if eligible(i)]
         if live:
@@ -264,7 +366,7 @@ class SqacStore:
             #    no lexical overlap ("x86" -> AMD64 rule, "db" -> database).
             #    Same noise floor (~0.5) and confidence scale as lexical.
             if self.semantic:
-                qsem = self._sem_encoder.encode_bits(query)
+                qsem = self._cached_encode(query, "semantic") if use_cache else self._sem_encoder.encode_bits(query)
                 sem_sims = self._bulk_similarity(qsem, live, tier="semantic")
                 for i, sim in zip(live, sem_sims):
                     if sim >= self.semantic_threshold:

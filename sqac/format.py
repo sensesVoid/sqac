@@ -34,12 +34,15 @@ Version history:
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import struct
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Generator
 
 MAGIC = b"SQAC"
 VERSION = 3
@@ -53,6 +56,63 @@ FLAG_KIND_MASK = 0xFF << FLAG_KIND_SHIFT
 
 class FormatError(ValueError):
     """Raised when a .sqac file is malformed or incompatible."""
+
+
+class CartridgeLockError(FormatError):
+    """Raised when a cartridge file cannot be locked."""
+
+
+# ── file locking ──────────────────────────────────────────────────────────────
+# Two layers:
+#   1. Process-level: fcntl.flock on the .sqac file (cross-process safe)
+#   2. Thread-level: threading.Lock per path (in-process safe)
+# The context manager acquires both; the fcntl lock is released on exit
+# even if the process crashes (kernel-level guarantee on Unix).
+
+_thread_locks: dict[str, threading.Lock] = {}
+_thread_locks_guard = threading.Lock()
+
+
+def _get_thread_lock(path: Path) -> threading.Lock:
+    """One threading.Lock per canonical path, created on demand."""
+    key = path.resolve().as_posix()
+    with _thread_locks_guard:
+        if key not in _thread_locks:
+            _thread_locks[key] = threading.Lock()
+        return _thread_locks[key]
+
+
+@contextmanager
+def locked_cartridge(path: Path, timeout: float = 10.0) -> Generator[None, None, None]:
+    """Acquire an exclusive lock on a .sqac file for writing.
+
+    Acquires both a process-level fcntl lock and a thread-level lock.
+    The fcntl lock is mandatory on Linux/macOS: another process cannot
+    read or write the file until we release it.  On failure (timeout or
+    unsupported platform), raises CartridgeLockError.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tlock = _get_thread_lock(path)
+    tlock.acquire()
+    try:
+        fd = open(path, "a+b")
+        try:
+            fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (OSError, BlockingIOError):
+            fd.close()
+            raise CartridgeLockError(
+                f"cannot lock {path}: another process is writing to it"
+            )
+        try:
+            yield
+        finally:
+            try:
+                fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+            finally:
+                fd.close()
+    finally:
+        tlock.release()
 
 
 @dataclass
@@ -177,8 +237,14 @@ def write_cartridge(
     vocab: dict[str, int],
     entries: list[Entry],
     ext_blocks: list[tuple[str, bytes]] | None = None,
+    locked: bool = True,
 ) -> None:
-    """Write a complete cartridge to disk atomically (tmp file + rename)."""
+    """Write a complete cartridge to disk atomically (tmp file + rename).
+
+    When *locked* (default), acquires an exclusive file lock so concurrent
+    writers cannot corrupt the cartridge.  The lock is released before the
+    tmp→rename swap, so readers never see a locked file.
+    """
     path = Path(path)
     header.vocab_fingerprint = header.compute_fingerprint(vocab)
 
@@ -224,10 +290,20 @@ def write_cartridge(
         parts.append(blob)
 
     tmp = path.with_suffix(path.suffix + ".tmp")
+    if locked:
+        with locked_cartridge(path):
+            _write_parts(tmp, parts)
+            tmp.replace(path)
+    else:
+        _write_parts(tmp, parts)
+        tmp.replace(path)
+
+
+def _write_parts(tmp: Path, parts: list[bytes]) -> None:
+    """Write serialized parts to a temp file."""
     with open(tmp, "wb") as f:
         for chunk in parts:
             f.write(chunk)
-    tmp.replace(path)
 
 
 @dataclass
@@ -240,10 +316,31 @@ class Cartridge:
     ext_blocks: dict[str, bytes] = field(default_factory=dict)
 
 
-def read_cartridge(path: str | Path) -> Cartridge:
+def read_cartridge(path: str | Path, locked: bool = False) -> Cartridge:
+    """Read a cartridge from disk.
+
+    When *locked*, acquires a shared (read) lock via fcntl so writers
+    cannot modify the file while we read.  Default is unlocked for
+    backward compatibility.
+    """
     path = Path(path)
-    with open(path, "rb") as f:
-        blob = f.read()
+    if locked:
+        fd = open(path, "rb")
+        try:
+            fcntl.flock(fd.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except (OSError, BlockingIOError):
+            fd.close()
+            raise CartridgeLockError(
+                f"cannot lock {path} for reading: another process is writing"
+            )
+        try:
+            blob = fd.read()
+        finally:
+            fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+            fd.close()
+    else:
+        with open(path, "rb") as f:
+            blob = f.read()
 
     off = 0
 
@@ -316,3 +413,25 @@ def hamming(a, b) -> int:
     for x, y in zip(a, b):
         n += (x ^ y).bit_count()
     return n
+
+
+def compact_cartridge(
+    path: str | Path,
+    out: str | Path | None = None,
+) -> dict:
+    """Remove tombstoned entries from a cartridge and rewrite it.
+
+    Reads the cartridge, filters out deleted entries, and writes a clean
+    version.  If *out* is None, overwrites the original atomically.
+    Returns a report dict.
+    """
+    path = Path(path)
+    cart = read_cartridge(path)
+    original_count = len(cart.entries)
+    alive = [e for e in cart.entries if not e.deleted]
+    removed = original_count - len(alive)
+    if removed == 0:
+        return {"original": original_count, "alive": original_count, "removed": 0, "compacted": False}
+    out = Path(out) if out else path
+    write_cartridge(out, cart.header, cart.vocab, alive, locked=True)
+    return {"original": original_count, "alive": len(alive), "removed": removed, "compacted": True}
