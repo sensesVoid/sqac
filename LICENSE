@@ -1,0 +1,72 @@
+Business Source License 1.1
+
+Licensor: sensesVoid
+Licensed Work: SQAC — Hyperdimensional Memory Cartridges for LLMs
+Change Date: 2030-09-07
+Change License: Apache License, Version 2.0
+
+Copyright (c) 2026 sensesVoid
+
+Notice
+
+The Licensor grants you (the "Licensee") a non-exclusive, royalty-free,
+world-wide license to reproduce, prepare derivative works of, publicly
+display, publicly perform, and distribute the Licensed Work and such
+derivative works in Source and Object form.
+
+Change License Grant
+
+On the Change Date, the Licensed Work is licensed under the Change
+License (Apache License, Version 2.0), and the Licensor grants you
+(and any successor to the Licensed Work) a perpetual, worldwide,
+non-exclusive, no-charge, royalty-free, irrevocable copyright license
+to reproduce, prepare derivative works of, publicly display, publicly
+perform, sublicense, and distribute the Licensed Work and such
+derivative works in Source and Object form.
+
+Use Limitation
+
+The Licensed Work is provided on an "AS IS" BASIS, WITHOUT WARRANTIES
+OR CONDITIONS OF ANY KIND. The Licensee may use, modify, and distribute
+the Licensed Work for any purpose, including commercial purposes, subject
+to the following restrictions:
+
+  1. The Licensee may not offer the Licensed Work or any modified version
+     of the Licensed Work as a managed service or hosted service where
+     the primary value of the service is access to the Licensed Work's
+     functionality (a "Competing Offering").
+
+  2. A "Competing Offering" means any product or service that provides
+     functionality substantially similar to the Licensed Work, including
+     but not limited to: offering the Licensed Work as a hosted API,
+     SaaS platform, managed database, or cloud service.
+
+  3. The Licensee may use the Licensed Work as an embedded component
+     within their own products and services, provided the Licensed Work
+     is not the primary value offering.
+
+Trademarks
+
+This license does not grant permission to use the trade names,
+trademarks, service marks, or product names of the Licensor.
+
+Disclaimer
+
+THE LICENSED WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE LICENSED WORK OR THE USE
+OR OTHER DEALINGS IN THE LICENSED WORK.
+
+Exception
+
+For the avoidance of doubt, the following uses are NOT considered a
+Competing Offering and are freely permitted:
+
+  - Using SQAC as an internal tool within your organization
+  - Embedding SQAC in a product where SQAC is not the primary offering
+  - Contributing improvements back to the SQAC project
+  - Academic research and education
+  - Personal and non-commercial use

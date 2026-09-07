@@ -711,6 +711,22 @@ We publish our negative results too — they're part of the record.
 
 ---
 
+## License
+
+SQAC is licensed under the **Business Source License 1.1 (BSL-1.1)**.
+
+**What this means:**
+- ✅ **Free to use** — internal tools, embedded in your products, research, education
+- ✅ **Free to modify** — fork it, customize it, contribute back
+- ✅ **Free to distribute** — share it with your team, include in open-source projects
+- ❌ **No competing SaaS** — you can't offer SQAC as a hosted API, managed database, or cloud service where SQAC is the primary value
+
+**After September 7, 2030**, the license automatically converts to **Apache License 2.0** — fully permissive, forever.
+
+See [LICENSE](LICENSE) for the full text.
+
+---
+
 ## Research
 
 SQAC stands on published work. Every link verified; no folklore citations.
