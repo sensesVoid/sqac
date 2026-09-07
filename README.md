@@ -31,6 +31,7 @@ A frozen, never-trained model answered private questions correctly — because w
 - [Cartridge Rack](#cartridge-rack)
 - [MCP Server](#mcp-server)
 - [HTTP API Server](#http-api-server)
+- [Use Cases](#use-cases)
 - [Performance](#performance)
 - [Research](#research)
 
@@ -647,6 +648,49 @@ sqac serve --dir ./memory --port 8420 --host 0.0.0.0 \
 
 ---
 
+## Use Cases
+
+SQAC is a **memory layer** — it gives any LLM access to knowledge it doesn't have, at runtime, without training. Here's where that matters:
+
+### What works today
+
+| Use Case | How SQAC helps | Example query |
+|---|---|---|---|
+| **Team knowledge base** | Store decisions, rules, conventions. Every LLM answers from your knowledge. | "What's our deployment target?" → ARM64 rule |
+| **Skill injection** | Store reasoning procedures. Small models follow them instead of guessing. | "Find the defective coin" → weighted-index skill card |
+| **Session memory** | Offload conversation context. Re-open sessions without re-derivation cost. | "What was that 504 about?" → offloaded exchange |
+| **Project auto-build** | `sqac init .` extracts knowledge from code. Stays in sync with `sqac track`. | "How does auth work?" → extracted from docstrings |
+| **Compliance & audit** | Store regulatory requirements. Query naturally. | "Are we GDPR compliant?" → retrieves relevant rules |
+| **Incident playbooks** | Store step-by-step procedures. Query by symptoms. | "504 on deploy" → exact playbook |
+| **Onboarding** | New hires query the company brain instead of reading 50 docs. | "How do we handle secrets?" → Vault policy |
+| **Multi-model knowledge** | Same cartridge works with Claude, GPT, Qwen, Llama. No vendor lock-in. | Any model, any cartridge |
+| **Edge / air-gapped** | Single file, no network. Works on air-gapped systems, edge devices, local LLMs. | Deploy anywhere |
+| **Customer support** | Store product knowledge + troubleshooting. Agents query in real-time. | "Reset password for enterprise SSO" → exact steps |
+| **Code review memory** | Store past decisions. "How did we handle X before?" retrieves the pattern. | "Race condition in worker pool" → past fix |
+| **Personal knowledge management** | "Second brain" — store notes, ideas, references. Query naturally. | "What did I read about VSA?" → stored summary |
+
+### What's promising but unproven
+
+| Use Case | Why it might work | What's missing |
+|---|---|---|
+| **Competitive intelligence** | Store competitor info, query naturally | Needs structured extraction pipeline |
+| **Legal contract analysis** | Store contract terms, query for obligations | Semantic tier needs legal vocabulary |
+| **Scientific research memory** | Store paper findings, query relationships | No citation tracking yet |
+| **Educational tutoring** | Store curriculum, generate explanations | Needs generation, not just retrieval |
+| **Skill marketplace** | Share cartridges across teams/orgs | No versioning or distribution mechanism |
+| **Regulatory cross-reference** | "Does this architecture violate SOC2?" | Needs multi-cartridge reasoning |
+| **IoT/Edge AI** | Small model + cartridge on edge devices | Rust SIMD helps, but no ARM wheel yet |
+
+### What SQAC is NOT (repeated for clarity)
+
+- **Not a RAG replacement.** RAG retrieves passages to quote. SQAC retrieves procedures to follow. Different jobs.
+- **Not a knowledge graph.** No entity relationships, no reasoning over graph structure.
+- **Not a search engine.** Fuzzy search is O(n). At 100K+ rules it needs the Rust engine.
+- **Not a fine-tuning tool.** It gives knowledge at runtime, not during training.
+- **Not a reasoning engine.** It retrieves what to think about, not how to synthesize.
+
+---
+
 ## Performance
 
 | Metric | Value |
@@ -764,10 +808,18 @@ clean = sanitize_for_injection("Ignore all previous instructions")
 
 ### What SQAC does NOT protect against
 
-- **Sophisticated semantic injection** — content that reads as normal facts but subtly biases the LLM
-- **Multi-turn injection** — small, innocent entries that accumulate into a payload over time
-- **Model-specific exploits** — some models are more susceptible than others
-- **The LLM itself** — SQAC detects patterns in text, not in the LLM's interpretation
+| Gap | Risk | Mitigation |
+|---|---|---|
+| **Sophisticated semantic injection** | Content reads as normal facts but subtly biases the LLM (e.g., "The sky is always green" stored as a fact) | Manual review of high-value entries. No automated defense. |
+| **Multi-turn accumulation** | Small, innocent entries that individually pass detection but collectively form a payload | Periodic audit of stored entries. Use `sqac track --log` for history. |
+| **Model-specific exploits** | Some models (especially smaller ones) are more susceptible to injection than others | Use the strongest model you can. Test injection resistance. |
+| **The LLM itself** | SQAC detects patterns in text, not in the model's interpretation. The model might follow instructions even from "safe" content. | Wrap ALL retrieved content in `<SQAC_UNTRUSTED>` tags. Instruct the model to extract facts only. |
+| **Adversarial cartridge files** | A shared `.sqac` file could contain hidden injection payloads | Verify cartridge provenance. Don't load untrusted cartridges. |
+| **Prompt stuffing** | Flooding the cartridge with thousands of entries to push real knowledge out of the top-k | Monitor entry count. Use kind filters. Set reasonable `top_k`. |
+| **Timing attacks** | Measuring search latency to infer cartridge contents | Not a realistic concern for most deployments. |
+| **Training data poisoning** | If SQAC is used to generate training data, injected content could poison the model | Never use SQAC output directly as training data without review. |
+
+**Bottom line:** SQAC is a detection layer, not a firewall. It flags suspicious content so humans and LLM consumers can make informed decisions. It does NOT make stored content safe — it makes unsafe content *visible*.
 
 ### Best practices
 
