@@ -117,30 +117,62 @@ A `.sqac` file is self-contained portable memory:
 - **Zero training, ever** — write a fact, it's stored in O(1). No embedding pipeline, no index rebuild.
 - **Hot-swappable** — load a different cartridge mid-conversation. Team A's knowledge, then Team B's.
 
-### Three Retrieval Tiers
+### What SQAC actually stores
+
+SQAC isn't just a search engine. It stores **four kinds of knowledge**, each with a different job:
+
+| Kind | What it is | What it does for the LLM |
+|---|---|---|
+| `fact` | A rule, decision, or piece of knowledge | "We deploy only to ARM64" — the LLM stops confabulating |
+| `skill` | A reasoning **procedure** with trigger phrases | "When you need to find the odd coin..." — the LLM learns HOW to think |
+| `doc` | Documentation or reference material | "The API accepts JSON payloads..." — the LLM knows your system |
+| `turn` | A conversation exchange (offloaded) | "Q: what was that bug? A: The 504 was..." — the LLM remembers context |
+
+The critical distinction: **facts tell the LLM what to know. Skills tell the LLM how to think.**
+
+A skill card contains a **pure procedure** — no answers, just the reasoning pattern. When a frozen model retrieves a skill and applies it to a novel problem, that's proof of *application*, not memorization. Measured: a 7B model goes from 57% to **95%** on unit conversion tasks by retrieving the right skill card and evaluating externally (see [Thought Injection](#thought-injection--skill-based-reasoning)).
+
+### Retrieval: how SQAC finds the right knowledge
 
 Every query runs through three tiers, sharing one calibrated confidence scale:
 
-| Tier | Catches | Example |
-|---|---|---|
-| **Exact** | verbatim keys | `deployment-target` → 1.0, in **5 μs** |
-| **Lexical** | typos, shared words | "auth midleware" → the auth rule @ 0.72 |
-| **Semantic** | paraphrase, synonyms | "can we deploy on **x86**?" → the **ARM64** rule @ 0.64 |
+| Tier | What it matches | Speed | Example |
+|---|---|---|---|
+| **Exact** | Verbatim keys | **5 μs** | `deployment-target` → 1.0 |
+| **Lexical** | Typos, word overlap, trigram similarity | 21-56 ms @ 10K | "auth midleware" → the auth rule @ 0.72 |
+| **Semantic** | Paraphrase, synonyms (static int8 model) | ~0.1 ms encode | "can we deploy on **x86**?" → the **ARM64** rule @ 0.64 |
+
+For **skills**, retrieval goes further: the router matches the question against trigger phrases (multiple keys per skill), picks the best-matching skill card, and injects its procedure into the prompt. The model then follows the procedure instead of relying on whatever implicit strategy it happens to have.
 
 **Fail-safe by design:** if nothing matches, SQAC returns empty and the LLM says "I don't know." It never confidently injects the wrong context.
 
-### Knowledge Kinds
+### Thought Injection — skill-based reasoning
 
-Every entry is stamped with a **kind** — what sort of knowledge it carries:
+The strongest result in the codebase. SQAC doesn't just store knowledge — it can **change how a model reasons** by injecting the right procedure at query time.
 
-| Kind | What it is | Example |
-|---|---|---|
-| `fact` | A rule, decision, or piece of knowledge | "We deploy only to ARM64" |
-| `skill` | A reasoning procedure with trigger phrases | "When you need to find the odd coin..." |
-| `doc` | Documentation or reference material | "The API accepts JSON payloads..." |
-| `turn` | A conversation exchange (offloaded) | "Q: what was that bug? A: The 504 was..." |
+**How it works:**
 
-Kinds enable filtered retrieval: search only facts, only skills, or everything.
+1. Store skill cards with pinned source→target operators (e.g., "multiply by 0.3048 to convert feet→meters")
+2. Route the question to the right skill card via the retrieval tiers
+3. Gate injection to high-confidence, single-operator cards only
+4. Inject the procedure as an arithmetic expression, evaluate externally (bypasses the model's arithmetic weakness)
+
+**Measured on 40 unit-conversion tasks (allam-2-7b):**
+
+| Arm | What it does | Accuracy | Output tokens |
+|---|---|---|---|
+| A — baseline (direct answer) | Model answers from training | 57% | 14 |
+| B — free CoT | Model thinks out loud | 40% | 161 |
+| C — verbose injection | Full procedure injected | 45% | 182 |
+| D — concise injection | Terse procedure, budget-forced | 48% | 16 |
+| E — PoT (expression) | Emit expression, evaluate externally | 50% | 26 |
+| **G — policy (operator + gated)** | **Pinned operator, confidence gate, external eval** | **95%** | **17** |
+
+**G beats every arm on accuracy AND all budget-forced arms on token cost.** The 57% → 95% jump is +38pp at only +3 total tokens over baseline.
+
+The key insight: **conditional injection of pinned single-pair operators, evaluated externally, is a reliable reasoning device for small models.** The skill card pins the exact conversion; the model just substitutes the number; the harness does the math. No confabulation possible.
+
+See `experiments/thought_injection/` for the full experiment log, `docs/RESEARCH-thought-injection.md` for the literature grounding.
 
 ---
 
@@ -371,11 +403,15 @@ The semantic tier ships as a **9.8MB int8 model running in pure numpy** — no t
 
 ## Skill Store
 
-Store **procedures, not answers**. Skill cards pair concrete trigger phrases with pure reasoning patterns:
+Store **procedures, not answers**. This is where SQAC goes beyond RAG: you're not just giving the LLM facts to quote, you're giving it **reasoning patterns to follow**.
+
+Skill cards pair concrete trigger phrases with pure reasoning patterns:
 
 ```yaml
 - name: weighted-index
   domain: logic
+  difficulty: hard
+  pattern: combinatorial
   content: |
     SKILL weighted-index: label items 1..N. Take i coins from item i.
     The total excess weight tells you which item has the defect.
@@ -384,22 +420,31 @@ Store **procedures, not answers**. Skill cards pair concrete trigger phrases wit
     - bags of identical items where one batch is heavier or lighter
 ```
 
-The stored skill contains **zero answers** — so when a frozen model solves a novel puzzle after retrieving it, that's proof of *application*, not recitation.
+**What makes this different from RAG:**
+- RAG retrieves a passage the model can quote. SQAC retrieves a **procedure the model follows**.
+- The skill card contains zero answers — so when a frozen model solves a novel puzzle, that's *application*, not memorization.
+- Multiple trigger phrases per skill (multi-key routing) ensure the right procedure fires for different phrasings of the same problem.
 
 ```bash
-# Validate skill cards
+# Validate skill cards (catches anti-patterns: abstract triggers, answer leakage, single keys)
 python -m sqac.skills validate examples/logic_skills.yaml
+
+# Suggest additional trigger keys
+python -m sqac.skills suggest examples/logic_skills.yaml
 
 # Pack into a cartridge (multi-key routing: one skill, many triggers)
 python -m sqac.skills pack examples/logic_skills.yaml -o skills.sqac --semantic
 ```
 
-Measured on a 50-problem benchmark:
+**Measured on a 50-problem reasoning benchmark:**
 
 | | Baseline | With skill store |
 |---|---|---|
 | 0.5B model | 23/50 | **31/50** |
 | Architecture-domain problems | 1/4 | **4/4** |
+| Hard problems (1.5B model) | 2/7 | **4/7** |
+
+**The full thought injection pipeline** (pinned operators + external evaluation) pushes this further: 57% → **95%** on unit conversion tasks. See [Thought Injection](#thought-injection--skill-based-reasoning) above.
 
 ---
 
