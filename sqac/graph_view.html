@@ -9,20 +9,44 @@
 body{background:#000;color:#c9d1d9;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
 canvas{display:block}
 #ui{position:fixed;top:0;left:0;width:100%;pointer-events:none;z-index:10}
-#header{padding:16px 24px;display:flex;align-items:center;gap:16px;pointer-events:auto}
+#header{padding:12px 20px;display:flex;align-items:center;gap:12px;pointer-events:auto;flex-wrap:wrap}
 #header h1{font-size:1.1rem;color:#58a6ff;font-weight:600;white-space:nowrap}
-#header .stat{font-size:.8rem;color:#8b949e;background:#161b2288;border:1px solid #30363d66;border-radius:8px;padding:4px 10px;backdrop-filter:blur(8px)}
-#controls{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:8px;pointer-events:auto;z-index:10}
-#controls button{background:#161b22cc;border:1px solid #30363d;color:#c9d1d9;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:.8rem;backdrop-filter:blur(8px);transition:all .2s}
+#header .stat{font-size:.75rem;color:#8b949e;background:#161b2288;border:1px solid #30363d66;border-radius:8px;padding:3px 8px;backdrop-filter:blur(8px)}
+#search-box{position:fixed;top:56px;left:20px;z-index:15;pointer-events:auto}
+#search-box input{background:#161b22cc;border:1px solid #30363d;color:#c9d1d9;padding:6px 12px;border-radius:8px;font-size:.8rem;width:220px;backdrop-filter:blur(8px);outline:none}
+#search-box input:focus{border-color:#58a6ff}
+#search-box input::placeholder{color:#484f58}
+#controls{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:6px;pointer-events:auto;z-index:10;flex-wrap:wrap;justify-content:center}
+#controls button{background:#161b22cc;border:1px solid #30363d;color:#c9d1d9;padding:5px 12px;border-radius:8px;cursor:pointer;font-size:.75rem;backdrop-filter:blur(8px);transition:all .2s}
 #controls button:hover{background:#1f6feb44;border-color:#1f6feb}
 #controls button.active{background:#1f6feb;color:#fff}
-#tooltip{position:fixed;display:none;background:#161b22ee;border:1px solid #30363d;border-radius:8px;padding:10px 14px;max-width:320px;pointer-events:none;z-index:20;backdrop-filter:blur(12px)}
-#tooltip .tt-key{color:#58a6ff;font-weight:600;font-size:.85rem;margin-bottom:4px}
+#slider-panel{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;pointer-events:auto;z-index:10;background:#161b22cc;border:1px solid #30363d;border-radius:8px;padding:6px 14px;backdrop-filter:blur(8px)}
+#slider-panel label{font-size:.75rem;color:#8b949e}
+#slider-panel input[type=range]{width:160px;accent-color:#58a6ff}
+#slider-panel .val{font-size:.75rem;color:#58a6ff;min-width:36px}
+#tooltip{position:fixed;display:none;background:#161b22ee;border:1px solid #30363d;border-radius:8px;padding:10px 14px;max-width:340px;pointer-events:none;z-index:20;backdrop-filter:blur(12px)}
+#tooltip .tt-key{color:#58a6ff;font-weight:600;font-size:.85rem;margin-bottom:3px}
 #tooltip .tt-content{color:#c9d1d9;font-size:.8rem;line-height:1.4}
-#tooltip .tt-meta{color:#8b949e;font-size:.7rem;margin-top:4px}
-#legend{position:fixed;bottom:60px;right:20px;pointer-events:auto;z-index:10}
-#legend div{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:.75rem;color:#8b949e}
-#legend .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+#tooltip .tt-meta{color:#8b949e;font-size:.7rem;margin-top:3px}
+#legend{position:fixed;bottom:100px;right:16px;pointer-events:auto;z-index:10;background:#161b22aa;border:1px solid #30363d66;border-radius:8px;padding:8px 12px;backdrop-filter:blur(8px)}
+#legend div{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:.72rem;color:#8b949e}
+#legend .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+#cluster-legend{position:fixed;bottom:100px;left:16px;pointer-events:auto;z-index:10;background:#161b22aa;border:1px solid #30363d66;border-radius:8px;padding:8px 12px;backdrop-filter:blur(8px);max-width:200px}
+#cluster-legend h4{font-size:.72rem;color:#8b949e;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+#cluster-legend div{display:flex;align-items:center;gap:6px;margin-bottom:2px;font-size:.7rem;color:#c9d1d9}
+#cluster-legend .swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0;opacity:.6}
+#timeline{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);pointer-events:auto;z-index:10;background:#161b22cc;border:1px solid #30363d;border-radius:8px;padding:8px 16px;backdrop-filter:blur(8px);display:none;width:400px;max-width:80vw}
+#timeline h4{font-size:.72rem;color:#8b949e;margin-bottom:6px}
+#timeline input[type=range]{width:100%;accent-color:#58a6ff}
+#timeline .tl-info{font-size:.7rem;color:#c9d1d9;margin-top:4px;display:flex;justify-content:space-between}
+#focused-panel{position:fixed;top:56px;right:20px;z-index:15;pointer-events:auto;background:#161b22cc;border:1px solid #30363d;border-radius:8px;padding:12px 16px;backdrop-filter:blur(8px);display:none;max-width:300px}
+#focused-panel .fp-key{color:#58a6ff;font-weight:600;font-size:.9rem}
+#focused-panel .fp-content{color:#c9d1d9;font-size:.8rem;margin:6px 0;line-height:1.4}
+#focused-panel .fp-meta{color:#8b949e;font-size:.72rem}
+#focused-panel .fp-connections{margin-top:8px;font-size:.72rem;color:#8b949e}
+#focused-panel .fp-conn-item{padding:2px 0;color:#c9d1d9;border-bottom:1px solid #21262d}
+#focused-panel .fp-close{position:absolute;top:8px;right:10px;cursor:pointer;color:#484f58;font-size:.9rem}
+#focused-panel .fp-close:hover{color:#c9d1d9}
 #loading{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#58a6ff;font-size:1rem;z-index:30}
 </style>
 </head>
@@ -34,13 +58,27 @@ canvas{display:block}
     <span class="stat" id="node-count">— nodes</span>
     <span class="stat" id="edge-count">— edges</span>
     <span class="stat" id="sim-range">—</span>
+    <span class="stat" id="cluster-count">— clusters</span>
   </div>
+</div>
+<div id="search-box"><input type="text" id="search-input" placeholder="🔍 Search nodes..." autocomplete="off"></div>
+<div id="slider-panel">
+  <label>Edge threshold:</label>
+  <input type="range" id="edge-slider" min="0" max="100" value="50">
+  <span class="val" id="edge-val">0.50</span>
 </div>
 <div id="controls">
   <button id="btn-auto" class="active" onclick="toggleAutoRotate()">Auto Rotate</button>
   <button onclick="resetCamera()">Reset View</button>
   <button id="btn-force" onclick="toggleForce()">Force Layout</button>
+  <button id="btn-clusters" class="active" onclick="toggleClusters()">Clusters</button>
+  <button onclick="toggleTimeline()">Timeline</button>
   <button onclick="exportImage()">📸 Export</button>
+</div>
+<div id="timeline">
+  <h4>Audit Log Timeline</h4>
+  <input type="range" id="timeline-slider" min="0" max="0" value="0">
+  <div class="tl-info"><span id="tl-date">—</span><span id="tl-detail">—</span></div>
 </div>
 <div id="legend">
   <div><span class="dot" style="background:#58a6ff"></span> fact</div>
@@ -49,6 +87,8 @@ canvas{display:block}
   <div><span class="dot" style="background:#bc8cff"></span> turn</div>
   <div><span class="dot" style="background:#8b949e"></span> generic</div>
 </div>
+<div id="cluster-legend"><h4>Clusters</h4><div id="cluster-list"></div></div>
+<div id="focused-panel"><span class="fp-close" onclick="unfocusNode()">✕</span><div class="fp-key"></div><div class="fp-content"></div><div class="fp-meta"></div><div class="fp-connections"><strong>Connected:</strong></div><div class="fp-conn-list"></div></div>
 <div id="tooltip"><div class="tt-key"></div><div class="tt-content"></div><div class="tt-meta"></div></div>
 
 <script type="importmap">
@@ -67,214 +107,280 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 // ── Config ──────────────────────────────────────────────────────────
-const NODE_BASE_SIZE = 0.3;
+const NODE_BASE_SIZE = 0.35;
 const NODE_HOVER_SIZE = 0.6;
-const EDGE_BASE_OPACITY = 0.15;
-const EDGE_HIGHLIGHT_OPACITY = 0.6;
+const EDGE_BASE_OPACITY = 0.12;
+const EDGE_HIGHLIGHT_OPACITY = 0.7;
 const PARTICLE_SPEED = 0.003;
 const FORCE_STRENGTH = 0.002;
-const FORCE_REPULSION = 2.0;
-const DAMPING = 0.92;
-const BLOOM_STRENGTH = 1.2;
-const BLOOM_RADIUS = 0.6;
+const FORCE_REPULSION = 2.5;
+const DAMPING = 0.9;
+const BLOOM_STRENGTH = 1.0;
+const BLOOM_RADIUS = 0.5;
 const BLOOM_THRESHOLD = 0.3;
+const CLUSTER_COLORS = [
+  0x58a6ff, 0xf0883e, 0x3fb950, 0xbc8cff, 0xf778ba,
+  0xff7b72, 0x79c0ff, 0xd2a8ff, 0x7ee787, 0xffa657,
+];
 
 // ── Scene Setup ─────────────────────────────────────────────────────
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x000000, 0.008);
-
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
-camera.position.set(0, 8, 25);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+scene.fog = new THREE.FogExp2(0x000000, 0.006);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 500);
+camera.position.set(0, 10, 30);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
 document.body.appendChild(renderer.domElement);
 
-// ── Post-processing (Bloom) ─────────────────────────────────────────
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
-  BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD
-);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
 composer.addPass(bloomPass);
 
-// ── Controls ────────────────────────────────────────────────────────
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.autoRotate = true;
-controls.autoRotateSpeed = 0.5;
-controls.maxDistance = 100;
+controls.autoRotateSpeed = 0.4;
+controls.maxDistance = 120;
 controls.minDistance = 3;
 
 // ── Lights ──────────────────────────────────────────────────────────
-const ambientLight = new THREE.AmbientLight(0x222244, 0.5);
-scene.add(ambientLight);
-const pointLight1 = new THREE.PointLight(0x58a6ff, 1.5, 60);
-pointLight1.position.set(10, 15, 10);
-scene.add(pointLight1);
-const pointLight2 = new THREE.PointLight(0xf0883e, 1.0, 50);
-pointLight2.position.set(-10, -5, -10);
-scene.add(pointLight2);
+scene.add(new THREE.AmbientLight(0x222244, 0.6));
+const pL1 = new THREE.PointLight(0x58a6ff, 1.5, 80); pL1.position.set(15, 20, 15); scene.add(pL1);
+const pL2 = new THREE.PointLight(0xf0883e, 1.0, 60); pL2.position.set(-15, -5, -15); scene.add(pL2);
 
-// ── Starfield background ────────────────────────────────────────────
+// ── Starfield ───────────────────────────────────────────────────────
 const starGeo = new THREE.BufferGeometry();
-const starPositions = new Float32Array(3000);
-for (let i = 0; i < 3000; i++) starPositions[i] = (Math.random() - 0.5) * 200;
-starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-const starMat = new THREE.PointsMaterial({ color: 0x444466, size: 0.08, transparent: true, opacity: 0.6 });
-scene.add(new THREE.Points(starGeo, starMat));
+const sp = new Float32Array(4500);
+for (let i = 0; i < 4500; i++) sp[i] = (Math.random() - 0.5) * 300;
+starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x444466, size: 0.06, transparent: true, opacity: 0.5 })));
 
-// ── Grid (subtle) ───────────────────────────────────────────────────
-const gridHelper = new THREE.GridHelper(40, 40, 0x111133, 0x0a0a1a);
-gridHelper.position.y = -8;
+const gridHelper = new THREE.GridHelper(50, 50, 0x111133, 0x0a0a1a);
+gridHelper.position.y = -10;
 scene.add(gridHelper);
 
 // ── State ───────────────────────────────────────────────────────────
-let graphData = null;
-let nodeMeshes = [];
-let edgeLines = [];
-let particles = [];
+let graphData = null, originalData = null;
+let nodeMeshes = [], edgeLines = [], particles = [];
+let clusterHulls = [];
 let velocityMap = new Map();
-let forceEnabled = false;
-let hoveredNode = null;
-let raycaster = new THREE.Raycaster();
-let mouse = new THREE.Vector2(-999, -999);
-let clock = new THREE.Clock();
+let forceEnabled = false, clustersVisible = true;
+let hoveredNode = null, focusedNode = null;
+let isDraggingNode = false, dragNode = null;
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2(-999, -999);
+const dragPlane = new THREE.Plane();
+const dragOffset = new THREE.Vector3();
+const clock = new THREE.Clock();
+let currentThreshold = 0.50;
+let entryAnimations = new Map(); // index -> {scale, targetScale}
+let clusterAssignments = []; // index -> clusterId
+let clusterCenters = [];
+let searchMatches = new Set();
 
-// ── Fetch graph data ────────────────────────────────────────────────
-const API_KEY = new URLSearchParams(window.location.search).get('key') || '';
-async function fetchGraph() {
-  try {
-    const resp = await fetch('/graph', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(API_KEY ? {'X-API-Key': API_KEY} : {})
-      },
-      body: JSON.stringify({ threshold: 0.50, max_edges: 300 })
+// ── K-Means Clustering ─────────────────────────────────────────────
+function kMeans(positions, k, maxIter = 50) {
+  const n = positions.length;
+  if (n === 0) return { assignments: [], centers: [] };
+  k = Math.min(k, n);
+  // Initialize centers using k-means++
+  const centers = [];
+  centers.push([...positions[0]]);
+  for (let c = 1; c < k; c++) {
+    const dists = positions.map(p => {
+      let minD = Infinity;
+      centers.forEach(cent => {
+        const dx = p[0]-cent[0], dy = p[1]-cent[1], dz = p[2]-cent[2];
+        minD = Math.min(minD, dx*dx+dy*dy+dz*dz);
+      });
+      return minD;
     });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    return await resp.json();
-  } catch (e) {
-    console.error('Failed to fetch graph:', e);
-    return { nodes: [], edges: [], dims: 1024 };
+    const total = dists.reduce((a,b) => a+b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < n; i++) {
+      r -= dists[i];
+      if (r <= 0) { centers.push([...positions[i]]); break; }
+    }
+    if (centers.length <= c) centers.push([...positions[Math.floor(Math.random()*n)]]);
+  }
+  let assignments = new Array(n).fill(0);
+  for (let iter = 0; iter < maxIter; iter++) {
+    // Assign
+    let changed = false;
+    for (let i = 0; i < n; i++) {
+      let best = 0, bestD = Infinity;
+      for (let c = 0; c < k; c++) {
+        const dx = positions[i][0]-centers[c][0], dy = positions[i][1]-centers[c][1], dz = positions[i][2]-centers[c][2];
+        const d = dx*dx+dy*dy+dz*dz;
+        if (d < bestD) { bestD = d; best = c; }
+      }
+      if (assignments[i] !== best) { changed = true; assignments[i] = best; }
+    }
+    if (!changed) break;
+    // Update centers
+    for (let c = 0; c < k; c++) {
+      const members = positions.filter((_, i) => assignments[i] === c);
+      if (members.length === 0) continue;
+      centers[c] = [
+        members.reduce((s, p) => s + p[0], 0) / members.length,
+        members.reduce((s, p) => s + p[1], 0) / members.length,
+        members.reduce((s, p) => s + p[2], 0) / members.length,
+      ];
+    }
+  }
+  return { assignments, centers };
+}
+
+// ── Convex Hull Wireframe (approximate sphere per cluster) ──────────
+function buildClusterHulls(positions, assignments, centers) {
+  clusterHulls.forEach(h => scene.remove(h.mesh));
+  clusterHulls = [];
+  const k = centers.length;
+  for (let c = 0; c < k; c++) {
+    const members = positions.filter((_, i) => assignments[i] === c);
+    if (members.length < 2) continue;
+    // Compute bounding sphere
+    const cx = centers[c][0], cy = centers[c][1], cz = centers[c][2];
+    let maxR = 0;
+    members.forEach(p => {
+      const d = Math.sqrt((p[0]-cx)**2 + (p[1]-cy)**2 + (p[2]-cz)**2);
+      if (d > maxR) maxR = d;
+    });
+    maxR += 2.0; // padding
+    const color = new THREE.Color(CLUSTER_COLORS[c % CLUSTER_COLORS.length]);
+    // Wireframe sphere
+    const geo = new THREE.SphereGeometry(maxR, 16, 12);
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.04, wireframe: true, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(cx, cy, cz);
+    scene.add(mesh);
+    clusterHulls.push({ mesh, clusterId: c, center: centers[c], radius: maxR, color });
   }
 }
 
-// ── Build scene from graph data ─────────────────────────────────────
-function buildGraph(data) {
-  // Clear previous
-  nodeMeshes.forEach(m => scene.remove(m));
+// ── Fetch graph data ────────────────────────────────────────────────
+const API_KEY = new URLSearchParams(location.search).get('key') || '';
+async function fetchGraph(threshold = 0.50, maxEdges = 500) {
+  try {
+    const resp = await fetch('/graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(API_KEY ? {'X-API-Key': API_KEY} : {}) },
+      body: JSON.stringify({ threshold, max_edges: maxEdges })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+  } catch (e) { console.error('Graph fetch failed:', e); return { nodes: [], edges: [], dims: 1024 }; }
+}
+
+// ── Rebuild edges at a given threshold (without re-fetching) ────────
+function rebuildEdges(data, threshold) {
   edgeLines.forEach(l => scene.remove(l));
   particles.forEach(p => scene.remove(p.mesh));
-  nodeMeshes = []; edgeLines = []; particles = [];
-  velocityMap.clear();
-
-  graphData = data;
+  edgeLines = []; particles = [];
+  if (!data) return;
   const { nodes, edges } = data;
-
-  // Update UI
-  document.getElementById('node-count').textContent = `${nodes.length} nodes`;
-  document.getElementById('edge-count').textContent = `${edges.length} edges`;
-  if (edges.length > 0) {
-    const sims = edges.map(e => e.similarity);
-    const minS = Math.min(...sims).toFixed(3);
-    const maxS = Math.max(...sims).toFixed(3);
-    document.getElementById('sim-range').textContent = `sim: ${minS}–${maxS}`;
-  }
-
-  // ── Nodes ─────────────────────────────────────────────────────
-  const nodeGroup = new THREE.Group();
-  nodes.forEach((node, i) => {
-    // Main sphere
-    const color = new THREE.Color(node.color);
-    const geo = new THREE.SphereGeometry(NODE_BASE_SIZE, 24, 24);
-    const mat = new THREE.MeshStandardMaterial({
-      color: color,
-      emissive: color,
-      emissiveIntensity: 0.5,
-      roughness: 0.3,
-      metalness: 0.7,
-      transparent: true,
-      opacity: 0.9,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(...node.position);
-    mesh.userData = { node, index: i, baseScale: 1 };
-    scene.add(mesh);
-    nodeMeshes.push(mesh);
-
-    // Glow halo
-    const glowGeo = new THREE.SphereGeometry(NODE_BASE_SIZE * 1.8, 16, 16);
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.08,
-      side: THREE.BackSide,
-    });
-    const glow = new THREE.Mesh(glowGeo, glowMat);
-    mesh.add(glow);
-    mesh.userData.glow = glow;
-
-    velocityMap.set(i, new THREE.Vector3(0, 0, 0));
-  });
-
-  // ── Edges ─────────────────────────────────────────────────────
-  const edgeGroup = new THREE.Group();
-  const edgePositions = [];
-  const edgeColors = [];
-  const edgeAlphas = [];
-
-  edges.forEach((edge, ei) => {
-    const src = nodes[edge.source];
-    const tgt = nodes[edge.target];
+  const filtered = edges.filter(e => e.similarity >= threshold);
+  filtered.forEach(edge => {
+    const src = nodes[edge.source], tgt = nodes[edge.target];
     if (!src || !tgt) return;
-
-    const points = [
-      new THREE.Vector3(...src.position),
-      new THREE.Vector3(...tgt.position),
-    ];
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-
-    // Color blend between source and target
-    const c1 = new THREE.Color(src.color);
-    const c2 = new THREE.Color(tgt.color);
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...src.position), new THREE.Vector3(...tgt.position)]);
+    const c1 = new THREE.Color(src.color), c2 = new THREE.Color(tgt.color);
     const blended = c1.clone().lerp(c2, 0.5);
-
-    const opacity = EDGE_BASE_OPACITY + edge.similarity * 0.4;
-    const mat = new THREE.LineBasicMaterial({
-      color: blended,
-      transparent: true,
-      opacity: opacity,
-      linewidth: 1,
-    });
+    const opacity = EDGE_BASE_OPACITY + edge.similarity * 0.35;
+    const mat = new THREE.LineBasicMaterial({ color: blended, transparent: true, opacity });
     const line = new THREE.Line(geo, mat);
     line.userData = { edge, sourceIdx: edge.source, targetIdx: edge.target };
     scene.add(line);
     edgeLines.push(line);
-
-    // Particle flowing along edge
-    const particleGeo = new THREE.SphereGeometry(0.04, 6, 6);
-    const particleMat = new THREE.MeshBasicMaterial({
-      color: blended,
-      transparent: true,
-      opacity: 0.7,
-    });
-    const particleMesh = new THREE.Mesh(particleGeo, particleMat);
-    scene.add(particleMesh);
+    // Particle
+    const pGeo = new THREE.SphereGeometry(0.05, 6, 6);
+    const pMat = new THREE.MeshBasicMaterial({ color: blended, transparent: true, opacity: 0.7 });
+    const pMesh = new THREE.Mesh(pGeo, pMat);
+    scene.add(pMesh);
     particles.push({
-      mesh: particleMesh,
+      mesh: pMesh,
       source: new THREE.Vector3(...src.position),
       target: new THREE.Vector3(...tgt.position),
       t: Math.random(),
       speed: PARTICLE_SPEED * (0.5 + Math.random()),
+      edge
     });
   });
+  document.getElementById('edge-count').textContent = `${filtered.length} edges`;
+}
+
+// ── Build scene from graph data ─────────────────────────────────────
+function buildGraph(data, animate = true) {
+  nodeMeshes.forEach(m => scene.remove(m));
+  edgeLines.forEach(l => scene.remove(l));
+  particles.forEach(p => scene.remove(p.mesh));
+  clusterHulls.forEach(h => scene.remove(h.mesh));
+  nodeMeshes = []; edgeLines = []; particles = []; clusterHulls = [];
+  velocityMap.clear(); entryAnimations.clear();
+
+  graphData = data; originalData = data;
+  const { nodes, edges } = data;
+
+  document.getElementById('node-count').textContent = `${nodes.length} nodes`;
+  document.getElementById('edge-count').textContent = `${edges.length} edges`;
+  if (edges.length > 0) {
+    const sims = edges.map(e => e.similarity);
+    document.getElementById('sim-range').textContent = `sim: ${Math.min(...sims).toFixed(3)}–${Math.max(...sims).toFixed(3)}`;
+  }
+
+  // ── K-means clustering ──
+  const positions = nodes.map(n => n.position);
+  const numClusters = Math.max(2, Math.min(Math.ceil(nodes.length / 4), 8));
+  const { assignments, centers } = kMeans(positions, numClusters);
+  clusterAssignments = assignments;
+  clusterCenters = centers;
+  document.getElementById('cluster-count').textContent = `${centers.length} clusters`;
+
+  // Cluster legend
+  const clEl = document.getElementById('cluster-list');
+  clEl.innerHTML = '';
+  centers.forEach((c, i) => {
+    const count = assignments.filter(a => a === i).length;
+    const col = '#' + new THREE.Color(CLUSTER_COLORS[i % CLUSTER_COLORS.length]).getHexString();
+    clEl.innerHTML += `<div><span class="swatch" style="background:${col}"></span>Cluster ${i+1} (${count})</div>`;
+  });
+
+  // ── Nodes ──
+  nodes.forEach((node, i) => {
+    const color = new THREE.Color(node.color);
+    const geo = new THREE.SphereGeometry(NODE_BASE_SIZE, 24, 24);
+    const mat = new THREE.MeshStandardMaterial({
+      color, emissive: color, emissiveIntensity: 0.5,
+      roughness: 0.3, metalness: 0.7, transparent: true, opacity: animate ? 0 : 0.9,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    if (animate) {
+      mesh.scale.setScalar(0.01);
+      entryAnimations.set(i, { scale: 0.01, targetScale: 1.0, delay: i * 0.03 });
+    } else {
+      mesh.scale.setScalar(1);
+    }
+    mesh.position.set(...node.position);
+    mesh.userData = { node, index: i };
+    scene.add(mesh);
+    nodeMeshes.push(mesh);
+
+    // Glow
+    const glowGeo = new THREE.SphereGeometry(NODE_BASE_SIZE * 1.8, 12, 12);
+    const glowMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.06, side: THREE.BackSide });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    mesh.add(glow);
+    mesh.userData.glow = glow;
+    velocityMap.set(i, new THREE.Vector3(0, 0, 0));
+  });
+
+  rebuildEdges(data, currentThreshold);
+  buildClusterHulls(positions, assignments, centers);
 
   document.getElementById('loading').style.display = 'none';
 }
@@ -282,159 +388,309 @@ function buildGraph(data) {
 // ── Force-directed layout ───────────────────────────────────────────
 function applyForces() {
   if (!forceEnabled || !graphData) return;
-  const { nodes, edges } = graphData;
-  const n = nodes.length;
-
-  // Repulsion between all pairs (O(n^2) but fine for <500 nodes)
+  const { edges } = graphData;
+  const n = nodeMeshes.length;
   for (let i = 0; i < n; i++) {
-    const vi = velocityMap.get(i);
-    const pi = nodeMeshes[i].position;
+    const vi = velocityMap.get(i), pi = nodeMeshes[i].position;
     for (let j = i + 1; j < n; j++) {
       const pj = nodeMeshes[j].position;
-      const dx = pi.x - pj.x;
-      const dy = pi.y - pj.y;
-      const dz = pi.z - pj.z;
-      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz) + 0.01;
+      const dx = pi.x-pj.x, dy = pi.y-pj.y, dz = pi.z-pj.z;
+      const dist = Math.sqrt(dx*dx+dy*dy+dz*dz) + 0.01;
       const force = FORCE_REPULSION / (dist * dist);
-      const fx = (dx / dist) * force;
-      const fy = (dy / dist) * force;
-      const fz = (dz / dist) * force;
-      vi.x += fx; vi.y += fy; vi.z += fz;
+      const f = force / dist;
+      vi.x += dx*f; vi.y += dy*f; vi.z += dz*f;
       const vj = velocityMap.get(j);
-      vj.x -= fx; vj.y -= fy; vj.z -= fz;
+      vj.x -= dx*f; vj.y -= dy*f; vj.z -= dz*f;
     }
   }
-
-  // Attraction along edges
-  edges.forEach(edge => {
-    const pi = nodeMeshes[edge.source]?.position;
-    const pj = nodeMeshes[edge.target]?.position;
+  edges.forEach(e => {
+    const pi = nodeMeshes[e.source]?.position, pj = nodeMeshes[e.target]?.position;
     if (!pi || !pj) return;
-    const dx = pj.x - pi.x;
-    const dy = pj.y - pi.y;
-    const dz = pj.z - pi.z;
-    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-    const force = (dist - 3) * FORCE_STRENGTH * edge.similarity;
-    const fx = (dx / dist) * force;
-    const fy = (dy / dist) * force;
-    const fz = (dz / dist) * force;
-    velocityMap.get(edge.source).add(new THREE.Vector3(fx, fy, fz));
-    velocityMap.get(edge.target).add(new THREE.Vector3(-fx, -fy, -fz));
+    const dx = pj.x-pi.x, dy = pj.y-pi.y, dz = pj.z-pi.z;
+    const dist = Math.sqrt(dx*dx+dy*dy+dz*dz) + 0.01;
+    const force = (dist - 3) * FORCE_STRENGTH * e.similarity;
+    const f = force / dist;
+    velocityMap.get(e.source).x += dx*f; velocityMap.get(e.source).y += dy*f; velocityMap.get(e.source).z += dz*f;
+    velocityMap.get(e.target).x -= dx*f; velocityMap.get(e.target).y -= dy*f; velocityMap.get(e.target).z -= dz*f;
   });
-
-  // Center gravity
   for (let i = 0; i < n; i++) {
-    const vi = velocityMap.get(i);
-    const pi = nodeMeshes[i].position;
-    vi.x -= pi.x * 0.001;
-    vi.y -= pi.y * 0.001;
-    vi.z -= pi.z * 0.001;
-    // Apply velocity
-    pi.x += vi.x;
-    pi.y += vi.y;
-    pi.z += vi.z;
+    const vi = velocityMap.get(i), pi = nodeMeshes[i].position;
+    vi.x -= pi.x * 0.0008; vi.y -= pi.y * 0.0008; vi.z -= pi.z * 0.0008;
+    pi.x += vi.x; pi.y += vi.y; pi.z += vi.z;
     vi.multiplyScalar(DAMPING);
   }
-
-  // Update edge positions
-  edgeLines.forEach(line => {
-    const { sourceIdx, targetIdx } = line.userData;
-    const sp = nodeMeshes[sourceIdx].position;
-    const tp = nodeMeshes[targetIdx].position;
-    const pos = line.geometry.attributes.position;
-    pos.setXYZ(0, sp.x, sp.y, sp.z);
-    pos.setXYZ(1, tp.x, tp.y, tp.z);
-    pos.needsUpdate = true;
+  // Update edges + particles
+  edgeLines.forEach(l => {
+    const sp = nodeMeshes[l.userData.sourceIdx].position, tp = nodeMeshes[l.userData.targetIdx].position;
+    const pos = l.geometry.attributes.position;
+    pos.setXYZ(0, sp.x, sp.y, sp.z); pos.setXYZ(1, tp.x, tp.y, tp.z); pos.needsUpdate = true;
   });
-
-  // Update particle positions
   particles.forEach(p => {
-    p.source.copy(nodeMeshes[edgeLines.find(l => l.userData.sourceIdx === nodes.indexOf(graphData.nodes.find(n => n.position[0] === p.source.x)))?.userData.sourceIdx]?.position || p.source);
+    p.source.copy(nodeMeshes[p.edge.source].position);
+    p.target.copy(nodeMeshes[p.edge.target].position);
   });
 }
 
-// ── Raycasting (hover) ──────────────────────────────────────────────
-function onMouseMove(e) {
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-
+// ── Node Drag ───────────────────────────────────────────────────────
+function onPointerDown(e) {
+  if (e.button !== 0) return;
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(nodeMeshes);
-
-  const tooltip = document.getElementById('tooltip');
-
-  if (intersects.length > 0) {
-    const hit = intersects[0].object;
-    const node = hit.userData.node;
-
-    if (hoveredNode !== hit) {
-      // Reset previous
-      if (hoveredNode) {
-        hoveredNode.scale.setScalar(1);
-        hoveredNode.material.emissiveIntensity = 0.5;
-        hoveredNode.userData.glow.material.opacity = 0.08;
-        // Reset edges
-        edgeLines.forEach(l => {
-          if (l.userData._wasHighlighted) {
-            l.material.opacity = EDGE_BASE_OPACITY + l.userData.edge.similarity * 0.4;
-            l.userData._wasHighlighted = false;
-          }
-        });
-      }
-      hoveredNode = hit;
-      hit.scale.setScalar(NODE_HOVER_SIZE / NODE_BASE_SIZE);
-      hit.material.emissiveIntensity = 1.0;
-      hit.userData.glow.material.opacity = 0.2;
-
-      // Highlight connected edges
+  const hits = raycaster.intersectObjects(nodeMeshes);
+  if (hits.length > 0) {
+    isDraggingNode = true;
+    dragNode = hits[0].object;
+    controls.enabled = false;
+    // Set drag plane perpendicular to camera
+    dragPlane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()).negate(), dragNode.position);
+    const intersection = new THREE.Vector3();
+    raycaster.ray.intersectPlane(dragPlane, intersection);
+    dragOffset.copy(dragNode.position).sub(intersection);
+  }
+}
+function onPointerMove(e) {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  if (isDraggingNode && dragNode) {
+    raycaster.setFromCamera(mouse, camera);
+    const intersection = new THREE.Vector3();
+    raycaster.ray.intersectPlane(dragPlane, intersection);
+    if (intersection) {
+      dragNode.position.copy(intersection.add(dragOffset));
+      // Update connected edges
       edgeLines.forEach(l => {
-        if (l.userData.sourceIdx === hit.userData.index || l.userData.targetIdx === hit.userData.index) {
-          l.material.opacity = EDGE_HIGHLIGHT_OPACITY;
-          l.userData._wasHighlighted = true;
+        if (l.userData.sourceIdx === dragNode.userData.index || l.userData.targetIdx === dragNode.userData.index) {
+          const sp = nodeMeshes[l.userData.sourceIdx].position, tp = nodeMeshes[l.userData.targetIdx].position;
+          const pos = l.geometry.attributes.position;
+          pos.setXYZ(0, sp.x, sp.y, sp.z); pos.setXYZ(1, tp.x, tp.y, tp.z); pos.needsUpdate = true;
         }
       });
     }
-
+    return;
+  }
+  // Hover detection
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(nodeMeshes);
+  const tooltip = document.getElementById('tooltip');
+  if (intersects.length > 0) {
+    const hit = intersects[0].object, node = hit.userData.node;
+    if (hoveredNode !== hit) {
+      resetHighlight();
+      hoveredNode = hit;
+      hit.scale.setScalar(NODE_HOVER_SIZE / NODE_BASE_SIZE);
+      hit.material.emissiveIntensity = 1.2;
+      hit.userData.glow.material.opacity = 0.25;
+      highlightConnections(hit.userData.index);
+    }
     tooltip.style.display = 'block';
     tooltip.style.left = (e.clientX + 15) + 'px';
     tooltip.style.top = (e.clientY - 10) + 'px';
     tooltip.querySelector('.tt-key').textContent = node.key || '(no key)';
     tooltip.querySelector('.tt-content').textContent = node.content;
-    tooltip.querySelector('.tt-meta').textContent = `kind: ${node.kind} · source: ${node.source || '—'}`;
+    tooltip.querySelector('.tt-meta').textContent = `kind: ${node.kind} · source: ${node.source || '—'} · cluster: ${(clusterAssignments[hit.userData.index]||0)+1}`;
   } else {
-    if (hoveredNode) {
-      hoveredNode.scale.setScalar(1);
-      hoveredNode.material.emissiveIntensity = 0.5;
-      hoveredNode.userData.glow.material.opacity = 0.08;
-      edgeLines.forEach(l => {
-        if (l.userData._wasHighlighted) {
-          l.material.opacity = EDGE_BASE_OPACITY + l.userData.edge.similarity * 0.4;
-          l.userData._wasHighlighted = false;
-        }
-      });
-      hoveredNode = null;
-    }
+    if (hoveredNode) { resetHighlight(); hoveredNode = null; }
     tooltip.style.display = 'none';
   }
 }
+function onPointerUp() {
+  if (isDraggingNode) {
+    isDraggingNode = false; dragNode = null;
+    controls.enabled = true;
+  }
+}
+function highlightConnections(idx) {
+  edgeLines.forEach(l => {
+    if (l.userData.sourceIdx === idx || l.userData.targetIdx === idx) {
+      l.material.opacity = EDGE_HIGHLIGHT_OPACITY;
+      l.userData._hl = true;
+    } else {
+      l.material.opacity *= 0.2;
+      l.userData._dimmed = true;
+    }
+  });
+  nodeMeshes.forEach((m, i) => {
+    if (i !== idx) {
+      const connected = edgeLines.some(l => l.userData._hl && (l.userData.sourceIdx === i || l.userData.targetIdx === i));
+      if (!connected) { m.material.opacity = 0.15; m.userData._dimmed = true; }
+    }
+  });
+}
+function resetHighlight() {
+  edgeLines.forEach(l => {
+    if (l.userData._hl) { l.material.opacity = EDGE_BASE_OPACITY + l.userData.edge.similarity * 0.35; l.userData._hl = false; }
+    if (l.userData._dimmed) { l.material.opacity = EDGE_BASE_OPACITY + l.userData.edge.similarity * 0.35; l.userData._dimmed = false; }
+  });
+  nodeMeshes.forEach(m => {
+    if (m.userData._dimmed) { m.material.opacity = 0.9; m.userData._dimmed = false; }
+    if (m !== hoveredNode && m !== focusedNode) {
+      m.scale.setScalar(1);
+      m.material.emissiveIntensity = 0.5;
+      if (m.userData.glow) m.userData.glow.material.opacity = 0.06;
+    }
+  });
+}
+
+// ── Click to Focus ──────────────────────────────────────────────────
+function onClick(e) {
+  if (isDraggingNode) return;
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(nodeMeshes);
+  if (hits.length > 0) {
+    focusNode(hits[0].object);
+  } else {
+    unfocusNode();
+  }
+}
+function focusNode(mesh) {
+  focusedNode = mesh;
+  const node = mesh.userData.node, idx = mesh.userData.index;
+  // Zoom camera toward node
+  const target = mesh.position.clone();
+  const dir = camera.position.clone().sub(target).normalize();
+  const newPos = target.clone().add(dir.multiplyScalar(8));
+  animateCamera(newPos, target);
+  // Highlight
+  resetHighlight();
+  mesh.scale.setScalar(NODE_HOVER_SIZE / NODE_BASE_SIZE * 1.2);
+  mesh.material.emissiveIntensity = 1.5;
+  mesh.userData.glow.material.opacity = 0.35;
+  highlightConnections(idx);
+  // Show panel
+  const panel = document.getElementById('focused-panel');
+  panel.style.display = 'block';
+  panel.querySelector('.fp-key').textContent = node.key;
+  panel.querySelector('.fp-content').textContent = node.content;
+  panel.querySelector('.fp-meta').textContent = `kind: ${node.kind} · source: ${node.source || '—'} · cluster: ${(clusterAssignments[idx]||0)+1}`;
+  // List connections
+  const connList = panel.querySelector('.fp-conn-list');
+  connList.innerHTML = '';
+  edgeLines.filter(l => l.userData.sourceIdx === idx || l.userData.targetIdx === idx)
+    .sort((a, b) => b.userData.edge.similarity - a.userData.edge.similarity)
+    .slice(0, 8)
+    .forEach(l => {
+      const otherIdx = l.userData.sourceIdx === idx ? l.userData.targetIdx : l.userData.sourceIdx;
+      const other = graphData.nodes[otherIdx];
+      connList.innerHTML += `<div class="fp-conn-item">${other.key} <span style="color:#8b949e">(${l.userData.edge.similarity.toFixed(3)})</span></div>`;
+    });
+}
+window.unfocusNode = () => {
+  focusedNode = null;
+  document.getElementById('focused-panel').style.display = 'none';
+  resetHighlight();
+  animateCamera(new THREE.Vector3(0, 10, 30), new THREE.Vector3(0, 0, 0));
+};
+function animateCamera(targetPos, targetLookAt) {
+  const startPos = camera.position.clone();
+  const startTarget = controls.target.clone();
+  const duration = 800;
+  const startTime = performance.now();
+  function step(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const ease = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+    camera.position.lerpVectors(startPos, targetPos, ease);
+    controls.target.lerpVectors(startTarget, targetLookAt, ease);
+    controls.update();
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ── Search ──────────────────────────────────────────────────────────
+document.getElementById('search-input').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase().trim();
+  searchMatches.clear();
+  if (!q || !graphData) {
+    nodeMeshes.forEach(m => { m.material.opacity = 0.9; m.userData._dimmed = false; });
+    return;
+  }
+  graphData.nodes.forEach((n, i) => {
+    if (n.key.toLowerCase().includes(q) || n.content.toLowerCase().includes(q)) searchMatches.add(i);
+  });
+  nodeMeshes.forEach((m, i) => {
+    if (searchMatches.has(i)) {
+      m.scale.setScalar(NODE_HOVER_SIZE / NODE_BASE_SIZE);
+      m.material.emissiveIntensity = 1.2;
+      m.material.opacity = 1.0;
+      m.userData.glow.material.opacity = 0.2;
+    } else {
+      m.scale.setScalar(0.6);
+      m.material.opacity = 0.1;
+      m.material.emissiveIntensity = 0.1;
+    }
+  });
+  edgeLines.forEach(l => {
+    const hl = searchMatches.has(l.userData.sourceIdx) || searchMatches.has(l.userData.targetIdx);
+    l.material.opacity = hl ? 0.6 : 0.02;
+  });
+});
+
+// ── Edge Threshold Slider ───────────────────────────────────────────
+const edgeSlider = document.getElementById('edge-slider');
+const edgeVal = document.getElementById('edge-val');
+edgeSlider.addEventListener('input', (e) => {
+  currentThreshold = parseInt(e.target.value) / 100;
+  edgeVal.textContent = currentThreshold.toFixed(2);
+  if (originalData) rebuildEdges(originalData, currentThreshold);
+});
+
+// ── Timeline ────────────────────────────────────────────────────────
+let auditLog = [];
+async function loadAuditLog() {
+  try {
+    const resp = await fetch('/cartridges', { headers: API_KEY ? {'X-API-Key': API_KEY} : {} });
+    // Timeline is optional — only if audit log exists
+  } catch(e) {}
+}
+window.toggleTimeline = () => {
+  const tl = document.getElementById('timeline');
+  tl.style.display = tl.style.display === 'none' ? 'block' : 'none';
+};
+
+// ── Controls ────────────────────────────────────────────────────────
+window.toggleAutoRotate = () => { controls.autoRotate = !controls.autoRotate; document.getElementById('btn-auto').classList.toggle('active', controls.autoRotate); };
+window.resetCamera = () => { animateCamera(new THREE.Vector3(0, 10, 30), new THREE.Vector3(0, 0, 0)); };
+window.toggleForce = () => { forceEnabled = !forceEnabled; document.getElementById('btn-force').classList.toggle('active', forceEnabled); };
+window.toggleClusters = () => {
+  clustersVisible = !clustersVisible;
+  document.getElementById('btn-clusters').classList.toggle('active', clustersVisible);
+  clusterHulls.forEach(h => { h.mesh.visible = clustersVisible; });
+};
+window.exportImage = () => {
+  composer.render();
+  const a = document.createElement('a'); a.download = 'sqac-graph.png'; a.href = renderer.domElement.toDataURL('image/png'); a.click();
+};
 
 // ── Animation Loop ──────────────────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
-  const delta = clock.getDelta();
   const elapsed = clock.getElapsedTime();
 
   controls.update();
 
+  // Entry animations (scale in with stagger)
+  entryAnimations.forEach((anim, i) => {
+    if (elapsed > anim.delay && anim.scale < anim.targetScale) {
+      anim.scale = Math.min(anim.scale + 0.04, anim.targetScale);
+      const mesh = nodeMeshes[i];
+      if (mesh && mesh !== hoveredNode && mesh !== focusedNode) {
+        mesh.scale.setScalar(anim.scale);
+        mesh.material.opacity = Math.min(anim.scale, 0.9);
+      }
+    }
+  });
+
   // Pulse nodes
   nodeMeshes.forEach((mesh, i) => {
-    const pulse = 1.0 + Math.sin(elapsed * 2 + i * 0.5) * 0.05;
-    if (mesh !== hoveredNode) {
-      mesh.scale.setScalar(pulse);
-    }
-    // Orbit glow
+    if (mesh === hoveredNode || mesh === focusedNode) return;
+    if (entryAnimations.has(i) && entryAnimations.get(i).scale < 0.9) return;
+    const pulse = 1.0 + Math.sin(elapsed * 1.8 + i * 0.7) * 0.04;
+    mesh.scale.setScalar(pulse);
     if (mesh.userData.glow) {
-      mesh.userData.glow.material.opacity = 0.06 + Math.sin(elapsed * 1.5 + i * 0.3) * 0.03;
+      mesh.userData.glow.material.opacity = 0.05 + Math.sin(elapsed * 1.2 + i * 0.4) * 0.03;
     }
   });
 
@@ -442,63 +698,47 @@ function animate() {
   particles.forEach(p => {
     p.t += p.speed;
     if (p.t > 1) p.t -= 1;
-    const t = p.t;
-    // Ease in-out
-    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    const ease = p.t < 0.5 ? 2*p.t*p.t : 1 - Math.pow(-2*p.t+2, 2)/2;
     p.mesh.position.lerpVectors(p.source, p.target, ease);
-    // Update source/target if nodes moved (force layout)
-    if (graphData) {
-      const line = edgeLines.find(l => l === p.mesh.parent?.children?.find?.(c => c === p.mesh));
-    }
-    p.mesh.material.opacity = 0.3 + Math.sin(elapsed * 3 + p.t * 10) * 0.3;
+    p.mesh.material.opacity = 0.2 + Math.sin(elapsed * 3 + p.t * 10) * 0.4;
+    // Pulse particle size
+    const s = 0.8 + Math.sin(elapsed * 4 + p.t * 8) * 0.4;
+    p.mesh.scale.setScalar(s);
+  });
+
+  // Cluster hull gentle rotation
+  clusterHulls.forEach((h, i) => {
+    h.mesh.rotation.y = elapsed * 0.05 + i;
+    h.mesh.rotation.x = Math.sin(elapsed * 0.1 + i) * 0.1;
   });
 
   // Force layout
   applyForces();
 
   // Move lights
-  pointLight1.position.x = Math.sin(elapsed * 0.3) * 15;
-  pointLight1.position.z = Math.cos(elapsed * 0.3) * 15;
-  pointLight2.position.x = Math.cos(elapsed * 0.2) * 12;
-  pointLight2.position.z = Math.sin(elapsed * 0.2) * 12;
+  pL1.position.x = Math.sin(elapsed * 0.25) * 18;
+  pL1.position.z = Math.cos(elapsed * 0.25) * 18;
+  pL2.position.x = Math.cos(elapsed * 0.18) * 14;
+  pL2.position.z = Math.sin(elapsed * 0.18) * 14;
 
   composer.render();
 }
 
-// ── Controls ────────────────────────────────────────────────────────
-window.toggleAutoRotate = () => {
-  controls.autoRotate = !controls.autoRotate;
-  document.getElementById('btn-auto').classList.toggle('active', controls.autoRotate);
-};
-window.resetCamera = () => {
-  camera.position.set(0, 8, 25);
-  controls.target.set(0, 0, 0);
-  controls.update();
-};
-window.toggleForce = () => {
-  forceEnabled = !forceEnabled;
-  document.getElementById('btn-force').classList.toggle('active', forceEnabled);
-};
-window.exportImage = () => {
-  renderer.render(scene, camera);
-  const link = document.createElement('a');
-  link.download = 'sqac-graph.png';
-  link.href = renderer.domElement.toDataURL('image/png');
-  link.click();
-};
-
 // ── Resize ──────────────────────────────────────────────────────────
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
 });
-window.addEventListener('mousemove', onMouseMove);
+addEventListener('pointermove', onPointerMove);
+addEventListener('pointerdown', onPointerDown);
+addEventListener('pointerup', onPointerUp);
+addEventListener('click', onClick);
 
 // ── Init ────────────────────────────────────────────────────────────
 const data = await fetchGraph();
-buildGraph(data);
+buildGraph(data, true);
 animate();
 </script>
 </body>
