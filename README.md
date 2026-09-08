@@ -416,6 +416,29 @@ On a realistic 25-file Python project (FastAPI + Celery + Redis):
 | Audit log entries | Correct timestamp, source list, dirty flag |
 | Rack sync | Cartridge copied, manifest updated, searchable |
 
+### Capacity benchmark — how far can one cartridge go?
+
+Measured with the Rust SIMD scan (D=1024 BSC). Full results & derivations in
+[`experiments/CAPACITY_BENCHMARK.md`](experiments/CAPACITY_BENCHMARK.md).
+
+| Entries | Tokens (×45) | Fuzzy search | RSS | File | Build |
+|---------|--------------|--------------|-----|------|-------|
+| 1,000 | 45K | 0.75ms | 23MB | 0.5MB | 6.1s |
+| 5,000 | 225K | 7.4ms | 41MB | 2.4MB | 30.4s |
+| 10,000 | 450K | 9.1ms | 63MB | 4.9MB | 62.9s |
+| **25,000** | **1.125M** | **27ms** | **132MB** | **12MB** | **2.6min** |
+
+**Scaling laws** (linear, R²>0.999): fuzzy search ≈ 1.078µs · n; RSS ≈ 4.5KB/entry; file ≈ 0.48KB/entry.
+
+- **Sweet spot: 25K entries (~1.1M tokens)** — sub-frame (27ms) search, 132MB RSS, 12MB file.
+- **Practical ceiling: 100K entries (~4.5M tokens)** — 108ms search, 471MB RSS, 48MB file.
+- **5M tokens is achievable**: ~111K entries → 120ms search, 500MB RSS, 53MB file (well within server resources).
+- **Hard limit: 250K+ entries** — 270ms+ search, 1.1GB+ RSS → shard or use tiered (hot/warm/cold) cartridges.
+
+Token density: ~93K tokens/MB on disk, ~9K tokens/MB in RAM. This is the **question the DMS policy
+(SqacStore capacity-eviction) answers**: evict when entries exceed 25K or RSS exceeds 150MB, keep the
+top 80% by utility, graduate 3+-recall entries to durable fact packs.
+
 ---
 
 ## Fact Store
@@ -512,6 +535,85 @@ python -m sqac.offloader transcript.jsonl -o session.sqac
 
 # Query
 python -m sqac.offloader --recall "that flaky test fix" --db session.sqac
+```
+
+### Dynamic Memory Sparsification (DMS) — staleness & decay
+
+The capacity benchmark showed one cartridge stays fast far beyond normal use
+(sweet spot 25K entries / ~1.1M tokens / 27ms). DMS (`sqac/dms.py`) is the
+eviction layer that keeps memory sparse *and* high-value when you push toward
+the ceiling. It also matches the KV-eviction result that selective forgetting
+can *improve* generation by suppressing attention dilution.
+
+```python
+from sqac import ContextOffloader
+from sqac.dms import DMS
+
+dms = DMS(budget=25_000)                     # evict when bucket exceeds 25K
+off = ContextOffloader("session.sqac", dms=dms)
+
+# recalling an exchange bumps its utility (ARC-like promotion)
+off.sparsify()                               # demote cold, low-utility turns
+```
+
+**Utility score** — higher = keep in the hot basket:
+
+```
+utility = salience · e^(−λ·age) + α · access_count
+```
+
+- `salience` — existing cheap importance (salient markers + questions).
+- `e^(−λ·age)` — TTL aging; protects the cold-but-valuable long tail (bimodal KV reuse: hot short-cycle + cold long-tail).
+- `α · access_count` — each recall bumps utility; repeatedly-accessed exchanges survive eviction.
+
+**Three tiers**: `live` (window buffer, always kept) → `bucket` (offloaded `turn`, evictable) → `durable` (`fact`, exempt). Sparsification demotes the low-utility tail of the bucket to durable facts rather than destroying them — they stay recallable, they just leave the hot basket so scans stay short.
+
+Tunables live in `UtilityWeights` (`lambda_decay`, `alpha`, `demote_threshold`, `keep_ratio`). Recommend starting defaults; `budget` from the capacity sweet spot: `25_000` entries / ~150MB RSS.
+
+```bash
+python -m pytest tests/test_dms.py -q   # policy coverage
+```
+
+### KV cache relief — sparse recall vs context stuffing
+
+SQAC doesn't touch the model's KV *tensors* (that's the serving layer: vLLM/SGLang + LMCache).
+But it *does* reduce the **number of tokens that enter context and therefore the KV cache the
+model materializes**. In the agentic regime, stuffing the whole accumulated memory into the
+window is the "5M-token" fantasy; SQAC recalls only the relevant top-k.
+
+Measured (`experiments/KV_BENCHMARK.md`, Llama-3.1-8B fp16 KV constant):
+
+| Bucket | Stuffing KV | SQAC KV | KV reduction |
+|---|---|---|---|
+| 200 exchanges (27K tok) | 3,375 MiB | 16.9 MiB | **200× (99.5%)** |
+| 1,000 exchanges (135K tok) | 16,875 MiB | 16.9 MiB | **1,000× (99.9%)** |
+| 5,000 exchanges (675K tok) | 84,375 MiB | 16.9 MiB | **5,000× (100%)** |
+
+Recall latency ~0.1 ms; paraphrase-queried retrieval lands the correct domain (conf 0.67–0.84,
+semantic mode). Because recall is append-only and doesn't mutate the prefix, it composes with
+KV-cache stacks without the 85%→45% truncation penalty. This is **token-level KV relief**, a
+complement to (not a replacement for) tensor-level caching.
+
+**Canonical estimator** (`sqac.kvcache`), model-agnostic and test-covered. KV bytes/token come
+from real model geometry (`n_layers × n_kv_heads × 2 × head_dim × bytes/value`):
+
+```python
+from sqac import estimate_sparse_recall, estimate_sweep, table
+
+estimate_sparse_recall(135_000, 135)   # bucket=135K tok, recall=135 tok
+# -> KVEstimate(reduction_x=1000.0, savings_pct=99.9)
+
+estimate_sweep(1_000_000, (1, 3, 10))  # curve across recall budgets
+print(table())                          # markdown table over known models
+python -m sqac.kvcache --bucket 1000000 --k 1 3 10
+```
+
+**top-k sweep (recall budget vs KV reduction)**, 1M-token bucket, Llama-3.1-8B fp16:
+k=1 → 45 tok → 5.6 MiB; k=3 → 135 tok → 16.9 MiB; k=10 → 450 tok → 56.2 MiB.
+Even a 10-exchange recall is ~2000× under the 125,000 MiB stuffing baseline.
+
+```bash
+python experiments/kv_bench.py --exchanges 1000 --domains 3 --topk 1 3 10
 ```
 
 ---

@@ -54,6 +54,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from .dms import DMS, UtilityWeights
 from .store import KIND_TURN, SqacStore
 
 # ── text utilities ──────────────────────────────────────────────────────────
@@ -202,12 +203,14 @@ class ContextOffloader:
         min_confidence: float = 0.60,
         distiller: Optional[Distiller] = None,
         semantic: bool = True,
+        dms: Optional[DMS] = None,
     ):
         self.path = Path(path) if path else None
         self.window = max(2, window)
         self.min_confidence = min_confidence
         self.distiller = distiller or heuristic_distill
         self.semantic = semantic
+        self.dms = dms  # optional Dynamic Memory Sparsification policy
         self._turn_count = 0
         self._xid = 0
         self._buffer: list[Turn] = []       # live turns inside the window
@@ -287,6 +290,8 @@ class ContextOffloader:
             "turns": list(ex.turn_range),
             "salience": round(ex.salience, 3),
         }
+        if self.dms is not None:
+            self.dms.register(ex.xid, ex.salience, tier="bucket")
         for k in keys:
             k = k.strip()
             if not k:
@@ -308,6 +313,45 @@ class ContextOffloader:
             self._flush_one()
             n += 1
         return n
+
+    def sparsify(self, top_k: int | None = None) -> int:
+        """Demote low-utility bucket entries to the durable fact tier.
+
+        Runs the DMS eviction list against the stored turn entries. Each
+        demoted exchange is rewritten as a kind=fact entry (exempt from the
+        hot basket) and its DMS record is marked durable. Returns the number
+        of exchanges demoted. No-op when no DMS is configured.
+        """
+        if self.dms is None:
+            return 0
+        xids = self.dms.evict_list(top_k=top_k)
+        if not xids:
+            return 0
+        # re-key the surviving entries by exchange id for lookup
+        by_exchange: dict[int, int] = {}
+        for idx, e in enumerate(self._store._entries):
+            if e.get("deleted"):
+                continue
+            by_exchange[e["meta"].get("exchange", idx)] = idx
+        demoted = 0
+        for xid in xids:
+            idx = by_exchange.get(xid)
+            if idx is None:
+                continue
+            e = self._store._entries[idx]
+            # rewrite in place: turn -> durable fact (exempt from the basket)
+            self._store.delete(idx)
+            self._store.add(
+                e["content"],
+                key=e.get("key_norm") or e["content"],
+                meta={**e.get("meta", {}), "tier": "durable"},
+                source=e.get("source", "user"),
+                kind="fact",
+            )
+            self.dms.promote(xid)  # mark the record durable, not evictable
+            demoted += 1
+        self._store.compact()
+        return demoted
 
     # ── read path ───────────────────────────────────────────────────────
 
@@ -331,6 +375,8 @@ class ContextOffloader:
             if xid in seen:  # one exchange has many keys: inject it once
                 continue
             seen.add(xid)
+            if self.dms is not None:
+                self.dms.touch(xid)
             lines.append(f"[{h.confidence:.2f}] {h.content}")
             if len(lines) >= top_k:
                 break
@@ -351,6 +397,8 @@ class ContextOffloader:
             if xid in seen:
                 continue
             seen.add(xid)
+            if self.dms is not None:
+                self.dms.touch(xid)
             out.append(
                 {
                     "content": h.content,

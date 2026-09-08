@@ -17,6 +17,7 @@ from .autobuild import (
     track_once,
     _sync_rack,
 )
+from .dms import DMS, UtilityWeights
 from .encoder import BSCEncoder
 from .format import CartridgeHeader, read_cartridge, write_cartridge
 from .offloader import ContextOffloader
@@ -35,11 +36,42 @@ from .store import (
 
 __version__ = "0.1.0"
 
+_KVCACHE_NAMES = frozenset(
+    {
+        "KVEstimate",
+        "estimate_sparse_recall",
+        "estimate_sweep",
+        "known_models",
+        "kv_bytes_per_token",
+        "model_kv_bytes_per_token",
+        "table",
+    }
+)
+
+
+def __getattr__(name: str):
+    """Lazily import sqac.kvcache names so `python -m sqac.kvcache` stays clean
+    (eager import would pre-load the submodule and trigger a benign CPython
+    'found in sys.modules' RuntimeWarning)."""
+    if name in _KVCACHE_NAMES:
+        from . import kvcache
+
+        return getattr(kvcache, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 __all__ = [
     "SqacStore",
     "ContextOffloader",
     "CartridgeRack",
     "BSCEncoder",
+    "DMS",
+    "UtilityWeights",
+    "KVEstimate",
+    "estimate_sparse_recall",
+    "estimate_sweep",
+    "known_models",
+    "kv_bytes_per_token",
+    "model_kv_bytes_per_token",
     "CartridgeHeader",
     "read_cartridge",
     "write_cartridge",
