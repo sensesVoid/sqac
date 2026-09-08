@@ -35,7 +35,7 @@ from .store import (
     resolve_kind,
 )
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 _KVCACHE_NAMES = frozenset(
     {
