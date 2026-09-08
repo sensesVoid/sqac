@@ -18,7 +18,7 @@ Formula (canonical, linear-in-tokens):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Literal, Optional
+from typing import Dict, Literal
 
 # Bytes per value in supported precisions.
 _BYTES_PER_VALUE = {"fp16": 2, "bf16": 2, "fp32": 4, "int8": 1, "fp8": 1}

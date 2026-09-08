@@ -24,7 +24,6 @@ import json
 import sys
 from pathlib import Path
 
-from .encoder import BSCEncoder, MiniLMSimHashEncoder
 from .store import SqacStore
 
 CONTENT_FIELDS = ["content", "text", "answer", "fact", "value", "body", "summary", "output"]

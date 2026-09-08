@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SQAC CLI — teach, search, pack, stats, init, track, compact.
+"""SQAC CLI — teach, search, pack, stats, init, track, compact, mcp setup.
 
     python -m sqac.cli teach "our deploys are ARM64 only" [--key deployment] [--db memory.sqac]
     python -m sqac.cli search "deployment target?" [--db memory.sqac] [--k 3]
@@ -8,6 +8,7 @@
     python -m sqac.cli init .                           # auto-build cartridge from project
     python -m sqac.cli track . --interval 5             # realtime tracking (Ctrl-C to stop)
     python -m sqac.cli compact --db memory.sqac         # remove tombstoned entries
+    python -m sqac.cli mcp setup [--dir ~/.sqacm]       # per-CLI wiring snippets
     python -m sqac.server --dir ./memory --port 8420    # HTTP API server
 """
 
@@ -106,6 +107,14 @@ def main(argv: list[str] | None = None) -> int:
     p_track.add_argument("--rack-name", default=None,
                          help="name for the cartridge in the rack (default: project dir name)")
 
+    p_mcp_setup = sub.add_parser("mcp", help="MCP server wiring for agent CLIs")
+    p_mcp_setup.add_argument("action", choices=["setup"], help="generate/install per-CLI wiring")
+    p_mcp_setup.add_argument("--dir", default="~/.sqacm", help="shared memory dir (default: ~/.sqacm)")
+    p_mcp_setup.add_argument("--host", default="all",
+                             help="opencode, claude-code, claude-desktop, codex, cursor, zed (default: all)")
+    p_mcp_setup.add_argument("--hook-project", default=None,
+                             help="install AGENTS.md memory hook into this project (path)")
+
     args = ap.parse_args(argv)
 
     if args.cmd == "teach":
@@ -199,6 +208,13 @@ def main(argv: list[str] | None = None) -> int:
                   rack_dir=rack_dir, rack_name=rack_name)
         except KeyboardInterrupt:
             pass
+
+    elif args.cmd == "mcp":
+        from . import mcp_setup
+        return mcp_setup.main([
+            "--dir", args.dir,
+            "--host", args.host,
+        ] + (["--hook-project", args.hook_project] if args.hook_project else []))
 
     elif args.cmd == "serve":
         from .server import main as serve_main

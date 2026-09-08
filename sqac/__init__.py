@@ -17,6 +17,7 @@ from .autobuild import (
     track_once,
     _sync_rack,
 )
+from .continuity import ContinuityStore, bootstrap_packet, detect_host, server_instructions
 from .dms import DMS, UtilityWeights
 from .encoder import BSCEncoder
 from .format import CartridgeHeader, read_cartridge, write_cartridge
@@ -91,4 +92,8 @@ __all__ = [
     "track_once",
     "track",
     "_sync_rack",
+    "ContinuityStore",
+    "bootstrap_packet",
+    "detect_host",
+    "server_instructions",
 ]

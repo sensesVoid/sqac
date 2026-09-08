@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .encoder import BSCEncoder, MiniLMSimHashEncoder
-from .static_encoder import DEFAULT_STATIC_MODEL, StaticSimHashEncoder
+from .static_encoder import StaticSimHashEncoder
 
 # Optional Rust SIMD acceleration — 100-300x faster for fuzzy scan
 try:
@@ -35,13 +35,10 @@ from .format import (
     _HAS_LZ4,
 
     VERSION,
-    Cartridge,
     CartridgeHeader,
     Entry,
     FormatError,
-    compact_cartridge,
     hamming,
-    locked_cartridge,
     read_cartridge,
     write_cartridge,
 )
@@ -140,8 +137,8 @@ class Hit:
             "confidence": round(self.confidence, 4),
             "source": self.source,
             "mode": self.mode,
-            "meta": self.meta,
-            "trust": self.trust,
+            "meta": dict(self.meta),
+            "trust": dict(self.trust),
         }
 
 
@@ -259,7 +256,7 @@ class SqacStore:
         self._invalidate_cache()
 
         # Prompt injection analysis
-        from .injection import analyze_content, RiskLevel
+        from .injection import analyze_content
         inj = analyze_content(content)
 
         idx = len(self._entries)
@@ -267,7 +264,7 @@ class SqacStore:
             {
                 "content": content,
                 "key_norm": norm,
-                "meta": meta or {},
+                "meta": dict(meta or {}),
                 "source": source,
                 "kind": resolve_kind(kind),
                 "trust": inj.to_dict(),
@@ -285,8 +282,13 @@ class SqacStore:
         """Tombstone an entry (O(1))."""
         if not (0 <= idx < len(self._entries)):
             return False
+        norm = self._entries[idx]["key_norm"]
         self._entries[idx]["deleted"] = True
-        self._exact.pop(self._entries[idx]["key_norm"], None)
+        # Only drop the exact mapping if it still points at this entry: a
+        # later add with the same key may have claimed it, and that sibling
+        # must keep its O(1) exact tier.
+        if self._exact.get(norm) == idx:
+            self._exact.pop(norm, None)
         self._invalidate_cache()
         return True
 
@@ -350,71 +352,66 @@ class SqacStore:
                 return False
             return True
 
-        # 1) Exact hit: O(1), confidence 1.0
+        def _hit(idx: int, mode: str, confidence: float) -> Hit:
+            e = self._entries[idx]
+            return Hit(
+                content=e["content"],
+                confidence=confidence,
+                source=e["source"],
+                mode=mode,
+                meta={
+                    **e["meta"],
+                    "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
+                    "latency_ms": _ms(time.perf_counter() - t0),
+                },
+                trust=dict(e.get("trust") or {}),
+            )
+
+        if top_k <= 0:
+            return []
+
+        # 1) Exact hit: O(1), confidence 1.0. Callers building a ranked window
+        #    (search_grouped, rack merge) rely on up to top_k results even for
+        #    exact keys, so the exact hit seeds the results and the fuzzy
+        #    tiers fill the rest rather than short-circuiting entirely.
+        out: list[Hit] = []
+        seen_idx: set[int] = set()
         idx = self._exact.get(norm)
         if idx is not None and eligible(idx):
-            e = self._entries[idx]
-            return [
-                Hit(
-                    content=e["content"],
-                    confidence=1.0,
-                    source=e["source"],
-                    mode="exact",
-                    meta={
-                        **e["meta"],
-                        "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
-                        "latency_ms": _ms(time.perf_counter() - t0),
-                    },
-                    trust=e.get("trust", {}),
-                )
-            ]
+            out.append(_hit(idx, "exact", 1.0))
+            seen_idx.add(idx)
 
         # 2) Lexical tier: BSC trigram bundling — typos, word overlap.
         #    XOR+popcount scan against BOTH key and content vectors, best
         #    similarity wins. Numpy bit-matrix fast path (Python stand-in
         #    for the archived Rust engine; the O(n) wall is fundamental
         #    at this tier — thesis Part VI).
-        qbits = self._cached_encode(query, "lexical") if use_cache else self.encoder.encode_bits(query)
-        results: list[tuple[float, int, str]] = []
-        live = [i for i in range(len(self._entries)) if eligible(i)]
-        if live:
-            sims = self._bulk_similarity(qbits, live, tier="lexical")
-            for i, sim in zip(live, sims):
-                if sim >= self.fuzzy_threshold:
-                    results.append((sim, i, "fuzzy"))
-            # 3) Semantic tier: MiniLM SimHash — synonyms/paraphrase with
-            #    no lexical overlap ("x86" -> AMD64 rule, "db" -> database).
-            #    Same noise floor (~0.5) and confidence scale as lexical.
-            if self.semantic:
-                qsem = self._cached_encode(query, "semantic") if use_cache else self._sem_encoder.encode_bits(query)
-                sem_sims = self._bulk_similarity(qsem, live, tier="semantic")
-                for i, sim in zip(live, sem_sims):
-                    if sim >= self.semantic_threshold:
-                        results.append((sim, i, "semantic"))
-        results.sort(reverse=True)
-        out = []
-        seen_idx: set[int] = set()
-        for sim, i, mode in results:
-            if i in seen_idx:  # same entry hit by both tiers: keep best
-                continue
-            seen_idx.add(i)
-            e = self._entries[i]
-            out.append(
-                Hit(
-                    content=e["content"],
-                    confidence=sim,
-                    source=e["source"],
-                    mode=mode,
-                    meta={
-                        **e["meta"],
-                        "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
-                        "latency_ms": _ms(time.perf_counter() - t0),
-                    },
-                    trust=e.get("trust", {}),
-                )
-            )
-            if len(out) >= top_k:
-                break
+        if len(out) < top_k:
+            qbits = self._cached_encode(query, "lexical") if use_cache else self.encoder.encode_bits(query)
+            results: list[tuple[float, int, str]] = []
+            live = [i for i in range(len(self._entries)) if eligible(i)]
+            if live:
+                sims = self._bulk_similarity(qbits, live, tier="lexical")
+                for i, sim in zip(live, sims):
+                    if sim >= self.fuzzy_threshold:
+                        results.append((sim, i, "fuzzy"))
+                # 3) Semantic tier: MiniLM SimHash — synonyms/paraphrase with
+                #    no lexical overlap ("x86" -> AMD64 rule, "db" -> database).
+                #    Same noise floor (~0.5) and confidence scale as lexical.
+                if self.semantic:
+                    qsem = self._cached_encode(query, "semantic") if use_cache else self._sem_encoder.encode_bits(query)
+                    sem_sims = self._bulk_similarity(qsem, live, tier="semantic")
+                    for i, sim in zip(live, sem_sims):
+                        if sim >= self.semantic_threshold:
+                            results.append((sim, i, "semantic"))
+            results.sort(reverse=True)
+            for sim, i, mode in results:
+                if i in seen_idx:  # same entry hit by both tiers: keep best
+                    continue
+                seen_idx.add(i)
+                out.append(_hit(i, mode, sim))
+                if len(out) >= top_k:
+                    break
         return out
 
     def search_or_none(self, query: str, min_confidence: float = 0.75) -> Optional[Hit]:

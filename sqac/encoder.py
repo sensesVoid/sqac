@@ -30,8 +30,6 @@ Character n-grams beat word tokens for v1 because:
 from __future__ import annotations
 
 import hashlib
-import struct
-from typing import Optional
 
 # Default dimension. Multiple of 8 for byte packing; 1024 chosen to match
 # the FissFus Stage 2 experiments (~94% retrieval at 128 items/bucket).

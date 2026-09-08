@@ -34,14 +34,10 @@ from __future__ import annotations
 
 import math
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-from .store import KIND_FACT, KIND_TURN, SqacStore
-
-# Time base for the TTL half-life when nothing extrinsic is passed in.
-# Matches the bimodal KV reuse finding: give the cold tail ~hours, not minutes.
-_AGE_FACTOR = 1.0 / 60.0  # convert elapsed seconds -> minutes for the decay term
+from .store import SqacStore
 
 
 @dataclass

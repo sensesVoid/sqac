@@ -29,6 +29,13 @@ from pydantic import Field
 
 from mcp.server.mcpserver import MCPServer
 
+from sqac.continuity import (
+    ContinuityStore,
+    bootstrap_packet,
+    detect_host,
+    server_instructions,
+)
+from sqac.dms import DMS
 from sqac.rack import CartridgeRack
 from sqac.offloader import ContextOffloader
 
@@ -36,20 +43,25 @@ SERVER_NAME = "sqac_mcp"
 DEFAULT_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
 DEFAULT_CARTRIDGES = ("facts", "docs", "skills")
 VALID_KINDS = ("generic", "fact", "skill", "doc", "turn")
+SESSION_BUDGET = 25_000  # DMS budget: capacity sweep sweet spot
 
 mcp = MCPServer(
     name=SERVER_NAME,
     title="SQAC Memory Server",
     description=(
         "A persistent key-value memory store with exact, lexical, and "
-        "semantic recall. Tools: mem_search (cross-cartridge lookup, "
+        "semantic recall. Tools: mem_bootstrap (load cross-CLI working "
+        "context at session start), mem_search (cross-cartridge lookup, "
         "optionally grouped by skill), mem_recall / mem_recall_detailed "
         "(recent working-memory context), mem_observe (record a conversation "
-        "turn), mem_write (store a fact/doc/skill by key), mem_graduate "
+        "turn), mem_write (store a fact/doc/skill by key), mem_checkpoint "
+        "(hand off task state across sessions and CLIs), mem_graduate "
         "(promote stable session memories into a long-term cartridge), "
-        "mem_cartridge_create / mem_cartridge_list, mem_stats, mem_save, "
-        "and mem_swap (archive and rotate the working session)."
+        "mem_sparsify (DMS eviction), mem_cartridge_create / "
+        "mem_cartridge_list, mem_stats, mem_save, and mem_swap (archive and "
+        "rotate the working session)."
     ),
+    instructions=server_instructions(),
     version="0.1.0",
 )
 
@@ -84,12 +96,15 @@ class _MemoryState:
             if name not in self.rack:
                 self.rack.create(name, description=f"{name} cartridge (auto-created)")
         self.session = ContextOffloader(
-            cfg.dir / "session.sqac", window=8, semantic=cfg.semantic
+            cfg.dir / "session.sqac", window=8, semantic=cfg.semantic,
+            dms=DMS(budget=SESSION_BUDGET),
         )
+        self.continuity = ContinuityStore(cfg.dir / "continuity.json")
 
     def save(self) -> None:
         self.rack.save()
         self.session.save()
+        self.continuity.save()
 
 
 _STATE_LOCK = threading.RLock()
@@ -135,7 +150,215 @@ def _hit_json(h) -> dict[str, Any]:
     }
 
 
+def _project_name(project: Optional[str]) -> str:
+    """Resolve the project key: explicit arg > env > cwd basename > default."""
+    if project and project.strip():
+        return project.strip()
+    env = os.environ.get("SQAC_PROJECT")
+    if env and env.strip():
+        return env.strip()
+    try:
+        return os.getcwd().split("/")[-1] or "default"
+    except OSError:
+        return "default"
+
+
+def _recent_exchanges(st, project: str, n: int = 5) -> list[dict[str, Any]]:
+    """Surface the most relevant exchanges for the active goal/project.
+
+    Fail-safe: empty list when nothing recalls (never fabricate)."""
+    try:
+        query = (
+            st.continuity.record(project).get("goal")
+            or st.continuity.record(project).get("last_summary")
+            or project
+        )
+        return st.session.recall_detailed(query, top_k=n)
+    except Exception:
+        return []
+
+
 # ── read tools ───────────────────────────────────────────────────────────────
+
+@mcp.tool(
+    name="mem_bootstrap",
+    annotations={
+        "title": "Load Working Context (cross-CLI)",
+        "read_only_hint": True,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": True,
+    },
+)
+@_serialized
+def mem_bootstrap(
+    project: Annotated[Optional[str], Field(description="Project key; inferred from cwd if omitted")] = None,
+    host: Annotated[Optional[str], Field(description="Host CLI name override (auto-detected by default)")] = None,
+    model: Annotated[Optional[str], Field(description="Model id to record as last active")] = None,
+) -> str:
+    """Load your working context at session start — puts any model in the loop.
+
+    Returns the project's continuity packet: last active host/model/time, the
+    active goal, the last summary, recent checkpoints, session stats, and the
+    most relevant recent exchanges. Also records that THIS host just engaged,
+    so a later session on a different CLI resumes seamlessly.
+
+    Call this ONCE when a session starts, especially after a CLI switch.
+
+    Returns:
+        JSON packet. A project with no prior state reports it honestly
+        ("no prior state recorded") instead of fabricating context.
+    """
+    try:
+        st = _state()
+        proj = _project_name(project)
+        host_name = detect_host(host)
+        # Packet first: it should describe where the work was left off BEFORE
+        # this session engaged (so a model resuming after a CLI switch sees
+        # the PREVIOUS host + goal). Then record this engagement for the next
+        # session to find.
+        packet = bootstrap_packet(
+            project=proj,
+            continuity=st.continuity,
+            host=host_name,
+            model=model,
+            session_stats=st.session.stats(),
+            rack_stats=st.rack.stats(),
+            recent=_recent_exchanges(st, proj),
+        )
+        st.continuity.touch(proj, host=host_name, model=model)
+        st.continuity.save()
+        return _ok(packet)
+    except Exception as e:
+        return _err(e)
+
+
+@mcp.tool(
+    name="mem_checkpoint",
+    annotations={
+        "title": "Save a Task Handoff",
+        "read_only_hint": False,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+)
+@_serialized
+def mem_checkpoint(
+    project: Annotated[Optional[str], Field(description="Project key; inferred from cwd if omitted")] = None,
+    goal: Annotated[Optional[str], Field(description="The active goal (carried into the next session)")] = None,
+    summary: Annotated[Optional[str], Field(description="What was accomplished / where it left off")] = None,
+    host: Annotated[Optional[str], Field(description="Host CLI name override (auto-detected by default)")] = None,
+) -> str:
+    """Persist a task-boundary handoff so any future session (any CLI) resumes here.
+
+    Records the active goal, a human-readable summary, and the host/time into
+    the shared continuity state, plus appends to the checkpoint trail. Call
+    this when a task completes, hits a blocker, or you switch contexts.
+
+    Returns:
+        JSON: {"project", "saved", "goal", "summary", "last_host"}.
+    """
+    try:
+        st = _state()
+        proj = _project_name(project)
+        host_name = detect_host(host)
+        rec = st.continuity.checkpoint(proj, host=host_name, goal=goal, summary=summary)
+        st.continuity.save()
+        return _ok(
+            {
+                "project": proj,
+                "saved": True,
+                "goal": rec.get("goal"),
+                "summary": rec.get("last_summary"),
+                "last_host": rec.get("last_host"),
+                "checkpoints": len(rec.get("checkpoints", [])),
+            }
+        )
+    except Exception as e:
+        return _err(e)
+
+
+@mcp.tool(
+    name="mem_sparsify",
+    annotations={
+        "title": "Prune Working Memory (DMS)",
+        "read_only_hint": False,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+)
+@_serialized
+def mem_sparsify(
+    top_k: Annotated[Optional[int], Field(ge=1, le=100000, description="Limit demotions to the N lowest-utility exchanges (default: all eligible)")] = None,
+) -> str:
+    """Run Dynamic Memory Sparsification: demote cold, low-utility session
+    exchanges into durable facts so the working memory stays sparse and scans
+    stay fast.
+
+    No-op when the session has no DMS policy configured.
+
+    Returns:
+        JSON: {"demoted", "session_entries", "kinds"}.
+    """
+    try:
+        st = _state()
+        demoted = st.session.sparsify(top_k=top_k)
+        st.session.save()
+        return _ok(
+            {
+                "demoted": demoted,
+                "session_entries": st.session.stats().get("entries", 0),
+                "kinds": st.session.stats().get("kinds", {}),
+                "note": (
+                    "Demoted exchanges became durable facts (still recallable, "
+                    "just out of the hot basket)."
+                    if demoted
+                    else "Nothing eligible; no DMS policy, or nothing cold enough."
+                ),
+            }
+        )
+    except Exception as e:
+        return _err(e)
+
+
+@mcp.resource(
+    "memory://context",
+    title="Memory Continuity Context",
+    description="Cross-CLI working-context packet (project, goal, last summary, recent exchanges).",
+    mime_type="text/markdown",
+)
+@_serialized
+def _resource_context() -> str:
+    """Text rendering of the bootstrap packet for clients that auto-read resources."""
+    st = _state()
+    proj = _project_name(None)
+    host_name = detect_host()
+    packet = bootstrap_packet(
+        project=proj,
+        continuity=st.continuity,
+        host=host_name,
+        session_stats=st.session.stats(),
+        rack_stats=st.rack.stats(),
+        recent=_recent_exchanges(st, proj),
+    )
+    st.continuity.touch(proj, host=host_name)
+    st.continuity.save()
+    lines = [f"# {packet['project']}", "", packet["summary"], ""]
+    if packet["checkpoints"]:
+        lines.append("## Recent checkpoints")
+        for cp in packet["checkpoints"]:
+            lines.append(f"- [{cp['host']} @ {cp['ts']}] goal={cp['goal']!r} — {cp['summary']}")
+        lines.append("")
+    if packet["recent"]:
+        lines.append("## Recent context")
+        for r in packet["recent"]:
+            lines.append(f"- (salience {r.get('salience')}) {r.get('content', '')[:200]}")
+        lines.append("")
+    lines.append(f"Memory: {packet['memory_entries']} long-term entries, "
+                 f"{packet['session'].get('entries', 0)} session entries.")
+    return "\n".join(lines)
 
 @mcp.tool(
     name="mem_search",
@@ -276,6 +499,8 @@ def mem_observe(
         st = _state()
         evicted = st.session.observe(role, text)
         st.session.save()
+        st.continuity.touch(_project_name(None), host=detect_host(), summary=text[:400])
+        st.continuity.save()
         return _ok(
             {
                 "recorded": True,
@@ -414,7 +639,8 @@ def mem_swap(
         archive_file = archive_dir / f"{name}.sqac"
         st.session.save(archive_file)
         st.session = ContextOffloader(
-            st.cfg.dir / "session.sqac", window=8, semantic=st.cfg.semantic
+            st.cfg.dir / "session.sqac", window=8, semantic=st.cfg.semantic,
+            dms=DMS(budget=SESSION_BUDGET),
         )
         return _ok(
             {"archived": name, "archive_file": str(archive_file), "session_reset": True}

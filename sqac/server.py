@@ -5,8 +5,8 @@
     python -m sqac.cli serve --dir ./memory --port 8420 --api-key sk-xxx
 """
 from __future__ import annotations
-import argparse, json, os, threading, time
-from collections import Counter
+import argparse, hmac, html, os, threading, time
+from collections import Counter, deque
 from pathlib import Path
 from typing import Optional
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
@@ -28,17 +28,36 @@ _start_time = time.time()
 
 # ── Metrics counters ────────────────────────────────────────────────────
 _metrics_lock = threading.Lock()
+_state_lock = threading.Lock()          # guards lazy _ensure_state() init
+_teach_locks: dict[str, threading.Lock] = {}   # per-cartridge write serialization
 _req_counts: Counter = Counter()        # endpoint -> count
-_req_latencies: list[float] = []        # last 1000 request latencies
+_req_latencies: deque[float] = deque(maxlen=1000)
 _req_errors: Counter = Counter()        # status_code -> count
-_search_latencies: list[float] = []     # last 1000 search latencies
+_search_latencies: deque[float] = deque(maxlen=1000)
 _teach_count = 0
 _compact_count = 0
 
 def _verify_key(key: str = Security(_security)):
-    if _api_key and key != _api_key:
+    if _api_key and not hmac.compare_digest(key or "", _api_key):
         raise HTTPException(status_code=401, detail="invalid API key")
     return key
+
+def _teach_lock_for(name: str) -> threading.Lock:
+    with _metrics_lock:
+        lock = _teach_locks.get(name)
+        if lock is None:
+            lock = _teach_locks[name] = threading.Lock()
+        return lock
+
+def _cartridge_path(name: str) -> Path:
+    """Resolve a cartridge name to a file, refusing path traversal."""
+    if "/" in name or "\\" in name or name in ("", ".", ".."):
+        raise HTTPException(400, f"invalid cartridge name: {name!r}")
+    base = _state["dir"].resolve()
+    path = (base / f"{name}.sqac").resolve()
+    if base not in path.parents:
+        raise HTTPException(400, f"invalid cartridge name: {name!r}")
+    return path
 
 # Module-level state: lazily initialized on first request from env vars
 _state: dict = {}
@@ -46,20 +65,23 @@ _state: dict = {}
 def _ensure_state():
     if _state:
         return
-    d = Path(os.environ.get("SQAC_DIR", ".")).resolve()
-    d.mkdir(parents=True, exist_ok=True)
-    _state["dir"] = d
-    _state["rack"] = None
-    _state["offloader"] = None
-    dp = d / "memory.sqac"
-    _state["default_store"] = SqacStore.load(dp) if dp.exists() else SqacStore()
-    if not dp.exists():
-        _state["default_store"].save(dp)
-    if os.environ.get("SQAC_RACK"):
-        _state["rack"] = CartridgeRack(directory=d, semantic=True)
-    sp = os.environ.get("SQAC_SESSION")
-    if sp:
-        _state["offloader"] = ContextOffloader(sp)
+    with _state_lock:
+        if _state:
+            return
+        d = Path(os.environ.get("SQAC_DIR", ".")).resolve()
+        d.mkdir(parents=True, exist_ok=True)
+        _state["dir"] = d
+        _state["rack"] = None
+        _state["offloader"] = None
+        dp = d / "memory.sqac"
+        _state["default_store"] = SqacStore.load(dp) if dp.exists() else SqacStore()
+        if not dp.exists():
+            _state["default_store"].save(dp)
+        if os.environ.get("SQAC_RACK"):
+            _state["rack"] = CartridgeRack(directory=d, semantic=True)
+        sp = os.environ.get("SQAC_SESSION")
+        if sp:
+            _state["offloader"] = ContextOffloader(sp)
 
 def _get_store(name: Optional[str] = None) -> SqacStore:
     _ensure_state()
@@ -101,8 +123,6 @@ async def _track_metrics(request: Request, call_next):
     with _metrics_lock:
         _req_counts[endpoint] += 1
         _req_latencies.append(elapsed)
-        if len(_req_latencies) > 1000:
-            _req_latencies.pop(0)
         if response.status_code >= 400:
             _req_errors[str(response.status_code)] += 1
     return response
@@ -119,13 +139,20 @@ def stats(cartridge: Optional[str] = None, _=Depends(_verify_key)):
 def search_endpoint(req: SearchRequest, _=Depends(_verify_key)):
     t0 = time.time()
     store = _get_store(req.cartridge)
-    if req.threshold is not None: store.fuzzy_threshold = req.threshold
-    hits = store.search(req.query, top_k=req.top_k, kind=req.kind)
+    if req.threshold is not None:
+        # Per-request threshold: apply WITHOUT leaking into the shared store
+        # for every subsequent request (that mutation also raced concurrently).
+        old = store.fuzzy_threshold
+        store.fuzzy_threshold = req.threshold
+        try:
+            hits = store.search(req.query, top_k=req.top_k, kind=req.kind)
+        finally:
+            store.fuzzy_threshold = old
+    else:
+        hits = store.search(req.query, top_k=req.top_k, kind=req.kind)
     latency = (time.time() - t0) * 1000
     with _metrics_lock:
         _search_latencies.append(latency)
-        if len(_search_latencies) > 1000:
-            _search_latencies.pop(0)
     return {"hits": [HitResponse(content=h.content, confidence=round(h.confidence,4), source=h.source, mode=h.mode, meta=h.meta).model_dump() for h in hits], "count": len(hits)}
 
 @app.post("/teach")
@@ -133,13 +160,11 @@ def teach(req: TeachRequest, _=Depends(_verify_key)):
     global _teach_count
     _ensure_state()
     store = _get_store(req.cartridge)
-    store.add(req.content, key=req.key, source=req.source, kind=req.kind)
     name = req.cartridge or "memory"
-    path = _state["dir"] / f"{name}.sqac"
-    store.save(path)
-    # Reload from disk so subsequent searches see the new entry
-    if not req.cartridge or req.cartridge == "memory":
-        _state["default_store"] = SqacStore.load(path)
+    path = _cartridge_path(name)
+    with _teach_lock_for(name):
+        store.add(req.content, key=req.key, source=req.source, kind=req.kind)
+        store.save(path)
     with _metrics_lock:
         _teach_count += 1
     return {"ok": True, "entries": len(store), "path": str(path)}
@@ -149,7 +174,7 @@ def compact_endpoint(req: CompactRequest, _=Depends(_verify_key)):
     global _compact_count
     _ensure_state()
     name = req.cartridge or "memory"
-    path = _state["dir"] / f"{name}.sqac"
+    path = _cartridge_path(name)
     if not path.exists(): raise HTTPException(404, f"cartridge not found: {name}")
     with _metrics_lock:
         _compact_count += 1
@@ -190,7 +215,8 @@ def session_recall(req: SessionRecallRequest, _=Depends(_verify_key)):
     _ensure_state()
     o = _state.get("offloader")
     if not o: raise HTTPException(400, "no session offloader")
-    return {"text": o.recall(req.query, top_k=req.top_k), "hit": bool(o.recall(req.query, top_k=req.top_k))}
+    text = o.recall(req.query, top_k=req.top_k)
+    return {"text": text, "hit": bool(text)}
 
 @app.post("/graph")
 def graph_endpoint(req: GraphRequest, _=Depends(_verify_key)):
@@ -423,17 +449,22 @@ def dashboard(_=Depends(_verify_key)):
         total_errors = sum(_req_errors.values())
         search_p50 = (sorted(_search_latencies)[len(_search_latencies)//2] if _search_latencies else 0)
         search_p99 = (sorted(_search_latencies)[int(len(_search_latencies)*0.99)] if _search_latencies else 0)
-    kinds_html = "".join(f'<span class="badge">{k}: {v}</span>' for k, v in sorted(stats.get("kinds", {}).items()))
+    kinds_html = "".join(
+        f'<span class="badge">{html.escape(str(k))}: {html.escape(str(v))}</span>'
+        for k, v in sorted(stats.get("kinds", {}).items())
+    )
     entries_html = ""
     for h in hits[:15]:
         tag = "exact" if h.mode == "exact" else "fuzzy"
+        content_h = html.escape(h.content[:120] or "")
+        source_h = html.escape(h.source or "")
         entries_html += f'<div class="entry"><span class="tag tag-{tag}">{tag}</span> '
         entries_html += f'<span class="conf">{h.confidence:.3f}</span> '
-        entries_html += f'<span class="content">{h.content[:120]}{'…' if len(h.content) > 120 else ''}</span>'
+        entries_html += f'<span class="content">{content_h}</span>'
         if h.source:
-            entries_html += f' <span class="source">{h.source}</span>'
+            entries_html += f' <span class="source">{source_h}</span>'
         entries_html += '</div>\n'
-    html = f"""<!DOCTYPE html>
+    dashboard_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -494,7 +525,7 @@ footer{{margin-top:24px;padding-top:12px;border-top:1px solid #21263d;color:#484
   </div>
   <div class="card">
     <div class="label">Cartridges</div>
-    <div style="margin-top:6px">{''.join(f'<span class="badge">{c}</span>' for c in cartridges)}</div>
+    <div style="margin-top:6px">{''.join(f'<span class="badge">{html.escape(c)}</span>' for c in cartridges)}</div>
   </div>
 </div>
 
@@ -520,7 +551,7 @@ footer{{margin-top:24px;padding-top:12px;border-top:1px solid #21263d;color:#484
 
 <footer>SQAC v0.1.0 — VSA memory cartridges for LLMs — <a href="/health" style="color:#58a6ff">Health</a> · <a href="/metrics" style="color:#58a6ff">Metrics</a> · <a href="/docs" style="color:#58a6ff">API Docs</a></footer>
 </body></html>"""
-    return HTMLResponse(html)
+    return HTMLResponse(dashboard_html)
 
 
 def main(argv: list[str] | None = None) -> int:

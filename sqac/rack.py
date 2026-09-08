@@ -30,6 +30,7 @@ holds for racks as it does for the offloader.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -265,7 +266,8 @@ class CartridgeRack:
     def _auto_load_directory(self) -> None:
         """Mount every *.sqac in the rack directory (except the reserved
         session bucket). Files that fail to load are skipped; the failures
-        are recorded in self._load_errors."""
+        are recorded in self._load_errors and surfaced as warnings so a
+        silently-dropped memory file is visible, not invisible."""
         for p in sorted(self.directory.glob("*.sqac")):
             if p.stem == self.RESERVED_SESSION or p.stem in self._stores:
                 continue
@@ -273,6 +275,9 @@ class CartridgeRack:
                 self.register(p.stem, p)
             except Exception as exc:  # FormatError / OSError / fingerprint
                 self._load_errors.append((p.stem, str(exc)))
+                logging.warning(
+                    "rack: not mounting %s (%s): %s", p.name, p.stem, exc
+                )
 
     def create(
         self,
@@ -491,8 +496,13 @@ class CartridgeRack:
     # ── persistence ─────────────────────────────────────────────────────
 
     def save(self, names: Optional[list[str]] = None) -> "CartridgeRack":
-        """Persist mounted cartridges back to their registered paths."""
-        for name in (names or self.names()):
+        """Persist mounted cartridges back to their registered paths.
+
+        `names=None` persists every mounted cartridge; an EMPTY list
+        deliberately persists nothing (allowing filtered saves)."""
+        if names is None:
+            names = self.names()
+        for name in names:
             store = self._require(name)
             p = self._paths.get(name)
             if p is None:

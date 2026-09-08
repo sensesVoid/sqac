@@ -21,7 +21,6 @@ decide how to handle it (wrap in <untrusted> tags, strip, etc.).
 from __future__ import annotations
 
 import re
-import unicodedata
 from dataclasses import dataclass, field
 from enum import Enum
 

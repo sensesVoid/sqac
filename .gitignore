@@ -16,6 +16,11 @@ venv/
 .idea/
 .vscode/
 
+# Secrets
+.env
+.env.*
+*.pem
+
 # Hugging Face cache
 .cache/
 

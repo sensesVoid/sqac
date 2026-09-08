@@ -54,7 +54,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from .dms import DMS, UtilityWeights
+from .dms import DMS
 from .store import KIND_TURN, SqacStore
 
 # ── text utilities ──────────────────────────────────────────────────────────
@@ -535,6 +535,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.transcript:
+        if not Path(args.transcript).exists():
+            print(f"transcript not found: {args.transcript}", file=sys.stderr)
+            return 1
         off = ContextOffloader.from_transcript(
             args.transcript, args.out, window=args.window, min_confidence=args.min_conf
         )

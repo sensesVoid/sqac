@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import time
 from dataclasses import dataclass
@@ -370,8 +371,8 @@ def extract_conventions(root: Path, rel_files: list[str], units: list[Unit]) -> 
                 pass
     found = [hint for hint, label in _FRAMEWORK_HINTS if any(hint in b for b in blob)]
     if found:
-        labels = [_FRAMEWORK_HINTS[_FRAMEWORK_HINTS.index((h, next(l for _, l in _FRAMEWORK_HINTS if _ == h)))
-                   ][1] for h in found]
+        label_of = dict(_FRAMEWORK_HINTS)
+        labels = [label_of[h] for h in found]
         units.append(Unit("_conventions#frameworks", "fact", "framework stack",
                           "Framework stack detected: " + ", ".join(sorted(set(labels))) + "."))
     tests = [f for f in rel_files if re.match(r"(test_|_test|.*[/_.]test[/_.])", f) or f.endswith(("_test.py", ".test.ts", ".spec.ts", ".test.js", "test.py"))]
@@ -485,16 +486,23 @@ def _state_path(sqac_dir: Path) -> Path:
 
 
 def save_state(sqac_dir: Path, sources: dict[str, str]) -> None:
-    _state_path(sqac_dir).write_text(
-        json.dumps({"sources": sources,
-                    "synced_at": time.strftime("%Y-%m-%dT%H:%M:%S")},
-                   indent=2, sort_keys=True))
+    """Write state atomically (tmp file + replace) so a crash mid-write can
+    never leave a truncated state.json (which would force a full re-extract)."""
+    sqac_dir.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps({"sources": sources,
+                          "synced_at": time.strftime("%Y-%m-%dT%H:%M:%S")},
+                         indent=2, sort_keys=True)
+    target = _state_path(sqac_dir)
+    tmp = target.with_suffix(".json.tmp")
+    tmp.write_text(payload, encoding="utf-8")
+    tmp.replace(target)
 
 
 def load_state(sqac_dir: Path) -> dict | None:
     try:
         return json.loads(_state_path(sqac_dir).read_text())
-    except Exception:
+    except Exception as exc:
+        logging.warning("autobuild: state.json unreadable (%s); will re-extract", exc)
         return None
 
 
@@ -596,11 +604,12 @@ def _sync_rack(rack_dir: Path, name: str, cart_path: Path) -> None:
     if manifest.exists():
         try:
             manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as exc:
+            logging.warning("autobuild: rack manifest unreadable (%s); rebuilding", exc)
     manifest_data[name] = {
         "path": dest.as_posix(),
         "synced_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
     }
-    manifest.write_text(json.dumps(manifest_data, indent=2, sort_keys=True),
-                        encoding="utf-8")
+    tmp = manifest.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(manifest_data, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.replace(manifest)

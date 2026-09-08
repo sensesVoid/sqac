@@ -293,6 +293,17 @@ sqac stats --db memory.sqac
 sqac serve --dir ./memory --port 8420 --api-key sk-secret --rack
 ```
 
+### `sqac mcp setup` — Wire the MCP server into a CLI
+
+Prints the exact registration snippet (JSON / TOML / config command) for a host so every CLI points at the **same** memory dir and `continuity.json`:
+
+```bash
+sqac mcp setup --host opencode              # print snippet
+sqac mcp setup --host claude-code           # print `claude mcp add …` command
+sqac mcp setup --host all                   # print every host's snippet
+sqac mcp setup --host opencode --dir /shared --hook-project .   # also append the memory protocol to ./AGENTS.md
+```
+
 ### `sqac dashboard` — Open the web dashboard
 
 Starts the server and opens the dashboard in your browser:
@@ -663,6 +674,38 @@ sqac-mcp
 - `session_observe` — feed a turn into the offloader
 - `rack_search` — search across the rack
 - `rack_write` — write with automatic routing
+
+### AgentBridge — automatic cross-CLI continuity
+
+When you switch CLIs (opencode → Claude Code → Codex → Cursor…), the *memory* follows — but the *working context* (what was decided, where it left off, the active goal) used to be lost with the old harness.
+
+AgentBridge closes that gap so **any model stays in the loop seamlessly**:
+
+1. **Every CLI registers the same server on the same memory dir** (`~/.sqacm` by default), so all harnesses share one memory store and one `continuity.json`:
+
+   ```bash
+   sqac mcp setup --host opencode      # also: claude-code, claude-desktop, codex, cursor, zed
+   sqac mcp setup --host opencode --hook-project .   # also append the memory protocol to ./AGENTS.md
+   sqac mcp setup --dir ~/.sqacm --host all          # reseat every registered CLI on one dir
+   ```
+
+2. **The server auto-injects the memory protocol** into the client's system prompt (`MCPServer(instructions=…)`). The model learns it can bootstrap/checkpoint its own state.
+
+3. **`mem_bootstrap` returns the handoff packet** — project, active goal, who worked last (host + model), last summary, recent checkpoints, and recent session context. The packet reflects the state *before* this session engaged, so the resuming model sees the previous worker.
+
+4. **`mem_checkpoint`** persists goals and summaries per project into `continuity.json`; **`mem_sparsify`** demotes stale session buckets to the durable rack (DMS-backed); `memory://context` serves the same packet as a resource for clients that auto-read resources.
+
+```python
+# First CLI (opencode):                       # Later, switched CLI (claude-code):
+mem_bootstrap(project="acme", host="opencode")
+mem_observe(user, "migrate acme auth to OIDC")
+mem_checkpoint(goal="migrate auth to OIDC", summary="PKCE flow chosen")
+                                             → mem_bootstrap(project="acme", host="claude-code")
+                                               # last_state: last_host=opencode, goal="migrate auth…"
+                                               # resumes with every checkpoint + recent exchange
+```
+
+Verified end-to-end over real MCP stdio: two server processes sharing one dir see each other's writes; a claude-code bootstrap after opencode work reports the prior host, the preserved goal, and ≥1 checkpoint + recent exchange. `detect_host()` walks the parent process chain to name the calling CLI (override with the `host=` tool argument).
 
 ---
 

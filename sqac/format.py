@@ -59,7 +59,6 @@ FLAG_KIND_MASK = 0xFF << FLAG_KIND_SHIFT
 # reduction on random binary data, 70-80% on correlated data.
 try:
     import lz4.block as _lz4_compress
-    import lz4.frame as _lz4
     _HAS_LZ4 = True
 except ImportError:
     _HAS_LZ4 = False
@@ -452,14 +451,21 @@ def compact_cartridge(
     Reads the cartridge, filters out deleted entries, and writes a clean
     version.  If *out* is None, overwrites the original atomically.
     Returns a report dict.
+
+    The exclusive lock is held across the whole read-modify-write span so a
+    concurrent writer cannot slip an update in between the read and the
+    atomic rename (which would silently lose that update).
     """
     path = Path(path)
-    cart = read_cartridge(path)
-    original_count = len(cart.entries)
-    alive = [e for e in cart.entries if not e.deleted]
-    removed = original_count - len(alive)
-    if removed == 0:
-        return {"original": original_count, "alive": original_count, "removed": 0, "compacted": False}
     out = Path(out) if out else path
-    write_cartridge(out, cart.header, cart.vocab, alive, locked=True)
-    return {"original": original_count, "alive": len(alive), "removed": removed, "compacted": True}
+    with locked_cartridge(path):
+        cart = read_cartridge(path)
+        original_count = len(cart.entries)
+        alive = [e for e in cart.entries if not e.deleted]
+        removed = original_count - len(alive)
+        if removed == 0:
+            return {"original": original_count, "alive": original_count, "removed": 0, "compacted": False}
+        # Lock already held for the whole span; write without re-acquiring
+        # (locked=True would deadlock on the non-reentrant thread lock).
+        write_cartridge(out, cart.header, cart.vocab, alive, locked=False)
+        return {"original": original_count, "alive": len(alive), "removed": removed, "compacted": True}
