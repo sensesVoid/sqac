@@ -81,10 +81,15 @@ def _ensure_state():
             _state["rack"] = CartridgeRack(directory=d, semantic=True)
         sp = os.environ.get("SQAC_SESSION")
         if sp:
-            _state["offloader"] = ContextOffloader(sp)
+            sp_path = Path(sp)
+            if not sp_path.is_absolute():
+                sp_path = d / sp
+            _state["offloader"] = ContextOffloader(sp_path)
 
 def _get_store(name: Optional[str] = None) -> SqacStore:
     _ensure_state()
+    if name == "session" and _state.get("offloader"):
+        return _state["offloader"]._store
     if _state.get("rack") and name:
         return _state["rack"][name]
     s = _state.get("default_store")
@@ -111,6 +116,7 @@ class SessionRecallRequest(BaseModel):
 class GraphRequest(BaseModel):
     threshold: float = Field(0.55, ge=0.0, le=1.0)
     max_edges: int = Field(200, ge=1, le=2000)
+    cartridge: Optional[str] = None
 class HitResponse(BaseModel):
     content: str; confidence: float; source: str; mode: str; meta: dict = {}
 
@@ -221,7 +227,7 @@ def session_recall(req: SessionRecallRequest, _=Depends(_verify_key)):
 @app.post("/graph")
 def graph_endpoint(req: GraphRequest, _=Depends(_verify_key)):
     """Compute pairwise VSA similarity and return nodes + edges for 3D visualization."""
-    store = _get_store()
+    store = _get_store(req.cartridge)
     alive = [i for i, e in enumerate(store._entries) if not e.get("deleted")]
     if not alive:
         return {"nodes": [], "edges": [], "dims": store.dims}
