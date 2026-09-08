@@ -6,14 +6,13 @@ build-backend = "setuptools.build_meta"
 name = "sqac"
 version = "0.1.0"
 description = "Hot-swappable VSA memory cartridges for LLMs — facts and skills that persist in one portable .sqac file"
-license = {text = "BUSL-1.1"}
+license = "BUSL-1.1"
 readme = "README.md"
 requires-python = ">=3.10"
 keywords = ["memory", "vector-symbolic-architecture", "llm", "rag", "in-context-learning"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "License :: Other/Proprietary License",
 ]
 dependencies = ["numpy"]
 
@@ -25,6 +24,7 @@ compress = ["lz4"]
 all = ["mcp>=1.0", "fastapi", "uvicorn", "lz4"]
 
 [project.scripts]
+sqac = "sqac.cli:main"
 sqac-mcp = "sqac_mcp:main"
 sqac-server = "sqac.server:main"
 

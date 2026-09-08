@@ -30,3 +30,8 @@ venv/
 
 # downloaded model weights (reproducible via hf_hub_download; see sqac/static_encoder.py)
 sqac/models/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
