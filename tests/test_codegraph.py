@@ -7,9 +7,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from sqac.codegraph import CodeGraph
-from sqac.codegraph.models import EdgeKind, SymbolKind
-from sqac.codegraph.parser import CodeParser, detect_language
+from sqac.graph import CodeGraph
+from sqac.graph.models import EdgeKind, SymbolKind
+from sqac.graph.parser import CodeParser, detect_language
 
 
 class TestParser(unittest.TestCase):

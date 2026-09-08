@@ -833,7 +833,7 @@ SQAC is a **memory layer** — it gives any LLM access to knowledge it doesn't h
 ### What works today
 
 | Use Case | How SQAC helps | Example query |
-|---|---|---|---|
+|---|---|---|
 | **Team knowledge base** | Store decisions, rules, conventions. Every LLM answers from your knowledge. | "What's our deployment target?" → ARM64 rule |
 | **Skill injection** | Store reasoning procedures. Small models follow them instead of guessing. | "Find the defective coin" → weighted-index skill card |
 | **Session memory** | Offload conversation context. Re-open sessions without re-derivation cost. | "What was that 504 about?" → offloaded exchange |
