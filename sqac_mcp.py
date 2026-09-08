@@ -89,6 +89,8 @@ class _MemoryState:
             semantic=cfg.semantic,
             min_confidence=0.60,
             auto_load=True,  # mounts existing *.sqac (never the session bucket)
+            max_entries=25_000,  # auto-split at capacity benchmark sweet spot
+            folder_routing=True,  # facts/, skills/, docs/ subdirectories
         )
         # Ensure the default cartridge set exists. create() is safe: existing
         # files are loaded, never wiped.

@@ -725,6 +725,85 @@ class CartridgeRack:
             store.save(p, name=name, description=desc)
         return self
 
+    def compact(self, name: str) -> dict[str, Any]:
+        """Merge all shards of a base cartridge into a single file.
+
+        Collects every entry across the active store and all numbered shards
+        (e.g. facts__2.sqac, facts__3.sqac), drops tombstones, writes a
+        single compacted file to the base path, and removes the shard files.
+
+        Returns a report dict with counts before/after/shards_removed.
+        """
+        # 1. Collect all stores for this base name
+        stores = self._shard_stores(name)
+        if not stores and name in self._stores:
+            stores = [self._stores[name]]
+        if not stores:
+            return {"name": name, "before": 0, "after": 0, "shards_removed": 0}
+        # 2. Merge all live entries
+        seen_keys: set[str] = set()
+        merged: list[dict[str, Any]] = []
+        before = 0
+        for store in stores:
+            for e in store._entries:
+                before += 1
+                if e.get("deleted"):
+                    continue
+                # Dedupe by content+key_norm to avoid duplicates across shards
+                dedupe = (e.get("content", ""), e.get("key_norm", ""))
+                if dedupe in seen_keys:
+                    continue
+                seen_keys.add(dedupe)
+                merged.append(e)
+        # 3. Create a fresh store and populate it
+        base_path = self._paths.get(name)
+        if base_path is None:
+            base_path = self._resolve_path(name, None)
+        compacted = SqacStore(
+            semantic=self.semantic, fuzzy_threshold=self.min_confidence
+        )
+        compacted.format_version = 3
+        # Replay entries into the fresh store (rebuilds indices)
+        for e in merged:
+            meta = dict(e.get("meta", {}))
+            meta.pop("kind", None)  # kind is stored separately
+            compacted.add(
+                e["content"],
+                key=e.get("key_norm"),
+                meta=meta,
+                source=e.get("source", ""),
+                kind=e.get("kind"),
+            )
+        # 4. Save to base path
+        compacted.save(base_path, name=name)
+        # 5. Remove shard files from disk
+        shards_removed = 0
+        for p in self._shards.get(name, []):
+            if p != base_path and p.exists():
+                p.unlink()
+                shards_removed += 1
+        # 6. Clean up tracking
+        self._stores[name] = compacted
+        self._paths[name] = base_path
+        # Remove shard store entries
+        for shard_name in list(self._stores.keys()):
+            if shard_name != name and _is_shard_name(shard_name):
+                shard_base = _base_name(shard_name)
+                if shard_base == name:
+                    self._stores.pop(shard_name, None)
+                    self._paths.pop(shard_name, None)
+        self._shards[name] = [base_path]
+        logging.info(
+            "rack: compacted %s — %d→%d entries, %d shards removed",
+            name, before, len(merged), shards_removed,
+        )
+        return {
+            "name": name,
+            "before": before,
+            "after": len(merged),
+            "shards_removed": shards_removed,
+        }
+
     def stats(self, name: Optional[str] = None) -> dict[str, Any]:
         if name is not None:
             s = self._require(name).stats()

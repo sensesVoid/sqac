@@ -17,6 +17,10 @@ A: "The Federal Reserve Bank of       A: "Team Atlas maintains the
 
 A frozen, never-trained model answered private questions correctly — because we handed it a 2.5KB memory file at runtime. Without it, it confidently made things up. **That gap is the entire product.**
 
+### Why it matters: KV cache relief
+
+Every token you put into an LLM's context costs GPU memory. A 1M-token conversation with Llama-3.1-8B needs **125,000 MiB** of KV cache — stuffing your entire memory into the window is the "5M-token" fantasy. SQAC recalls only the top-k relevant exchanges (~135 tokens) at ~0.1ms, reducing KV cache to **16.9 MiB** — a **1,000× (99.9%) reduction**. This is the single biggest practical benefit: your memory stays constant-cost regardless of how much you've stored.
+
 ---
 
 ## Table of Contents
@@ -30,7 +34,7 @@ A frozen, never-trained model answered private questions correctly — because w
 - [Fact Store](#fact-store)
 - [Skill Store](#skill-store)
 - [Context Offloader](#context-offloader)
-- [Cartridge Rack](#cartridge-rack)
+- [Cartridge Rack](#cartridge-rack) — auto-split + folder routing
 - [MCP Server](#mcp-server)
 - [HTTP API Server](#http-api-server)
 - [Use Cases](#use-cases)
@@ -641,21 +645,35 @@ python experiments/kv_bench.py --exchanges 1000 --domains 3 --topk 1 3 10
 
 ## Cartridge Rack
 
-A rack owns several `.sqac` files by name and decides where each fact lands:
+A rack owns several `.sqac` files by name, auto-splits at capacity, and organizes cartridges into kind-based folders:
 
 ```python
 from sqac import CartridgeRack
 
-rack = CartridgeRack("memory/", routes={"fact": "team", "skill": "skills"}, default="facts")
-rack.write_routed("Deploy only to ARM64", kind="fact")    # -> memory/team.sqac
-rack.write_routed("SKILL weighted-index ...", kind="skill") # -> memory/skills.sqac
+# Folder routing: facts go to facts/, skills to skills/, etc.
+rack = CartridgeRack(
+    "memory/",
+    routes={"fact": "facts", "skill": "skills"},
+    default="facts",
+    folder_routing=True,
+    max_entries=25_000,  # auto-split threshold
+)
 
-# Search across all cartridges
+rack.write_routed("Deploy only to ARM64", kind="fact")    # -> memory/facts/facts.sqac
+rack.write_routed("SKILL weighted-index ...", kind="skill") # -> memory/skills/skills.sqac
+
+# Search across all cartridges (merges across shards automatically)
 hits = rack.search("deployment target")
+
+# Compact: merge sparse shards back into a single file
+rack.compact("facts")
 ```
 
 **Features:**
-- Auto-mounts all `.sqac` files in a directory on open
+- **Auto-split** at `max_entries` (default 25K) — keeps search fast as memory grows. Shards are numbered (`facts__2.sqac`) and searched automatically.
+- **Folder routing** with `folder_routing=True` — organizes cartridges into `facts/`, `skills/`, `docs/` subdirectories.
+- **Compaction** — `rack.compact("facts")` merges all shards, drops tombstones, removes shard files.
+- Auto-mounts all `.sqac` files recursively on open
 - `write_routed` auto-creates routed cartridges on demand
 - `create()` never wipes — loads existing cartridges, reset only with `overwrite=True`
 - Reserved `session` bucket is never auto-mounted (keeps durable search clean)

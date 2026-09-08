@@ -2,6 +2,15 @@
 
 All notable changes to SQAC (Symbolic Query Addressable Cartridge) are documented here.
 
+## [0.1.3] — 2026-09-08
+
+### Added
+- **Shard compaction:** `rack.compact("facts")` merges all shards of a cartridge back into a single file, drops tombstones, and removes shard files from disk. Keeps search fast and file count manageable after heavy delete workloads.
+- **MCP server uses folder routing** (`facts/`, `skills/`, `docs/` subdirectories) and auto-split (`max_entries=25,000`) by default.
+
+### Improved
+- **KV cache relief documentation:** README now highlights the 200x–5,000x KV cache reduction as the primary benefit — SQAC recalls only top-k tokens instead of stuffing the entire memory into context.
+
 ## [0.1.2] — 2026-09-08
 
 ### Changed

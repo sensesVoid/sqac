@@ -257,6 +257,95 @@ class TestFolderRouting(unittest.TestCase):
         self.assertEqual(root_files[0].stem, "memory")
 
 
+class TestShardCompaction(unittest.TestCase):
+    """Compaction merges shards back into a single file."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def test_compact_merges_shards(self):
+        """After compaction, all shards are merged into one file."""
+        rack = CartridgeRack(
+            directory=self.tmp.name,
+            default="memory",
+            max_entries=3,
+            auto_load=False,
+        )
+        rack.create("memory")
+        # Create 3 shards
+        for i in range(9):
+            rack.write("memory", f"fact {i}", key=f"k{i}", kind="fact")
+        # Should have memory + memory__2 + memory__3
+        files_before = list(Path(self.tmp.name).glob("*.sqac"))
+        self.assertGreater(len(files_before), 1)
+        rack.save()
+        # Compact
+        result = rack.compact("memory")
+        self.assertEqual(result["shards_removed"], 2)
+        self.assertGreater(result["after"], 0)
+        # Should have only memory.sqac
+        files_after = list(Path(self.tmp.name).glob("*.sqac"))
+        self.assertEqual(len(files_after), 1)
+        self.assertEqual(files_after[0].stem, "memory")
+
+    def test_compact_removes_tombstones(self):
+        """Compaction drops deleted entries."""
+        rack = CartridgeRack(
+            directory=self.tmp.name,
+            default="memory",
+            max_entries=3,
+            auto_load=False,
+        )
+        rack.create("memory")
+        for i in range(4):
+            rack.write("memory", f"fact {i}", key=f"k{i}", kind="fact")
+        # Delete some entries
+        store = rack["memory"]
+        store.delete(0)
+        store.delete(1)
+        rack.save()
+        # Reload and compact
+        rack2 = CartridgeRack(directory=self.tmp.name, default="memory", max_entries=3, auto_load=True)
+        result = rack2.compact("memory")
+        self.assertGreater(result["before"], result["after"])
+
+    def test_compact_preserves_search(self):
+        """After compaction, all entries are still searchable."""
+        rack = CartridgeRack(
+            directory=self.tmp.name,
+            default="memory",
+            max_entries=3,
+            auto_load=False,
+        )
+        rack.create("memory")
+        rack.write("memory", "ARM64 deploy rule", key="deploy", kind="fact")
+        rack.write("memory", "Stripe payment processor", key="payment", kind="fact")
+        rack.write("memory", "Error budget 0.1%", key="slo", kind="fact")
+        rack.write("memory", "Vault stores secrets", key="vault", kind="fact")
+        rack.compact("memory")
+        hits = rack.search("deploy", top_k=5)
+        self.assertTrue(any("ARM64" in h.content for h in hits))
+
+    def test_compact_into_sharded_cartridge(self):
+        """Compaction works with folder routing."""
+        rack = CartridgeRack(
+            directory=self.tmp.name,
+            routes={"fact": "facts"},
+            default="facts",
+            max_entries=3,
+            folder_routing=True,
+            auto_load=False,
+        )
+        for i in range(5):
+            rack.write_routed(f"fact {i}", key=f"k{i}", kind="fact")
+        result = rack.compact("facts")
+        self.assertGreater(result["after"], 0)
+        facts_dir = Path(self.tmp.name) / "facts"
+        files = list(facts_dir.glob("*.sqac"))
+        self.assertEqual(len(files), 1)
+
+
 class TestAutoSplitIntegration(unittest.TestCase):
     """Integration tests combining auto-split with existing features."""
 
