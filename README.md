@@ -941,6 +941,33 @@ We publish our negative results too — they're part of the record.
 
 ---
 
+## Security — What SQAC protects against (and what it doesn't)
+
+### ⚠️ Do NOT store credentials in SQAC
+
+**SQAC is not a secrets manager.** `.sqac` files are plaintext with no encryption at rest. Anyone with file read access can see all stored content. Do not store:
+
+- API keys, tokens, or secrets
+- Passwords or connection strings
+- Private keys or certificates
+- JWT tokens or session cookies
+
+**Use instead:** environment variables, `.env` files (gitignored), or a dedicated secrets manager (HashiCorp Vault, AWS Secrets Manager, etc.).
+
+SQAC includes a **credential detector** that rejects content matching common secret patterns (AWS keys, GitHub tokens, OpenAI/Anthropic keys, Stripe keys, private keys, passwords, connection strings, JWTs). You'll get a clear error message if you try to store something that looks like a credential.
+
+```python
+from sqac import SqacStore
+store = SqacStore()
+store.add("sk_live_abc123...", key="stripe-key")
+# → CredentialError: Content appears to contain credentials (Stripe Key).
+#   SQAC is not a secrets manager — use environment variables.
+```
+
+If you need to reference a secret, store the *reference* (e.g., `"Stripe key lives in STRIPE_SECRET_KEY env var"`) rather than the value.
+
+---
+
 ## Security — Prompt Injection Defense
 
 SQAC stores text that gets injected into LLM prompts. This creates a **prompt injection attack surface**: if an attacker controls what's stored, they can embed malicious instructions that the LLM will follow.

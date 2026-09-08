@@ -251,6 +251,11 @@ class SqacStore:
         content = sanitize_content(content)
         if not content:
             raise ValueError("content must be non-empty")
+
+        # Credential detection — reject secrets before storage
+        from .credentials import validate_content
+        validate_content(content, strict=True)
+
         key_text = sanitize_key(key) if key is not None else content
         norm = normalize(key_text)
         self._invalidate_cache()

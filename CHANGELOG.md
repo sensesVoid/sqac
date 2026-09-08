@@ -2,6 +2,14 @@
 
 All notable changes to SQAC (Symbolic Query Addressable Cartridge) are documented here.
 
+## [0.1.5] — 2026-09-08
+
+### Added
+- **Credential detection:** SQAC now rejects content matching common secret patterns (AWS keys, GitHub tokens, OpenAI/Anthropic keys, Stripe keys, private keys, passwords, connection strings, JWTs) with a clear `CredentialError`. This prevents accidental storage of credentials in plaintext `.sqac` files.
+
+### Security
+- **SQAC is not a secrets manager** — README now documents this boundary prominently. `.sqac` files are plaintext with no encryption at rest. Use environment variables or a secrets manager for credentials.
+
 ## [0.1.4] — 2026-09-08
 
 ### Added
