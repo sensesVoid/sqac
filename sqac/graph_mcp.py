@@ -2,6 +2,9 @@
 
 Adds ast_init, ast_explore, ast_blast, ast_callers, ast_callees,
 ast_search, and ast_stats tools to the SQAC MCP server.
+
+Graph data is persisted to <mem_dir>/ast/ within the SQAC memory
+directory, so it lives alongside facts/, skills/, docs/ in the rack.
 """
 
 from __future__ import annotations
@@ -23,11 +26,21 @@ _graphs: dict[str, CodeGraph] = {}
 
 
 def _get_graph(project_root: Optional[str] = None) -> CodeGraph:
-    """Get or create a CodeGraph for the given project root."""
+    """Get or create a CodeGraph for the given project root.
+
+    Stores graph data in <mem_dir>/ast/ so it lives within the rack.
+    Falls back to <project>/.sqac-graph/ if no SQAC_MEM_DIR is set.
+    """
     root = Path(project_root or os.getcwd()).resolve()
     key = str(root)
     if key not in _graphs:
-        graph = CodeGraph(root)
+        # Determine where to store the graph
+        mem_dir = os.environ.get("SQAC_MEM_DIR")
+        if mem_dir:
+            graph_dir = Path(mem_dir) / "ast"
+        else:
+            graph_dir = root / ".sqac-graph"
+        graph = CodeGraph(root, graph_dir=graph_dir)
         # Try to load existing graph
         if not graph.load():
             graph.build()
@@ -74,15 +87,20 @@ def register_graph_tools(mcp_server):
 
         Parses all source files, extracts symbols (functions, classes,
         methods) and edges (calls, imports, inheritance), and persists
-        to .sqac-graph/. Returns summary stats.
+        to <mem_dir>/ast/. Returns summary stats.
         """
         try:
             root = Path(project or os.getcwd()).resolve()
-            graph = CodeGraph(root)
+            mem_dir = os.environ.get("SQAC_MEM_DIR")
+            if mem_dir:
+                graph_dir = Path(mem_dir) / "ast"
+            else:
+                graph_dir = root / ".sqac-graph"
+            graph = CodeGraph(root, graph_dir=graph_dir)
             summary = graph.build()
             graph.save()
             _graphs[str(root)] = graph
-            return _ok({"status": "built", **summary})
+            return _ok({"status": "built", "graph_dir": str(graph_dir), **summary})
         except Exception as e:
             return _err(e)
 

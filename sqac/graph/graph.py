@@ -43,7 +43,12 @@ class CodeGraph:
 
     def __init__(self, project_root: str | Path, graph_dir: Optional[str | Path] = None):
         self.project_root = Path(project_root).resolve()
-        self.graph_dir = Path(graph_dir) if graph_dir else self.project_root / ".sqac-graph"
+        if graph_dir:
+            self.graph_dir = Path(graph_dir)
+        else:
+            # Default: store in the project's .sqac-graph/ directory
+            # When used via MCP, graph_dir is set to <mem_dir>/ast/
+            self.graph_dir = self.project_root / ".sqac-graph"
         self._symbols: dict[str, Symbol] = {}     # id -> Symbol
         self._edges: list[Edge] = []
         self._files: dict[str, FileInfo] = {}     # path -> FileInfo
