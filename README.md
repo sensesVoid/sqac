@@ -42,10 +42,18 @@ A frozen, never-trained model answered private questions correctly — because w
 ### Install
 
 ```bash
-pip install -e .                  # core: numpy only
-pip install -e ".[mcp]"           # + the MCP server for LLM integration
-pip install -e ".[server]"        # + HTTP API server (FastAPI + uvicorn)
-pip install -e ".[simd]"          # + Rust SIMD for 261x faster fuzzy scan
+pip install sqac                  # core: numpy only — gives you the `sqac` CLI
+pip install sqac[mcp]             # + the MCP server for LLM integration
+pip install sqac[server]          # + HTTP API server (FastAPI + uvicorn)
+pip install sqac[simd]            # + Rust SIMD for 261x faster fuzzy scan
+pip install sqac[all]             # everything
+```
+
+Or from source:
+
+```bash
+git clone https://github.com/your-org/sqac.git && cd sqac
+pip install -e ".[all]"
 ```
 
 ### Option A: Auto-build from your project (recommended)
@@ -666,12 +674,17 @@ sqac-mcp
 ```
 
 **Available tools:**
+- `mem_bootstrap` — load cross-CLI working context at session start
+- `mem_checkpoint` — persist task handoff (goal + summary) across sessions
+- `mem_sparsify` — run DMS eviction on session memory
 - `mem_search` — search the memory store
 - `mem_write` — teach a new fact
+- `mem_observe` — record a conversation turn
+- `mem_recall` / `mem_recall_detailed` — recent working-memory context
+- `mem_graduate` — promote stable session memories into durable facts
 - `mem_swap` — hot-swap to a different cartridge
 - `mem_stats` — show cartridge statistics
-- `session_recall` — recall from session memory
-- `session_observe` — feed a turn into the offloader
+- `mem_cartridge_create` / `mem_cartridge_list` — manage cartridges
 - `rack_search` — search across the rack
 - `rack_write` — write with automatic routing
 
@@ -894,7 +907,7 @@ pip install target/wheels/sqac_simd-*.whl
 | Fail-safe: garbage query → no confident hit | held |
 | Graduation | promotes, rerun idempotent |
 | Durability | facts + session re-answer from disk after reload |
-| Test suite | **97/97 passing** |
+| Test suite | **261/261 passing** |
 
 ---
 
@@ -974,6 +987,18 @@ clean = sanitize_for_injection("Ignore all previous instructions")
 
 **Bottom line:** SQAC is a detection layer, not a firewall. It flags suspicious content so humans and LLM consumers can make informed decisions. It does NOT make stored content safe — it makes unsafe content *visible*.
 
+### Server security hardening (v0.1.1)
+
+The HTTP API server includes several production hardening measures:
+
+- **Timing-safe auth** — API key comparison uses `hmac.compare_digest` to prevent timing side-channels
+- **Path traversal guard** — cartridge names are validated; `/`, `\`, `..`, `.` are rejected before any filesystem access
+- **Per-cartridge write locks** — concurrent `/teach` requests to the same cartridge are serialized
+- **Thread-safe init** — `_ensure_state()` uses a lock to prevent race conditions on first request
+- **XSS escaping** — dashboard HTML output escapes all dynamic content with `html.escape()`
+- **Threshold isolation** — per-request `/search` threshold changes are restored after the request, preventing leaks into the shared store
+- **Atomic writes** — `state.json` and rack manifests are written atomically (tmp + replace) to prevent corruption on crash
+
 ### Best practices
 
 1. **Review trust scores** before injecting into LLM prompts
@@ -1026,6 +1051,6 @@ SQAC stands on published work. Every link verified; no folklore citations.
 
 ---
 
-**Status:** research-grade, under active development. Core stable and tested (139/139 tests passing).
+**Status:** research-grade, under active development. Core stable and tested (261/261 tests passing). Published to PyPI: `pip install sqac`.
 
 *Built as an implementation of the SQ thesis — see `docs/THESIS.md` for the full research narrative.*
