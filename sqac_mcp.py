@@ -38,6 +38,7 @@ from sqac.continuity import (
 from sqac.dms import DMS
 from sqac.rack import CartridgeRack
 from sqac.offloader import ContextOffloader
+from sqac.graph_mcp import register_graph_tools
 
 SERVER_NAME = "sqac_mcp"
 DEFAULT_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
@@ -64,6 +65,9 @@ mcp = MCPServer(
     instructions=server_instructions(),
     version="0.1.0",
 )
+
+# Register graph tools (code intelligence)
+register_graph_tools(mcp)
 
 
 @dataclass

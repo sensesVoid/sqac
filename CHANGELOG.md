@@ -2,6 +2,14 @@
 
 All notable changes to SQAC (Symbolic Query Addressable Cartridge) are documented here.
 
+## [0.1.4] — 2026-09-08
+
+### Added
+- **sqac ast** — AST-level code structure intelligence. Parses source files with tree-sitter, extracts symbols (functions, classes, methods) and edges (calls, imports, inheritance). Query API: `ast_explore` (definition + callers + callees), `ast_blast` (blast radius analysis), `ast_callers`, `ast_callees`, `ast_search` (fuzzy name matching). Supports Python, JavaScript/TypeScript, Go, Rust with regex fallback.
+- **sqac ast CLI** — `sqac ast init`, `sqac ast explore <symbol>`, `sqac ast blast <symbol>`, `sqac ast callers <symbol>`, `sqac ast callees <symbol>`, `sqac ast search <query>`, `sqac ast stats`, `sqac ast watch`.
+- **MCP tools** — `ast_init`, `ast_explore`, `ast_blast`, `ast_callers`, `ast_callees`, `ast_search`, `ast_stats` available via the SQAC MCP server.
+- **File watcher** — `sqac ast watch` polls for file changes and rebuilds the graph automatically.
+
 ## [0.1.3] — 2026-09-08
 
 ### Added
