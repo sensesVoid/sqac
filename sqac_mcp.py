@@ -50,17 +50,14 @@ mcp = MCPServer(
     name=SERVER_NAME,
     title="SQAC Memory Server",
     description=(
-        "A persistent key-value memory store with exact, lexical, and "
-        "semantic recall. Tools: mem_bootstrap (load cross-CLI working "
-        "context at session start), mem_search (cross-cartridge lookup, "
-        "optionally grouped by skill), mem_recall / mem_recall_detailed "
-        "(recent working-memory context), mem_observe (record a conversation "
-        "turn), mem_write (store a fact/doc/skill by key), mem_checkpoint "
-        "(hand off task state across sessions and CLIs), mem_graduate "
-        "(promote stable session memories into a long-term cartridge), "
-        "mem_sparsify (DMS eviction), mem_cartridge_create / "
-        "mem_cartridge_list, mem_stats, mem_save, and mem_swap (archive and "
-        "rotate the working session)."
+        "SQAC: Symbolic Query Addressable Cartridge. Persistent memory + "
+        "structural code intelligence for LLMs. Memory tools: mem_bootstrap "
+        "(cross-CLI context), mem_search (fuzzy/semantic recall), mem_write "
+        "(store facts/skills), mem_checkpoint (task handoff), mem_sparsify "
+        "(DMS eviction). Code structure tools: ast_init (build index), "
+        "ast_explore (symbol definition + callers + callees), ast_blast "
+        "(blast radius — what breaks if I change this), ast_callers, "
+        "ast_callees, ast_search (fuzzy symbol search), ast_stats."
     ),
     instructions=server_instructions(),
     version="0.1.0",

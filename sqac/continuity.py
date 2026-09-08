@@ -257,8 +257,8 @@ def bootstrap_packet(
 
 _SERVER_INSTRUCTIONS = (
     "SQAC gives you persistent, shared memory that survives across sessions and CLI harnesses "
-    "(opencode, Claude Code, Codex, Cursor, Claude Desktop, ...).\n"
-    "Memory protocol:\n"
+    "(opencode, Claude Code, Codex, Cursor, Claude Desktop, ...).\n\n"
+    "MEMORY PROTOCOL:\n"
     "1. At the START of a session, call mem_bootstrap once to load your working context "
     "(project, active goal, last summary, which host worked last). This puts you in the loop "
     "even after a CLI switch.\n"
@@ -271,7 +271,18 @@ _SERVER_INSTRUCTIONS = (
     "mem_graduate promotes stable session facts into long-term cartridges; mem_sparsify keeps "
     "the working memory sparse.\n"
     "5. Recall is fail-safe: it returns empty rather than guessing. If memory has nothing on a "
-    "topic, say \"I don't have that in memory\" — never fabricate."
+    "topic, say \"I don't have that in memory\" — never fabricate.\n\n"
+    "CODE STRUCTURE (AST) TOOLS:\n"
+    "Use these when you need to understand code structure, find callers/callees, or assess "
+    "the impact of a change:\n"
+    "- ast_init: build the structural index for a project (run once, auto-cached)\n"
+    "- ast_explore(name): get a symbol's definition, docstring, callers, and callees\n"
+    "- ast_blast(name): find all symbols affected by changing this symbol (upstream callers)\n"
+    "- ast_callers(name): who calls this function/method?\n"
+    "- ast_callees(name): what does this function/method call?\n"
+    "- ast_search(query): fuzzy search across all symbols by name or docstring\n"
+    "- ast_stats: symbol/edge/language counts\n"
+    "Use ast_init first if the graph is empty or stale. The tools auto-load cached graphs."
 )
 
 
