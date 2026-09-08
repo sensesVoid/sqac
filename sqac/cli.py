@@ -30,7 +30,7 @@ def _open(path: str) -> SqacStore:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="sqac", description="VSA memory cartridges")
+    ap = argparse.ArgumentParser(prog="sqac", description="SQAC — Symbolic Query Addressable Cartridge")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def add_db(p):

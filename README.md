@@ -1,4 +1,6 @@
-# SQAC — Give your LLM a memory it can carry in a file
+# SQAC — Symbolic Query Addressable Cartridge
+
+**Give your LLM a memory it can carry in a file.**
 
 **One `.sqac` file. Any LLM. Facts and skills that persist, survive restarts, and swap in milliseconds — no retraining, no database, no GPU.**
 
