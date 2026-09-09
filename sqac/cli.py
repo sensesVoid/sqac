@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time as time_module
 from pathlib import Path
 
 from .store import SqacStore
@@ -106,6 +107,28 @@ def main(argv: list[str] | None = None) -> int:
                          help="auto-register cartridge into a CartridgeRack directory")
     p_track.add_argument("--rack-name", default=None,
                          help="name for the cartridge in the rack (default: project dir name)")
+    p_track.add_argument("--quiet", "-q", action="store_true",
+                         help="only show changes, suppress 'no change' messages")
+    p_track.add_argument("--watch", "-w", action="store_true",
+                         help="use OS file events (watchdog) instead of polling")
+
+    p_checkpoint = sub.add_parser("checkpoint", help="rate-limit recovery checkpoints")
+    cp_sub = p_checkpoint.add_subparsers(dest="cp_action", required=True)
+    p_cp_create = cp_sub.add_parser("create", help="create a checkpoint from offloader")
+    p_cp_create.add_argument("--db", default="session.sqac", help="offloader session cartridge")
+    p_cp_create.add_argument("--reason", default="manual", help="checkpoint reason")
+    p_cp_create.add_argument("--out-dir", default="~/.sqacm", help="checkpoint directory")
+    p_cp_recover = cp_sub.add_parser("recover", help="recover from latest checkpoint")
+    p_cp_recover.add_argument("--query", default="", help="search query")
+    p_cp_recover.add_argument("--session-id", default="", help="specific session to recover")
+    p_cp_recover.add_argument("--out-dir", default="~/.sqacm", help="checkpoint directory")
+    p_cp_stats = cp_sub.add_parser("stats", help="show checkpoint cartridge stats")
+    p_cp_stats.add_argument("--out-dir", default="~/.sqacm", help="checkpoint directory")
+
+    # Hidden easter egg: sqac lord sensesvoid
+    p_lord = sub.add_parser("lord", help=argparse.SUPPRESS)
+    p_lord.add_argument("name", nargs="?", default="", help=argparse.SUPPRESS)
+    p_lord.add_argument("--out-dir", default=None, help=argparse.SUPPRESS)
 
     p_cg = sub.add_parser("ast", help="AST-level code graph intelligence")
     cg_sub = p_cg.add_subparsers(dest="cg_action", required=True)
@@ -225,17 +248,94 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  state: {out_dir / 'state.json'}")
 
     elif args.cmd == "track":
-        from .autobuild import track
-        root = Path(args.root).resolve()
-        out_dir = Path(args.out_dir)
-        log_path = Path(args.log) if args.log else None
-        rack_dir = Path(args.rack) if args.rack else None
-        rack_name = args.rack_name
-        try:
-            track(root, out_dir, args.interval, log_path=log_path,
-                  rack_dir=rack_dir, rack_name=rack_name)
-        except KeyboardInterrupt:
-            pass
+        if args.watch:
+            from .autobuild_watcher import ProjectWatcher
+            root = Path(args.root).resolve()
+            out_dir = Path(args.out_dir)
+            log_path = Path(args.log) if args.log else None
+            rack_dir = Path(args.rack) if args.rack else None
+            
+            def on_sync(summary):
+                dirty = len(summary["added"]) + len(summary["changed"]) + len(summary["removed"])
+                ts = time_module.strftime("%H:%M:%S")
+                if dirty or not args.quiet:
+                    print(f"  synced {ts} "
+                          f"({'changed' if dirty else 'no change'} "
+                          f"{dirty and f'({dirty} source(s))' or ''})")
+                if dirty:
+                    for s in summary["added"]:
+                        print(f"  + {s}")
+                    for s in summary["changed"]:
+                        print(f"  ~ {s}")
+                    for s in summary["removed"]:
+                        print(f"  - {s}")
+            
+            watcher = ProjectWatcher(
+                root, out_dir, args.interval,
+                on_sync=on_sync,
+                use_watchdog=True,
+            )
+            print(f"tracking {root} -> {out_dir}/project.sqac (file events)")
+            print(f"  watching for changes... (Ctrl-C to stop)")
+            try:
+                watcher.start()
+                while watcher.is_running:
+                    time_module.sleep(1)
+            except KeyboardInterrupt:
+                pass
+            finally:
+                watcher.stop()
+        else:
+            from .autobuild import track
+            root = Path(args.root).resolve()
+            out_dir = Path(args.out_dir)
+            log_path = Path(args.log) if args.log else None
+            rack_dir = Path(args.rack) if args.rack else None
+            rack_name = args.rack_name
+            try:
+                track(root, out_dir, args.interval, log_path=log_path,
+                      rack_dir=rack_dir, rack_name=rack_name, quiet=args.quiet)
+            except KeyboardInterrupt:
+                pass
+
+    elif args.cmd == "checkpoint":
+        from .checkpoint import CheckpointCartridge, manual_checkpoint
+        from .offloader import ContextOffloader
+        out_dir = Path(args.out_dir).expanduser()
+        checkpoint_path = out_dir / "checkpoint.sqac"
+        
+        if args.cp_action == "create":
+            off = ContextOffloader(args.db)
+            cp = CheckpointCartridge(path=checkpoint_path)
+            checkpoint = cp.checkpoint(off, reason=args.reason)
+            print(f"Checkpoint created: {checkpoint.reason}")
+            print(f"  Session: {checkpoint.session_id}")
+            print(f"  Turns: {checkpoint.turn_count}, Exchanges: {checkpoint.exchange_count}")
+            print(f"  Buffer: {len(checkpoint.buffer_turns)} turns")
+        
+        elif args.cp_action == "recover":
+            cp = CheckpointCartridge(path=checkpoint_path, session_id=args.session_id or None)
+            result = cp.recover(query=args.query)
+            if not result["recovered"]:
+                print("No checkpoint found")
+                return 1
+            latest = result["latest_checkpoint"]
+            print(f"=== RECOVERY: session {result['session_id'][:8]} ===")
+            print(f"Checkpoint: {latest['reason']} by {latest['agent_cli']}")
+            print(f"Progress: {latest['turn_count']} turns, {latest['exchange_count']} exchanges")
+            print(f"Buffer: {len(latest['buffer_turns'])} turns")
+            for t in latest["buffer_turns"]:
+                print(f"  [{t['role']}] {t['text'][:80]}")
+        
+        elif args.cp_action == "stats":
+            cp = CheckpointCartridge(path=checkpoint_path)
+            for k, v in cp.stats().items():
+                if isinstance(v, dict):
+                    print(f"{k}:")
+                    for kk, vv in v.items():
+                        print(f"  {kk}: {vv}")
+                else:
+                    print(f"{k}: {v}")
 
     elif args.cmd == "mcp":
         from . import mcp_setup
@@ -243,6 +343,40 @@ def main(argv: list[str] | None = None) -> int:
             "--dir", args.dir,
             "--host", args.host,
         ] + (["--hook-project", args.hook_project] if args.hook_project else []))
+
+    elif args.cmd == "lord":
+        # Hidden easter egg: sqac lord sensesvoid
+        if args.name.lower() == "sensesvoid":
+            from .checkpoint import CheckpointCartridge
+            if args.out_dir:
+                out_dir = Path(args.out_dir).expanduser()
+                checkpoint_path = out_dir / "checkpoint.sqac"
+            else:
+                from .checkpoint import CheckpointCartridge as CPClass
+                checkpoint_path = CPClass.DEFAULT_PATH
+            cp = CheckpointCartridge(path=checkpoint_path)
+            result = cp.recover()
+            if not result["recovered"]:
+                print("No memory of that.")
+                return 1
+            latest = result["latest_checkpoint"]
+            print(f"⚡ RECOVERY INITIATED ⚡")
+            print(f"Session: {result['session_id'][:8]}")
+            print(f"Checkpoint: {latest['reason']} by {latest['agent_cli']}")
+            print(f"Progress: {latest['turn_count']} turns, {latest['exchange_count']} exchanges")
+            print(f"Buffer: {len(latest['buffer_turns'])} turns preserved")
+            for t in latest["buffer_turns"]:
+                print(f"  [{t['role']}] {t['text'][:80]}")
+            if result["recent_exchanges"]:
+                print()
+                print("Recent context:")
+                for ex in result["recent_exchanges"][:3]:
+                    print(f"  [{ex['confidence']:.2f}] {ex['content'][:120]}")
+            print()
+            print("Memory restored. Continue.")
+        else:
+            print("Unknown lord. The void remembers only one name.")
+        return 0
 
     elif args.cmd == "serve":
         from .server import main as serve_main

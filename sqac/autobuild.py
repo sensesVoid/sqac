@@ -499,8 +499,11 @@ def save_state(sqac_dir: Path, sources: dict[str, str]) -> None:
 
 
 def load_state(sqac_dir: Path) -> dict | None:
+    p = _state_path(sqac_dir)
+    if not p.exists():
+        return None
     try:
-        return json.loads(_state_path(sqac_dir).read_text())
+        return json.loads(p.read_text())
     except Exception as exc:
         logging.warning("autobuild: state.json unreadable (%s); will re-extract", exc)
         return None
@@ -531,7 +534,8 @@ def track_once(root: Path, sqac_dir: Path, verbose: bool = True) -> dict:
 def track(root: Path, sqac_dir: Path, interval: float,
            log_path: Path | None = None,
            rack_dir: Path | None = None,
-           rack_name: str | None = None) -> None:
+           rack_name: str | None = None,
+           quiet: bool = False) -> None:
     """Poll the project and keep the cartridge fresh. Ctrl-C to stop.
 
     When *log_path* is given, each sync appends a JSONL line to the file:
@@ -543,25 +547,32 @@ def track(root: Path, sqac_dir: Path, interval: float,
     a CartridgeRack at that directory, making it searchable alongside other
     cartridges via ``rack.search()`` or ``sqac search --db <rack>``.
     *rack_name* defaults to the project directory name.
+
+    If *quiet* is True, only changes are printed (no "no change" messages).
     """
     log_fh = None
     if log_path is not None:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_fh = open(log_path, "a", encoding="utf-8")
-        print(f"audit log: {log_path}")
+        if not quiet:
+            print(f"audit log: {log_path}")
     name = rack_name or root.name
-    print(f"tracking {root} -> {sqac_dir}/project.sqac (every {interval:g}s)")
+    if not quiet:
+        print(f"tracking {root} -> {sqac_dir}/project.sqac (every {interval:g}s)")
+        print(f"  watching for changes... (Ctrl-C to stop)")
     if rack_dir is not None:
-        print(f"rack: {rack_dir} (cartridge name: {name})")
+        if not quiet:
+            print(f"rack: {rack_dir} (cartridge name: {name})")
     try:
         while True:
             try:
-                summary = track_once(root, sqac_dir, verbose=True)
+                summary = track_once(root, sqac_dir, verbose=not quiet)
                 dirty = len(summary["added"]) + len(summary["changed"]) + len(summary["removed"])
                 ts = time.strftime("%Y-%m-%dT%H:%M:%S")
-                print(f"  synced {time.strftime('%H:%M:%S')} "
-                      f"({'changed' if dirty else 'no change'} "
-                      f"{dirty and f'({dirty} source(s))' or ''})")
+                if dirty or not quiet:
+                    print(f"  synced {time.strftime('%H:%M:%S')} "
+                          f"({'changed' if dirty else 'no change'} "
+                          f"{dirty and f'({dirty} source(s))' or ''})")
                 if log_fh is not None:
                     state = load_state(sqac_dir) or {}
                     total = len(state.get("sources", {}))

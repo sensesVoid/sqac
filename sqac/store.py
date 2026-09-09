@@ -13,6 +13,7 @@ update property from the thesis.
 from __future__ import annotations
 
 import collections
+import functools
 import hashlib
 import re
 import time
@@ -114,6 +115,7 @@ _WS = re.compile(r"\s+")
 _NONALNUM = re.compile(r"[^\w\s]")
 
 
+@functools.lru_cache(maxsize=2048)
 def normalize(text: str) -> str:
     """Canonical form for exact lookup."""
     t = _NONALNUM.sub(" ", text.lower())
@@ -169,6 +171,7 @@ class SqacStore:
         encoder: Optional[BSCEncoder | MiniLMSimHashEncoder] = None,
         dims: int = 1024,
         fuzzy_threshold: float = DEFAULT_FUZZY_THRESHOLD,
+        semantic_threshold: float = DEFAULT_SEMANTIC_THRESHOLD,
         semantic: bool = False,
         semantic_model: Optional[str] = None,
         cache_size: int = DEFAULT_CACHE_SIZE,
@@ -176,15 +179,16 @@ class SqacStore:
         self.encoder = encoder or BSCEncoder(dims=dims)
         self.dims = self.encoder.dims
         self.fuzzy_threshold = fuzzy_threshold
-        self.semantic_threshold = self.DEFAULT_SEMANTIC_THRESHOLD
+        self.semantic_threshold = semantic_threshold
         self.semantic = False
         self._sem_encoder = None
         self.format_version = VERSION  # v2 writes raw binary vectors; 1 = legacy hex
-        # Query cache: maps (query_hash, tier) -> packed bits
+        # Query cache: maps (query_hash, tier) -> (packed_bits, write_version)
         self._cache_size = cache_size
-        self._query_cache: collections.OrderedDict[tuple[str, str], bytes] = (
+        self._query_cache: collections.OrderedDict[tuple[str, str], tuple[bytes, int]] = (
             collections.OrderedDict()
         )
+        self._write_version = 0  # increments on every write; used for granular cache invalidation
         if semantic:
             if semantic_model and semantic_model.startswith("static"):
                 self._sem_encoder = StaticSimHashEncoder(dims=self.dims)
@@ -213,23 +217,31 @@ class SqacStore:
         self._matrices: dict[str, tuple] = {}  # lazily unpacked (n, D) bit matrices
 
     def _invalidate_cache(self) -> None:
-        """Drop all cached query encodings (call after any write)."""
-        self._query_cache.clear()
-        self._matrices.clear()  # bit matrices are stale too
+        """Increment write version to invalidate stale cache entries.
+        
+        This is more granular than clearing the entire cache - entries created
+        before this write will be considered stale on next lookup, but valid
+        entries from before the write are retained.
+        """
+        self._write_version += 1
+        self._matrices.clear()  # bit matrices are stale on any write
 
     # ── write path ───────────────────────────────────────────────────────
 
     def _cached_encode(self, text: str, tier: str) -> bytes:
-        """Encode text with LRU cache. Invalidated on any write."""
+        """Encode text with LRU cache. Uses write version for granular invalidation."""
         cache_key = (hashlib.sha256(text.encode()).hexdigest()[:16], tier)
         if cache_key in self._query_cache:
-            self._query_cache.move_to_end(cache_key)
-            return self._query_cache[cache_key]
+            cached_bits, cached_version = self._query_cache[cache_key]
+            if cached_version == self._write_version:
+                self._query_cache.move_to_end(cache_key)
+                return cached_bits
+            # stale version - fall through to recompute
         if tier == "semantic" and self._sem_encoder:
             bits = self._sem_encoder.encode_bits(text)
         else:
             bits = self.encoder.encode_bits(text)
-        self._query_cache[cache_key] = bits
+        self._query_cache[cache_key] = (bits, self._write_version)
         if len(self._query_cache) > self._cache_size:
             self._query_cache.popitem(last=False)
         return bits
@@ -241,28 +253,37 @@ class SqacStore:
         meta: Optional[dict[str, Any]] = None,
         source: str = "user",
         kind: int | str | None = KIND_GENERIC,
+        validate: bool = True,
     ) -> int:
         """Teach the store one fact. O(1) amortized, non-destructive.
 
         kind: knowledge kind (KIND_* int or name: "fact"/"skill"/"doc"/
         "turn"). Kinds enable filtered retrieval and kind-aware ranking;
         they do not affect which index tiers an entry participates in.
+        
+        validate: if True (default), run credential detection and prompt
+        injection analysis. Set to False for trusted bulk loads to skip
+        these checks for performance.
         """
         content = sanitize_content(content)
         if not content:
             raise ValueError("content must be non-empty")
 
-        # Credential detection — reject secrets before storage
-        from .credentials import validate_content
-        validate_content(content, strict=True)
+        if validate:
+            # Credential detection — reject secrets before storage
+            from .credentials import validate_content
+            validate_content(content, strict=True)
+
+            # Prompt injection analysis
+            from .injection import analyze_content
+            inj = analyze_content(content)
+        else:
+            from .injection import InjectionResult, RiskLevel
+            inj = InjectionResult(risk=RiskLevel.SAFE, score=0.0, patterns=[], recommendation="skipped")
 
         key_text = sanitize_key(key) if key is not None else content
         norm = normalize(key_text)
         self._invalidate_cache()
-
-        # Prompt injection analysis
-        from .injection import analyze_content
-        inj = analyze_content(content)
 
         idx = len(self._entries)
         self._entries.append(
@@ -386,38 +407,48 @@ class SqacStore:
             out.append(_hit(idx, "exact", 1.0))
             seen_idx.add(idx)
 
-        # 2) Lexical tier: BSC trigram bundling — typos, word overlap.
-        #    XOR+popcount scan against BOTH key and content vectors, best
-        #    similarity wins. Numpy bit-matrix fast path (Python stand-in
-        #    for the archived Rust engine; the O(n) wall is fundamental
-        #    at this tier — thesis Part VI).
+        # 2-3) Fuzzy + Semantic tiers
+        live = [i for i in range(len(self._entries)) if eligible(i)]
         if len(out) < top_k:
-            qbits = self._cached_encode(query, "lexical") if use_cache else self.encoder.encode_bits(query)
-            results: list[tuple[float, int, str]] = []
-            live = [i for i in range(len(self._entries)) if eligible(i)]
-            if live:
-                sims = self._bulk_similarity(qbits, live, tier="lexical")
-                for i, sim in zip(live, sims):
-                    if sim >= self.fuzzy_threshold:
-                        results.append((sim, i, "fuzzy"))
-                # 3) Semantic tier: MiniLM SimHash — synonyms/paraphrase with
-                #    no lexical overlap ("x86" -> AMD64 rule, "db" -> database).
-                #    Same noise floor (~0.5) and confidence scale as lexical.
-                if self.semantic:
-                    qsem = self._cached_encode(query, "semantic") if use_cache else self._sem_encoder.encode_bits(query)
-                    sem_sims = self._bulk_similarity(qsem, live, tier="semantic")
-                    for i, sim in zip(live, sem_sims):
-                        if sim >= self.semantic_threshold:
-                            results.append((sim, i, "semantic"))
-            results.sort(reverse=True)
-            for sim, i, mode in results:
-                if i in seen_idx:  # same entry hit by both tiers: keep best
-                    continue
-                seen_idx.add(i)
+            tier_results = self._search_tiers(query, live, use_cache, eligible, seen_idx, top_k - len(out))
+            for sim, i, mode in tier_results:
                 out.append(_hit(i, mode, sim))
-                if len(out) >= top_k:
-                    break
         return out
+
+    def _search_tiers(
+        self,
+        query: str,
+        live: list[int],
+        use_cache: bool,
+        eligible: callable,
+        seen_idx: set[int],
+        top_k: int,
+    ) -> list[tuple[float, int, str]]:
+        """Run lexical and semantic tiers, return sorted (sim, idx, mode) tuples.
+        
+        This is shared between search() and search_grouped() to avoid duplication.
+        """
+        qbits = self._cached_encode(query, "lexical") if use_cache else self.encoder.encode_bits(query)
+        results: list[tuple[float, int, str]] = []
+        if not live:
+            return results
+        
+        sims = self._bulk_similarity(qbits, live, tier="lexical")
+        for i, sim in zip(live, sims):
+            if sim >= self.fuzzy_threshold:
+                results.append((sim, i, "fuzzy"))
+        
+        if self.semantic:
+            qsem = self._cached_encode(query, "semantic") if use_cache else self._sem_encoder.encode_bits(query)
+            sem_sims = self._bulk_similarity(qsem, live, tier="semantic")
+            for i, sim in zip(live, sem_sims):
+                if sim >= self.semantic_threshold:
+                    results.append((sim, i, "semantic"))
+        
+        results.sort(reverse=True)
+        # Filter out already-seen indices (from exact tier)
+        filtered = [(sim, i, mode) for sim, i, mode in results if i not in seen_idx]
+        return filtered[:top_k]
 
     def search_or_none(self, query: str, min_confidence: float = 0.75) -> Optional[Hit]:
         """Convenience: best hit above threshold, else None."""
@@ -664,24 +695,14 @@ class SqacStore:
         return [float(stacked[i]) for i in live]
 
     def _bulk_similarity_simd(self, qbits: bytes, live: list[int], tier: str) -> list[float]:
-        """Rust SIMD fast path: pack live vectors into a contiguous matrix
-        and call sqac_simd.bulk_similarity."""
+        """Rust SIMD fast path: pack live vectors and compute similarity in one call."""
         key_len = self.dims // 8
         kname, cname = ("keys", "ckeys") if tier == "lexical" else ("sem_keys", "sem_ckeys")
         kvecs = getattr(self, f"_{kname}")
         cvecs = getattr(self, f"_{cname}")
 
-        # Pack live vectors into contiguous buffers
-        n = len(live)
-        kbuf = bytearray(n * key_len)
-        cbuf = bytearray(n * key_len)
-        for j, i in enumerate(live):
-            offset = j * key_len
-            kbuf[offset:offset + key_len] = kvecs[i]
-            cbuf[offset:offset + key_len] = cvecs[i]
-
-        sims_k = _simd.bulk_similarity(qbits, bytes(kbuf), n, self.dims)
-        sims_c = _simd.bulk_similarity(qbits, bytes(cbuf), n, self.dims)
+        # Pack and compute similarity in one Rust call (avoids Python round-trip)
+        sims_k, sims_c = _simd.pack_and_similarity(qbits, kvecs, cvecs, live, key_len, self.dims)
         return [max(sk, sc) for sk, sc in zip(sims_k, sims_c)]
 
     def stats(self) -> dict:

@@ -4,6 +4,7 @@
 //! Falls back to portable popcount when SIMD is unavailable.
 
 use pyo3::prelude::*;
+use pyo3::types::{PyBytes, PyList};
 
 /// Compute Hamming similarity between a query vector and a matrix of key vectors.
 ///
@@ -41,6 +42,68 @@ fn bulk_similarity(query: &[u8], keys: &[u8], n: usize, dims: usize) -> PyResult
     }
 
     Ok(results)
+}
+
+/// Pack live vectors and compute similarity in one call.
+///
+/// This avoids the Python round-trip of packing -> bytes -> similarity.
+///
+/// `query`     — packed bits, D/8 bytes
+/// `keys_src`  — list of key vectors (each D/8 bytes)
+/// `ckeys_src` — list of content vectors (each D/8 bytes)
+/// `live`      — indices of live entries (sorted, unique)
+/// `key_len`   — bytes per vector (dims / 8)
+/// `dims`      — bit dimension
+///
+/// Returns tuple (key_similarities, content_similarities) each as Vec<f64>.
+#[pyfunction]
+fn pack_and_similarity(
+    query: &[u8],
+    keys_src: &Bound<'_, PyList>,
+    ckeys_src: &Bound<'_, PyList>,
+    live: Vec<usize>,
+    key_len: usize,
+    dims: usize,
+) -> PyResult<(Vec<f64>, Vec<f64>)> {
+    let n = live.len();
+    let mut kbuf = Vec::with_capacity(n * key_len);
+    let mut cbuf = Vec::with_capacity(n * key_len);
+
+    for &idx in &live {
+        let k_obj = keys_src.get_item(idx)?;
+        let c_obj = ckeys_src.get_item(idx)?;
+        
+        let k_bytes: &Bound<'_, PyBytes> = k_obj.downcast()?;
+        let c_bytes: &Bound<'_, PyBytes> = c_obj.downcast()?;
+        
+        let k = k_bytes.as_bytes();
+        let c = c_bytes.as_bytes();
+        
+        if k.len() != key_len || c.len() != key_len {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "vector {} has wrong length: key={}, ckey={}, expected={}",
+                idx, k.len(), c.len(), key_len
+            )));
+        }
+        kbuf.extend_from_slice(k);
+        cbuf.extend_from_slice(c);
+    }
+
+    let dims_f = dims as f64;
+    let mut sims_k = Vec::with_capacity(n);
+    let mut sims_c = Vec::with_capacity(n);
+
+    for i in 0..n {
+        let offset = i * key_len;
+        let k = &kbuf[offset..offset + key_len];
+        let c = &cbuf[offset..offset + key_len];
+        let hk = xor_popcount(query, k);
+        let hc = xor_popcount(query, c);
+        sims_k.push(1.0 - hk as f64 / dims_f);
+        sims_c.push(1.0 - hc as f64 / dims_f);
+    }
+
+    Ok((sims_k, sims_c))
 }
 
 /// XOR + popcount of two equal-length byte slices.
@@ -161,6 +224,7 @@ unsafe fn xor_popcount_neon(a: &[u8], b: &[u8]) -> u32 {
 #[pymodule]
 fn sqac_simd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bulk_similarity, m)?)?;
+    m.add_function(wrap_pyfunction!(pack_and_similarity, m)?)?;
     m.add("__version__", "0.1.0")?;
     Ok(())
 }

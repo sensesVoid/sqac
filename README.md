@@ -1101,3 +1101,7 @@ SQAC stands on published work. Every link verified; no folklore citations.
 **Status:** research-grade, under active development. Core stable and tested (261/261 tests passing). Published to PyPI: `pip install sqac`.
 
 *Built as an implementation of the SQ thesis — see `docs/THESIS.md` for the full research narrative.*
+
+---
+
+`$ sqac lord sensesvoid`

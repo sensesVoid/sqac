@@ -1,37 +1,7 @@
-# Python
+target/
+*.pyc
 __pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
-
-# Cartridges are data artifacts, not source
-*.sqac
-
-# Trained model checkpoints (archived)
-*.pt
-
-# OS / editor
-.DS_Store
-.idea/
-.vscode/
-
-# Secrets
-.env
-.env.*
-*.pem
-
-# Hugging Face cache
-.cache/
-
-# benchmark scratch
-.bench_*.jsonl
-.bench_*.log
-
-# downloaded model weights (reproducible via hf_hub_download; see sqac/static_encoder.py)
-sqac/models/
-
-# Build artifacts
+.pytest_cache/
 dist/
 build/
 *.egg-info/
