@@ -1,5 +1,7 @@
 # SQAC — Symbolic Query Addressable Cartridge
 
+![SQAC Banner](sqac.png)
+
 **Give your LLM a memory it can carry in a file.**
 
 **One `.sqac` file. Any LLM. Facts and skills that persist, survive restarts, and swap in milliseconds — no retraining, no database, no GPU.**
@@ -446,19 +448,19 @@ On a realistic 25-file Python project (FastAPI + Celery + Redis):
 Measured with the Rust SIMD scan (D=1024 BSC). Full results & derivations in
 [`experiments/CAPACITY_BENCHMARK.md`](experiments/CAPACITY_BENCHMARK.md).
 
-| Entries | Tokens (×45) | Fuzzy search | RSS | File | Build |
-|---------|--------------|--------------|-----|------|-------|
-| 1,000 | 45K | 0.75ms | 23MB | 0.5MB | 6.1s |
-| 5,000 | 225K | 7.4ms | 41MB | 2.4MB | 30.4s |
-| 10,000 | 450K | 9.1ms | 63MB | 4.9MB | 62.9s |
-| **25,000** | **1.125M** | **27ms** | **132MB** | **12MB** | **2.6min** |
+| Entries | Tokens (×45) | Fuzzy search (Rust SIMD) | RSS (MiB) | Disk (MB) | Build |
+|---------|--------------|---------------------------|-----------|-----------|-------|
+| 1,000 | 45K | 0.8 ms | 23 | 0.5 | 6.1s |
+| 5,000 | 225K | 3.1 ms | 41 | 2.4 | 30.4s |
+| 10,000 | 450K | 5.1 ms | 63 | 4.9 | 62.9s |
+| **25,000** | **1.125M** | **13.2 ms** | **132** | **12** | **2.6min** |
 
-**Scaling laws** (linear, R²>0.999): fuzzy search ≈ 1.078µs · n; RSS ≈ 4.5KB/entry; file ≈ 0.48KB/entry.
+**Scaling laws** (linear, R²>0.999): fuzzy search ≈ 0.53 µs · n; RSS ≈ 5.3 KiB/entry; disk ≈ 0.48 KiB/entry.
 
-- **Sweet spot: 25K entries (~1.1M tokens)** — sub-frame (27ms) search, 132MB RSS, 12MB file.
-- **Practical ceiling: 100K entries (~4.5M tokens)** — 108ms search, 471MB RSS, 48MB file.
-- **5M tokens is achievable**: ~111K entries → 120ms search, 500MB RSS, 53MB file (well within server resources).
-- **Hard limit: 250K+ entries** — 270ms+ search, 1.1GB+ RSS → shard or use tiered (hot/warm/cold) cartridges.
+- **Sweet spot: 25K entries (~1.1M tokens)** — sub-frame (13ms) search, 132MB RSS, 12MB file.
+- **Practical ceiling: 100K entries (~4.5M tokens)** — ~53ms search, 528MB RSS, 48MB file.
+- **5M tokens is achievable**: ~111K entries → ~60ms search, 588MB RSS, 53MB file (well within server resources).
+- **Hard limit: 250K+ entries** — 130ms+ search, 1.3GB+ RSS → shard or use tiered (hot/warm/cold) cartridges.
 
 Token density: ~93K tokens/MB on disk, ~9K tokens/MB in RAM. This is the **question the DMS policy
 (SqacStore capacity-eviction) answers**: evict when entries exceed 25K or RSS exceeds 150MB, keep the
@@ -882,13 +884,17 @@ SQAC is a **memory layer** — it gives any LLM access to knowledge it doesn't h
 | Metric | Value |
 |---|---|
 | Exact lookup | **5 μs**, O(1) at any size |
-| Fuzzy scan @ 10K rules (NumPy) | 21–56 ms |
-| Fuzzy scan @ 10K rules (Rust SIMD) | **0.7 ms** — **261x speedup** |
+| Fuzzy scan @ 10K (NumPy) | 21–56 ms |
+| Fuzzy scan @ 10K (Rust SIMD) | **0.7 ms** — **261x speedup** |
+| Fuzzy scan @ 25K (Rust SIMD) | **13.2 ms** |
 | Semantic encode | **~0.1 ms**/query |
 | Write (teach) | O(1), ~4 ms/fact |
-| Cartridge @ 10K rules | 6.5 MB (semantic vectors) |
+| Cartridge @ 10K (lexical) | 33.4 MiB RAM, 4.9 MB disk |
+| Cartridge @ 10K (semantic) | 68.1 MiB RAM (+34.7 MiB overhead) |
+| Cartridge @ 25K (lexical) | 99.7 MiB RAM, 12 MB disk |
 | lz4 compression | 15x at scale (payload JSON) |
-| Memory (RAM) @ 10K rules | 146 MB |
+| Memory per entry (lexical) | **3.4 KiB/entry** (10K), **4.1 KiB/entry** (25K) |
+| Memory per entry (semantic) | **7.1 KiB/entry** (5K vectors) |
 | Runtime deps | numpy. That's it. |
 | Rust SIMD deps | pyo3 + packed_simd2 (optional, auto-detected) |
 
@@ -907,7 +913,7 @@ SQAC ships an optional Rust extension (`sqac-simd/`) that accelerates the XOR+po
 # Rust SIMD:                     0.7 ms  ← 261x faster
 ```
 
-At 100K rules (which would be 18 seconds in Python), Rust SIMD brings it to **~70ms**.
+At 100K rules (which would be 18 seconds in Python), Rust SIMD brings it to **~70ms**. At 25K: **13ms**.
 
 Build it:
 
@@ -927,7 +933,7 @@ pip install target/wheels/sqac_simd-*.whl
 | Fail-safe: garbage query → no confident hit | held |
 | Graduation | promotes, rerun idempotent |
 | Durability | facts + session re-answer from disk after reload |
-| Test suite | **261/261 passing** |
+| Test suite | **272/272 passing** |
 
 ---
 
