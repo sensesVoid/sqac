@@ -933,7 +933,7 @@ pip install target/wheels/sqac_simd-*.whl
 | Fail-safe: garbage query → no confident hit | held |
 | Graduation | promotes, rerun idempotent |
 | Durability | facts + session re-answer from disk after reload |
-| Test suite | **272/272 passing** |
+| Test suite | **307/307 passing** |
 
 ---
 
@@ -1104,7 +1104,7 @@ SQAC stands on published work. Every link verified; no folklore citations.
 
 ---
 
-**Status:** research-grade, under active development. Core stable and tested (261/261 tests passing). Published to PyPI: `pip install sqac`.
+**Status:** research-grade, under active development. Core stable and tested (307/307 tests passing). Published to PyPI: `pip install sqac`.
 
 *Built as an implementation of the SQ thesis — see `docs/THESIS.md` for the full research narrative.*
 

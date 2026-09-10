@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sqac"
-version = "0.1.9"
+version = "0.1.10"
 description = "Symbolic Query Addressable Cartridge — hot-swappable VSA memory for LLMs"
 license = "BUSL-1.1"
 readme = "README.md"
@@ -14,14 +14,15 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = ["numpy"]
+dependencies = ["numpy<2"]
 
 [project.optional-dependencies]
 mcp = ["mcp>=1.0"]
 server = ["fastapi", "uvicorn"]
 simd = ["sqac-simd"]
 compress = ["lz4"]
-all = ["mcp>=1.0", "fastapi", "uvicorn", "lz4"]
+semantic = ["transformers>=4.30", "torch", "sentence-transformers"]
+all = ["mcp>=1.0", "fastapi", "uvicorn", "lz4", "transformers>=4.30", "torch", "sentence-transformers"]
 
 [project.scripts]
 sqac = "sqac.cli:main"
