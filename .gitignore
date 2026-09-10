@@ -1,7 +1,56 @@
+# Build artifacts
 target/
-*.pyc
-__pycache__/
-.pytest_cache/
 dist/
 build/
 *.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+*.so
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.venv/
+venv/
+.envsitter/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Models and data
+models/
+*.safetensors
+*.npz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SQAC specific
+.sqac/
+.sqac-graph/
+*.sqac
+*.sqac.tmp
+
+# Cargo
+sqac-simd/target/
+
+# Notebooks
+*.ipynb
+
+# Visualization
+graph_preview.png
+graph_preview.svg
+standalone_dashboard.html
+standalone_graph.html
+
+# MCP
+sqac_mcp.py

@@ -83,23 +83,67 @@ class Unit:
 
 # ── git-ignore-ish walk ────────────────────────────────────────────────────────
 
-def _ignore_rules(root: Path) -> list[re.Pattern]:
-    pats: list[re.Pattern] = []
-    gi = root / ".gitignore"
-    if not gi.exists():
-        return pats
+def _parse_gitignore(path: Path) -> list[tuple[re.Pattern, bool]]:
+    """Parse a .gitignore file, returning (pattern, is_negation) tuples.
+    
+    Handles:
+    - Basic glob patterns
+    - ** for recursive directories
+    - * for any characters except /
+    - ! for negation
+    - # for comments
+    """
+    patterns: list[tuple[re.Pattern, bool]] = []
+    if not path.exists():
+        return patterns
     try:
-        for line in gi.read_text(encoding="utf-8", errors="replace").splitlines():
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
             line = line.strip()
-            if not line or line.startswith("#") or line.startswith("!"):
+            if not line or line.startswith("#"):
                 continue
-            pats.append(re.compile(re.escape(line).replace(r"\*\*", ".*").replace(r"\*", "[^/]*")))
+            is_negation = line.startswith("!")
+            if is_negation:
+                line = line[1:]
+            if not line:
+                continue
+            # Convert glob to regex
+            regex = re.escape(line)
+            regex = regex.replace(r"\*\*", ".*")
+            regex = regex.replace(r"\*", "[^/]*")
+            # Anchor to path boundaries
+            if not line.startswith("/") and "/" not in line:
+                regex = f"(^|/){regex}"
+            else:
+                regex = f"^{regex}" if line.startswith("/") else f"(^|/){regex}"
+            if line.endswith("/"):
+                regex = f"{regex}.*"
+            patterns.append((re.compile(regex), is_negation))
     except Exception:
         pass
-    return pats
+    return patterns
 
 
-def _ignored(rel: str, rules: list[re.Pattern]) -> bool:
+def _ignore_rules(root: Path) -> list[tuple[re.Pattern, bool]]:
+    """Collect ignore rules from .gitignore files in root and all parent dirs."""
+    patterns: list[tuple[re.Pattern, bool]] = []
+    # Walk up from root to filesystem root, collecting .gitignore files
+    current = root
+    while True:
+        gi = current / ".gitignore"
+        if gi.exists():
+            patterns.extend(_parse_gitignore(gi))
+        # Also check for .sqacignore in project root
+        if current == root:
+            sqac_ignore = current / ".sqacignore"
+            if sqac_ignore.exists():
+                patterns.extend(_parse_gitignore(sqac_ignore))
+        if current == current.parent:
+            break
+        current = current.parent
+    return patterns
+
+
+def _ignored(rel: str, rules: list[tuple[re.Pattern, bool]]) -> bool:
     parts = rel.split("/")
     for p in parts:
         if p in EXCLUDED_DIRS:
@@ -110,14 +154,26 @@ def _ignored(rel: str, rules: list[re.Pattern]) -> bool:
             return True
         if name == pat:
             return True
-    for r in rules:
-        if r.search(rel):
-            return True
-    return False
+    # Apply gitignore rules with negation support
+    ignored = False
+    for pattern, is_negation in rules:
+        if pattern.search(rel):
+            if is_negation:
+                ignored = False
+            else:
+                ignored = True
+    return ignored
 
 
-def walk_project(root: Path) -> list[Path]:
-    rules = _ignore_rules(root)
+def walk_project(root: Path, exclude_patterns: list[str] | None = None,
+                    respect_gitignore: bool = True) -> list[Path]:
+    rules: list[tuple[re.Pattern, bool]] = []
+    if respect_gitignore:
+        rules = _ignore_rules(root)
+    # Add custom exclude patterns
+    if exclude_patterns:
+        for pat in exclude_patterns:
+            rules.append((re.compile(re.escape(pat).replace(r"\*\*", ".*").replace(r"\*", "[^/]*")), False))
     out: list[Path] = []
     for dirpath, dirnames, filenames in __import__("os").walk(root):
         dirnames[:] = [
@@ -440,9 +496,10 @@ def extract_file(root: Path, rel: str) -> list[Unit]:
 
 # ── public API ────────────────────────────────────────────────────────────────
 
-def extract_project_units(root: Path) -> list[Unit]:
+def extract_project_units(root: Path, exclude_patterns: list[str] | None = None,
+                            respect_gitignore: bool = True) -> list[Unit]:
     """Run every extractor over the project and return all units, sorted."""
-    files = walk_project(root)
+    files = walk_project(root, exclude_patterns=exclude_patterns, respect_gitignore=respect_gitignore)
     rel_files = [p.relative_to(root).as_posix() for p in files]
     units: list[Unit] = []
     for rel in rel_files:

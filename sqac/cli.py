@@ -78,6 +78,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="output .sqac dir (default: .sqac)")
     p_init.add_argument("--semantic", action="store_true",
                         help="enable semantic tier in the built cartridge")
+    p_init.add_argument("--exclude", action="append", default=[],
+                        help="additional glob patterns to exclude (e.g. 'vendor/**', '*.min.js')")
+    p_init.add_argument("--no-gitignore", action="store_true",
+                        help="ignore .gitignore files when scanning")
 
     p_dashboard = sub.add_parser("dashboard", help="open web dashboard (starts server)")
     p_dashboard.add_argument("--dir", default=".", help="cartridge directory (default: .)")
@@ -87,13 +91,13 @@ def main(argv: list[str] | None = None) -> int:
     p_dashboard.add_argument("--rack", action="store_true", help="mount cartridges as rack")
     p_dashboard.add_argument("--no-browser", action="store_true", help="don't try to open browser")
 
-    p_graph = sub.add_parser("graph", help="open 3D hyperdimensional graph (starts server)")
-    p_graph.add_argument("--dir", default=".", help="cartridge directory (default: .)")
-    p_graph.add_argument("--port", type=int, default=8420, help="port (default: 8420)")
-    p_graph.add_argument("--host", default="0.0.0.0", help="host (default: 0.0.0.0)")
-    p_graph.add_argument("--api-key", default=None, help="API key")
-    p_graph.add_argument("--threshold", type=float, default=0.50, help="min similarity for edges (default: 0.50)")
-    p_graph.add_argument("--no-browser", action="store_true", help="don't try to open browser")
+    p_viz = sub.add_parser("viz", help="open 3D hyperdimensional graph (starts server)")
+    p_viz.add_argument("--dir", default=".", help="cartridge directory (default: .)")
+    p_viz.add_argument("--port", type=int, default=8420, help="port (default: 8420)")
+    p_viz.add_argument("--host", default="0.0.0.0", help="host (default: 0.0.0.0)")
+    p_viz.add_argument("--api-key", default=None, help="API key")
+    p_viz.add_argument("--threshold", type=float, default=0.50, help="min similarity for edges (default: 0.50)")
+    p_viz.add_argument("--no-browser", action="store_true", help="don't try to open browser")
 
     p_track = sub.add_parser("track", help="realtime project tracking (Ctrl-C to stop)")
     p_track.add_argument("root", nargs="?", default=".", help="project root (default: .)")
@@ -130,33 +134,33 @@ def main(argv: list[str] | None = None) -> int:
     p_lord.add_argument("name", nargs="?", default="", help=argparse.SUPPRESS)
     p_lord.add_argument("--out-dir", default=None, help=argparse.SUPPRESS)
 
-    p_cg = sub.add_parser("ast", help="AST-level code graph intelligence")
-    cg_sub = p_cg.add_subparsers(dest="cg_action", required=True)
-    p_cg_init = cg_sub.add_parser("init", help="build the code graph for this project")
-    p_cg_init.add_argument("root", nargs="?", default=".", help="project root (default: .)")
-    p_cg_explore = cg_sub.add_parser("explore", help="explore a code symbol")
-    p_cg_explore.add_argument("symbol", help="symbol name to explore")
-    p_cg_explore.add_argument("--root", default=".", help="project root (default: .)")
-    p_cg_blast = cg_sub.add_parser("blast", help="blast radius analysis")
-    p_cg_blast.add_argument("symbol", help="symbol to analyze")
-    p_cg_blast.add_argument("--depth", type=int, default=3, help="max depth (default: 3)")
-    p_cg_blast.add_argument("--root", default=".", help="project root (default: .)")
-    p_cg_callers = cg_sub.add_parser("callers", help="find who calls a symbol")
-    p_cg_callers.add_argument("symbol", help="symbol name")
-    p_cg_callers.add_argument("--root", default=".", help="project root (default: .)")
-    p_cg_callees = cg_sub.add_parser("callees", help="find what a symbol calls")
-    p_cg_callees.add_argument("symbol", help="symbol name")
-    p_cg_callees.add_argument("--root", default=".", help="project root (default: .)")
-    p_cg_search = cg_sub.add_parser("search", help="search code symbols")
-    p_cg_search.add_argument("query", help="search query")
-    p_cg_search.add_argument("--kind", default=None, help="filter by kind: function, class, method")
-    p_cg_search.add_argument("--top", type=int, default=20, help="max results (default: 20)")
-    p_cg_search.add_argument("--root", default=".", help="project root (default: .)")
-    p_cg_stats = cg_sub.add_parser("stats", help="show code graph statistics")
-    p_cg_stats.add_argument("--root", default=".", help="project root (default: .)")
-    p_cg_watch = cg_sub.add_parser("watch", help="watch for changes and auto-rebuild")
-    p_cg_watch.add_argument("root", nargs="?", default=".", help="project root (default: .)")
-    p_cg_watch.add_argument("--interval", type=float, default=5.0, help="poll interval in seconds")
+    p_graph = sub.add_parser("graph", help="AST-level code graph intelligence")
+    graph_sub = p_graph.add_subparsers(dest="graph_action", required=True)
+    p_graph_init = graph_sub.add_parser("init", help="build the code graph for this project")
+    p_graph_init.add_argument("root", nargs="?", default=".", help="project root (default: .)")
+    p_graph_explore = graph_sub.add_parser("explore", help="explore a code symbol")
+    p_graph_explore.add_argument("symbol", help="symbol name to explore")
+    p_graph_explore.add_argument("--root", default=".", help="project root (default: .)")
+    p_graph_blast = graph_sub.add_parser("blast", help="blast radius analysis")
+    p_graph_blast.add_argument("symbol", help="symbol to analyze")
+    p_graph_blast.add_argument("--depth", type=int, default=3, help="max depth (default: 3)")
+    p_graph_blast.add_argument("--root", default=".", help="project root (default: .)")
+    p_graph_callers = graph_sub.add_parser("callers", help="find who calls a symbol")
+    p_graph_callers.add_argument("symbol", help="symbol name")
+    p_graph_callers.add_argument("--root", default=".", help="project root (default: .)")
+    p_graph_callees = graph_sub.add_parser("callees", help="find what a symbol calls")
+    p_graph_callees.add_argument("symbol", help="symbol name")
+    p_graph_callees.add_argument("--root", default=".", help="project root (default: .)")
+    p_graph_search = graph_sub.add_parser("search", help="search code symbols")
+    p_graph_search.add_argument("query", help="search query")
+    p_graph_search.add_argument("--kind", default=None, help="filter by kind: function, class, method")
+    p_graph_search.add_argument("--top", type=int, default=20, help="max results (default: 20)")
+    p_graph_search.add_argument("--root", default=".", help="project root (default: .)")
+    p_graph_stats = graph_sub.add_parser("stats", help="show code graph statistics")
+    p_graph_stats.add_argument("--root", default=".", help="project root (default: .)")
+    p_graph_watch = graph_sub.add_parser("watch", help="watch for changes and auto-rebuild")
+    p_graph_watch.add_argument("root", nargs="?", default=".", help="project root (default: .)")
+    p_graph_watch.add_argument("--interval", type=float, default=5.0, help="poll interval in seconds")
 
     p_mcp_setup = sub.add_parser("mcp", help="MCP server wiring for agent CLIs")
     p_mcp_setup.add_argument("action", choices=["setup"], help="generate/install per-CLI wiring")
@@ -229,7 +233,7 @@ def main(argv: list[str] | None = None) -> int:
         root = Path(args.root).resolve()
         out_dir = Path(args.out_dir)
         print(f"scanning {root} ...")
-        units = extract_project_units(root)
+        units = extract_project_units(root, exclude_patterns=args.exclude, respect_gitignore=not args.no_gitignore)
         if not units:
             print("no units extracted — empty or unsupported project")
             return 1
@@ -406,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
                 pass
         return serve_main(serve_args)
 
-    elif args.cmd == "graph":
+    elif args.cmd == "viz":
         from .server import main as serve_main
         serve_args = ["--dir", args.dir, "--port", str(args.port), "--host", args.host]
         if args.api_key:
@@ -423,98 +427,98 @@ def main(argv: list[str] | None = None) -> int:
                 pass
         return serve_main(serve_args)
 
-    elif args.cmd == "ast":
-        from .graph import CodeGraph
-        root = Path(args.root if hasattr(args, 'root') else '.').resolve()
-        graph = CodeGraph(root)
+    elif args.cmd == "graph":
+            from .graph import CodeGraph
+            root = Path(args.root if hasattr(args, 'root') else '.').resolve()
+            graph = CodeGraph(root)
 
-        if args.cg_action == "init":
-            summary = graph.build()
-            graph.save()
-            print(f"built .sqac-graph/ — {summary['files_parsed']} files, "
-                  f"{summary['symbols']} symbols, {summary['edges']} edges")
-            if summary['errors']:
-                print(f"  {summary['errors']} files failed to parse")
+            if args.graph_action == "init":
+                summary = graph.build()
+                graph.save()
+                print(f"built .sqac-graph/ — {summary['files_parsed']} files, "
+                      f"{summary['symbols']} symbols, {summary['edges']} edges")
+                if summary['errors']:
+                    print(f"  {summary['errors']} files failed to parse")
 
-        elif args.cg_action == "explore":
-            graph.load()
-            result = graph.explore(args.symbol)
-            if not result["found"]:
-                print(f"symbol not found: {args.symbol}")
-                return 1
-            sym = result["symbol"]
-            print(f"{sym['kind']} {sym['name']} @ {sym['file_path']}:{sym['line_start']}-{sym['line_end']}")
-            if sym.get("docstring"):
-                print(f"  \"\"{sym['docstring']}\"\"")
-            if sym.get("parent"):
-                print(f"  parent: {sym['parent']}")
-            if result["callers"]:
-                print(f"  callers ({result['caller_count']}):")
-                for c in result["callers"][:10]:
-                    print(f"    {c['name']} @ {c['file_path']}:{c['line_start']}")
-            if result["callees"]:
-                print(f"  callees ({result['callee_count']}):")
-                for c in result["callees"][:10]:
-                    print(f"    {c['name']} @ {c['file_path']}:{c['line_start']}")
+            elif args.graph_action == "explore":
+                graph.load()
+                result = graph.explore(args.symbol)
+                if not result["found"]:
+                    print(f"symbol not found: {args.symbol}")
+                    return 1
+                sym = result["symbol"]
+                print(f"{sym['kind']} {sym['name']} @ {sym['file_path']}:{sym['line_start']}-{sym['line_end']}")
+                if sym.get("docstring"):
+                    print(f"  \"\"{sym['docstring']}\"\"")
+                if sym.get("parent"):
+                    print(f"  parent: {sym['parent']}")
+                if result["callers"]:
+                    print(f"  callers ({result['caller_count']}):")
+                    for c in result["callers"][:10]:
+                        print(f"    {c['name']} @ {c['file_path']}:{c['line_start']}")
+                if result["callees"]:
+                    print(f"  callees ({result['callee_count']}):")
+                    for c in result["callees"][:10]:
+                        print(f"    {c['name']} @ {c['file_path']}:{c['line_start']}")
 
-        elif args.cg_action == "blast":
-            graph.load()
-            result = graph.blast_radius(args.symbol, max_depth=args.depth)
-            if not result["found"]:
-                print(f"symbol not found: {args.symbol}")
-                return 1
-            sym = result["symbol"]
-            print(f"blast radius for {sym['name']} ({result['total_affected']} affected):")
-            for a in result["affected"]:
-                depth_str = f"depth={a['depth']}" if a['depth'] >= 0 else "dependency"
-                print(f"  {a['name']} @ {a['file_path']}:{a['line_start']} ({depth_str})")
+            elif args.graph_action == "blast":
+                graph.load()
+                result = graph.blast_radius(args.symbol, max_depth=args.depth)
+                if not result["found"]:
+                    print(f"symbol not found: {args.symbol}")
+                    return 1
+                sym = result["symbol"]
+                print(f"blast radius for {sym['name']} ({result['total_affected']} affected):")
+                for a in result["affected"]:
+                    depth_str = f"depth={a['depth']}" if a['depth'] >= 0 else "dependency"
+                    print(f"  {a['name']} @ {a['file_path']}:{a['line_start']} ({depth_str})")
 
-        elif args.cg_action == "callers":
-            graph.load()
-            callers = graph.callers(args.symbol)
-            print(f"callers of {args.symbol} ({len(callers)}):")
-            for c in callers:
-                print(f"  {c['name']} @ {c['file_path']}:{c['line_start']}")
+            elif args.graph_action == "callers":
+                graph.load()
+                callers = graph.callers(args.symbol)
+                print(f"callers of {args.symbol} ({len(callers)}):")
+                for c in callers:
+                    print(f"  {c['name']} @ {c['file_path']}:{c['line_start']}")
 
-        elif args.cg_action == "callees":
-            graph.load()
-            callees = graph.callees(args.symbol)
-            print(f"callees of {args.symbol} ({len(callees)}):")
-            for c in callees:
-                print(f"  {c['name']} @ {c['file_path']}:{c['line_start']}")
+            elif args.graph_action == "callees":
+                graph.load()
+                callees = graph.callees(args.symbol)
+                print(f"callees of {args.symbol} ({len(callees)}):")
+                for c in callees:
+                    print(f"  {c['name']} @ {c['file_path']}:{c['line_start']}")
 
-        elif args.cg_action == "search":
-            graph.load()
-            results = graph.search(args.query, kind=args.kind, top_k=args.top)
-            print(f"search '{args.query}' ({len(results)} results):")
-            for r in results:
-                print(f"  {r['kind']} {r['name']} @ {r['file_path']}:{r['line_start']}")
+            elif args.graph_action == "search":
+                graph.load()
+                results = graph.search(args.query, kind=args.kind, top_k=args.top)
+                print(f"search '{args.query}' ({len(results)} results):")
+                for r in results:
+                    print(f"  {r['kind']} {r['name']} @ {r['file_path']}:{r['line_start']}")
 
-        elif args.cg_action == "stats":
-            graph.load()
-            stats = graph.stats()
-            print(f"symbols: {stats['symbols']}")
-            print(f"edges: {stats['edges']}")
-            print(f"files: {stats['files']}")
-            if stats["symbol_kinds"]:
-                print(f"symbol kinds: {', '.join(f'{k}={v}' for k, v in sorted(stats['symbol_kinds'].items()))}")
-            if stats["edge_kinds"]:
-                print(f"edge kinds: {', '.join(f'{k}={v}' for k, v in sorted(stats['edge_kinds'].items()))}")
-            if stats["languages"]:
-                print(f"languages: {', '.join(f'{k}={v}' for k, v in sorted(stats['languages'].items()))}")
+            elif args.graph_action == "stats":
+                graph.load()
+                stats = graph.stats()
+                print(f"symbols: {stats['symbols']}")
+                print(f"edges: {stats['edges']}")
+                print(f"files: {stats['files']}")
+                if stats["symbol_kinds"]:
+                    print(f"symbol kinds: {', '.join(f'{k}={v}' for k, v in sorted(stats['symbol_kinds'].items()))}")
+                if stats["edge_kinds"]:
+                    print(f"edge kinds: {', '.join(f'{k}={v}' for k, v in sorted(stats['edge_kinds'].items()))}")
+                if stats["languages"]:
+                    print(f"languages: {', '.join(f'{k}={v}' for k, v in sorted(stats['languages'].items()))}")
 
-        elif args.cg_action == "watch":
-            from .graph.watcher import GraphWatcher
-            print(f"watching {root} for changes (every {args.interval}s)...")
-            watcher = GraphWatcher(root, interval=args.interval)
-            watcher.start()
-            try:
-                while watcher.is_running:
-                    import time
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                watcher.stop()
-                print("\nstopped.")
+            elif args.graph_action == "watch":
+                from .graph.watcher import GraphWatcher
+                print(f"watching {root} for changes (every {args.interval}s)...")
+                watcher = GraphWatcher(root, interval=args.interval)
+                watcher.start()
+                try:
+                    while watcher.is_running:
+                        import time
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    watcher.stop()
+                    print("\nstopped.")
 
     return 0
 

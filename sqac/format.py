@@ -34,15 +34,25 @@ Version history:
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
+import os
 import struct
+import sys
 import threading
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Generator
+
+# Platform-specific locking
+if sys.platform == "win32":
+    import msvcrt
+    _HAS_FCNTL = False
+else:
+    import fcntl
+    _HAS_FCNTL = True
 
 MAGIC = b"SQAC"
 VERSION = 4  # v4 adds lz4 compression on binvec blocks
@@ -74,10 +84,10 @@ class CartridgeLockError(FormatError):
 
 # ── file locking ──────────────────────────────────────────────────────────────
 # Two layers:
-#   1. Process-level: fcntl.flock on the .sqac file (cross-process safe)
+#   1. Process-level: fcntl.flock on Unix, msvcrt.locking on Windows
 #   2. Thread-level: threading.Lock per path (in-process safe)
-# The context manager acquires both; the fcntl lock is released on exit
-# even if the process crashes (kernel-level guarantee on Unix).
+# The context manager acquires both; the OS lock is released on exit
+# even if the process crashes (kernel-level guarantee).
 
 _thread_locks: dict[str, threading.Lock] = {}
 _thread_locks_guard = threading.Lock()
@@ -92,12 +102,48 @@ def _get_thread_lock(path: Path) -> threading.Lock:
         return _thread_locks[key]
 
 
+def _acquire_file_lock(fd, exclusive: bool) -> bool:
+    """Acquire a file lock. Returns True on success, False if would block.
+    
+    On Unix: fcntl.flock with LOCK_EX|LOCK_NB or LOCK_SH|LOCK_NB
+    On Windows: msvcrt.locking with LK_NBLCK (locks first byte, no shared mode)
+    """
+    if _HAS_FCNTL:
+        try:
+            if exclusive:
+                fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            else:
+                fcntl.flock(fd.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+            return True
+        except (OSError, BlockingIOError):
+            return False
+    else:
+        # Windows: msvcrt.locking - locks byte 0, no shared mode (map LOCK_SH → exclusive)
+        try:
+            # Lock first byte (offset 0, length 1)
+            fd.seek(0)
+            msvcrt.locking(fd.fileno(), msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+
+
+def _release_file_lock(fd):
+    """Release a file lock acquired by _acquire_file_lock."""
+    if _HAS_FCNTL:
+        fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+    else:
+        # Windows: unlock the first byte
+        fd.seek(0)
+        msvcrt.locking(fd.fileno(), msvcrt.LK_UNLCK, 1)
+
+
 @contextmanager
 def locked_cartridge(path: Path, timeout: float = 10.0) -> Generator[None, None, None]:
     """Acquire an exclusive lock on a .sqac file for writing.
 
-    Acquires both a process-level fcntl lock and a thread-level lock.
-    The fcntl lock is mandatory on Linux/macOS: another process cannot
+    Acquires both a process-level OS lock and a thread-level lock.
+    The OS lock is mandatory on all platforms: another process cannot
     read or write the file until we release it.  On failure (timeout or
     unsupported platform), raises CartridgeLockError.
     """
@@ -108,7 +154,19 @@ def locked_cartridge(path: Path, timeout: float = 10.0) -> Generator[None, None,
     try:
         fd = open(path, "a+b")
         try:
-            fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # Wait with exponential backoff for the file lock
+            start = time.time()
+            backoff = 0.01
+            while time.time() - start < timeout:
+                if _acquire_file_lock(fd, exclusive=True):
+                    break
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 0.5)
+            else:
+                fd.close()
+                raise CartridgeLockError(
+                    f"cannot lock {path}: timeout after {timeout}s (another process is writing to it)"
+                )
         except (OSError, BlockingIOError):
             fd.close()
             raise CartridgeLockError(
@@ -118,11 +176,38 @@ def locked_cartridge(path: Path, timeout: float = 10.0) -> Generator[None, None,
             yield
         finally:
             try:
-                fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+                _release_file_lock(fd)
             finally:
                 fd.close()
     finally:
         tlock.release()
+
+
+def _acquire_shared_lock(fd, timeout: float = 5.0) -> bool:
+    """Acquire a shared (read) lock. Returns True on success."""
+    if _HAS_FCNTL:
+        try:
+            fcntl.flock(fd.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+            return True
+        except (OSError, BlockingIOError):
+            return False
+    else:
+        # Windows: no shared mode, use exclusive
+        try:
+            fd.seek(0)
+            msvcrt.locking(fd.fileno(), msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+
+
+def _release_shared_lock(fd):
+    """Release a shared lock."""
+    if _HAS_FCNTL:
+        fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+    else:
+        fd.seek(0)
+        msvcrt.locking(fd.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 @dataclass
@@ -311,10 +396,34 @@ def write_cartridge(
     if locked:
         with locked_cartridge(path):
             _write_parts(tmp, parts)
-            tmp.replace(path)
+            _atomic_replace(tmp, path)
     else:
         _write_parts(tmp, parts)
-        tmp.replace(path)
+        _atomic_replace(tmp, path)
+
+
+def _atomic_replace(tmp: Path, target: Path) -> None:
+    """Atomically replace target with tmp, with Windows retry logic.
+
+    On Windows, Windows Defender/indexer can hold the file briefly after
+    creation, causing PermissionError on rename. Uses exponential backoff.
+    """
+    max_attempts = 10 if sys.platform == "win32" else 1
+    backoff = 0.05
+    for attempt in range(max_attempts):
+        try:
+            tmp.replace(target)
+            return
+        except PermissionError:
+            if attempt == max_attempts - 1:
+                raise
+            time.sleep(backoff)
+            backoff = min(backoff * 1.5, 1.0)
+        except OSError:
+            if attempt == max_attempts - 1:
+                raise
+            time.sleep(backoff)
+            backoff = min(backoff * 1.5, 1.0)
 
 
 def _write_parts(tmp: Path, parts: list[bytes]) -> None:
@@ -337,15 +446,27 @@ class Cartridge:
 def read_cartridge(path: str | Path, locked: bool = False) -> Cartridge:
     """Read a cartridge from disk.
 
-    When *locked*, acquires a shared (read) lock via fcntl so writers
-    cannot modify the file while we read.  Default is unlocked for
+    When *locked*, acquires a shared (read) lock via platform-specific locking
+    so writers cannot modify the file while we read.  Default is unlocked for
     backward compatibility.
     """
     path = Path(path)
     if locked:
         fd = open(path, "rb")
         try:
-            fcntl.flock(fd.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+            # Wait with backoff for shared lock
+            start = time.time()
+            backoff = 0.01
+            while time.time() - start < 5.0:
+                if _acquire_shared_lock(fd):
+                    break
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 0.5)
+            else:
+                fd.close()
+                raise CartridgeLockError(
+                    f"cannot lock {path} for reading: another process is writing"
+                )
         except (OSError, BlockingIOError):
             fd.close()
             raise CartridgeLockError(
@@ -354,7 +475,7 @@ def read_cartridge(path: str | Path, locked: bool = False) -> Cartridge:
         try:
             blob = fd.read()
         finally:
-            fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+            _release_shared_lock(fd)
             fd.close()
     else:
         with open(path, "rb") as f:
