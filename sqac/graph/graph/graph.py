@@ -9,7 +9,7 @@ supports:
 - blast_radius(symbol): what breaks if I change this?
 - callers(symbol) / callees(symbol): direct relationships
 - search(query): fuzzy search across symbol names and docstrings
-- save() / load(): persist to .codegraph/graph.json
+- save() / load(): persist to .sqac-graph/graph.json
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ class CodeGraph:
 
     def __init__(self, project_root: str | Path, graph_dir: Optional[str | Path] = None):
         self.project_root = Path(project_root).resolve()
-        self.graph_dir = Path(graph_dir) if graph_dir else self.project_root / ".codegraph"
+        self.graph_dir = Path(graph_dir) if graph_dir else self.project_root / ".sqac-graph"
         self._symbols: dict[str, Symbol] = {}     # id -> Symbol
         self._edges: list[Edge] = []
         self._files: dict[str, FileInfo] = {}     # path -> FileInfo
@@ -91,7 +91,7 @@ class CodeGraph:
                 files_parsed += 1
             except Exception as exc:
                 errors += 1
-                logger.warning("codegraph: failed to parse %s: %s", rel_path, exc)
+                logger.warning("sqac.graph: failed to parse %s: %s", rel_path, exc)
 
         summary = {
             "project": str(self.project_root),
@@ -102,7 +102,7 @@ class CodeGraph:
             "edges": len(self._edges),
             "errors": errors,
         }
-        logger.info("codegraph: built — %s", summary)
+        logger.info("sqac.graph: built — %s", summary)
         return summary
 
     def _walk_project(self):
@@ -111,7 +111,7 @@ class CodeGraph:
             # Skip hidden dirs and common non-source dirs
             dirs[:] = [d for d in dirs if not d.startswith(".") and d not in (
                 "node_modules", "__pycache__", ".venv", "venv",
-                ".sqac", ".codegraph", "dist", "build", ".tox",
+                ".sqac", ".sqac-graph", "dist", "build", ".tox",
                 ".mypy_cache", ".pytest_cache",
             )]
             for fname in files:
@@ -260,7 +260,7 @@ class CodeGraph:
         tmp = save_path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
         tmp.replace(save_path)
-        logger.info("codegraph: saved to %s (%d symbols, %d edges)",
+        logger.info("sqac.graph: saved to %s (%d symbols, %d edges)",
                      save_path, len(self._symbols), len(self._edges))
 
     def load(self, path: Optional[str | Path] = None) -> bool:
@@ -292,11 +292,11 @@ class CodeGraph:
             for fp, fid in data.get("files", {}).items():
                 self._files[fp] = FileInfo.from_dict(fid)
 
-            logger.info("codegraph: loaded %d symbols, %d edges from %s",
+            logger.info("sqac.graph: loaded %d symbols, %d edges from %s",
                          len(self._symbols), len(self._edges), load_path)
             return True
         except Exception as exc:
-            logger.warning("codegraph: failed to load %s: %s", load_path, exc)
+            logger.warning("sqac.graph: failed to load %s: %s", load_path, exc)
             return False
 
     # ── stats ───────────────────────────────────────────────────────────

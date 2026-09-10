@@ -1,6 +1,6 @@
-"""Tests for the SQAC code graph.
+"""Tests for the SQAC graph.
 
-Run: python -m pytest tests/test_codegraph.py -q
+Run: python -m pytest tests/test_graph.py -q
 """
 
 import tempfile

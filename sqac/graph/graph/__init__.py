@@ -1,4 +1,4 @@
-"""SQAC Code Graph — AST-level code intelligence.
+"""SQAC Graph — AST-level code intelligence.
 
 Parses source files with tree-sitter, extracts symbols and call edges,
 and builds a queryable knowledge graph. Answers "what calls X?", "what
@@ -6,11 +6,11 @@ does X call?", "what breaks if I change X?" — the structural questions
 that fuzzy text search can't handle.
 
 Usage:
-    from sqac.codegraph import CodeGraph
+    from sqac.graph import CodeGraph
 
     graph = CodeGraph("/path/to/project")
     graph.build()                          # parse all source files
-    graph.save()                           # persist to .codegraph/
+    graph.save()                           # persist to .sqac-graph/
 
     # Query
     graph.explore("my_function")           # definition + callers + callees

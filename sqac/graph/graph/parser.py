@@ -43,7 +43,7 @@ _EXT_MAP: dict[str, str] = {
 # Files/dirs to skip
 _SKIP_DIRS = {
     "node_modules", ".git", "__pycache__", ".venv", "venv",
-    ".sqac", ".codegraph", "dist", "build", ".tox", ".mypy_cache",
+    ".sqac", ".sqac-graph", "dist", "build", ".tox", ".mypy_cache",
     ".pytest_cache", "egg-info", ".eggs",
 }
 _SKIP_EXTS = {
