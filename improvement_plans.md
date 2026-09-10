@@ -6,14 +6,30 @@
 
 ---
 
+# SQAC Improvement Plans — Road to v1.0
+
+> **Current**: v0.1.10 (semantic tier unblocked)  
+> **Target**: v1.0 (stable, documented, encrypted, cross-platform)  
+> **Milestones**: v0.2.0 → v0.3.0 → v1.0
+
+---
+
 ## 🔴 Blockers (Must Fix Before v0.2.0)
 
-### 1. Semantic Tier Broken — numpy 2.x / scipy Incompatibility
+### 1. ~~Semantic Tier Broken — numpy 2.x / scipy Incompatibility~~ ✅ **DONE** (v0.1.10)
 **Impact**: `pip install sqac[all]` installs but semantic encoder crashes at runtime (`ModuleNotFoundError: scipy`).
 
-**Root Cause**: `scipy` wheels compiled against numpy 1.x; current env has numpy 2.5.3.
+**Root Cause**: `scipy` wheels compiled against numpy 1.x; current env had numpy 2.5.3.
 
-**Fix Options**:
+**Fix Applied**: Pin `numpy<2` in `pyproject.toml` (v0.1.10). Added `semantic` extra with `transformers>=4.30`, `torch`, `sentence-transformers`.
+
+**Verified**:
+- MiniLM encoder works (paraphrase queries pass)
+- Static encoder tests pass (9/9)
+- Semantic tier tests pass (4/4)
+- All 307 tests passing
+
+**Original Fix Options** (kept for reference):
 | Option | Effort | Trade-off |
 |--------|--------|-----------|
 | Pin `numpy<2` in `pyproject.toml` | 5 min | Works now; defers upgrade |
@@ -157,8 +173,10 @@ sqac migrate session.sqac session_v2.sqac --from-version 1 --to-version 2
 
 ## 📋 Sprint Plan
 
+## 📋 Sprint Plan
+
 ### Sprint 1 (v0.2.0 — 1 week)
-- [ ] Pin `numpy<2` in `pyproject.toml`
+- [x] Pin `numpy<2` in `pyproject.toml` ✅ **DONE** (v0.1.10)
 - [ ] Add ARM64 wheel build workflow
 - [ ] Implement `age` encryption for `save/load`
 - [ ] Fix MCP connection cleanup
