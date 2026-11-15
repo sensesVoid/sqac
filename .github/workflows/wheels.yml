@@ -1,0 +1,71 @@
+name: Wheels
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "sqac-simd/**"
+      - "setup.py"
+      - "pyproject.toml"
+      - "MANIFEST.in"
+      - ".github/workflows/wheels.yml"
+
+jobs:
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build twine
+      - run: python -m build --sdist
+      - run: python -m twine check dist/*
+      - name: Assert Rust sources shipped
+        run: |
+          tar -tf dist/*.tar.gz | grep -q "sqac-simd/Cargo.toml"
+          tar -tf dist/*.tar.gz | grep -q "sqac-simd/Cargo.lock"
+          tar -tf dist/*.tar.gz | grep -q "sqac-simd/src/lib.rs"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  wheels:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            archs: "x86_64 aarch64"
+          - os: macos-15-intel
+            archs: "x86_64"
+          - os: macos-15
+            archs: "arm64"
+          - os: windows-latest
+            archs: "AMD64"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Rust (macOS/Windows)
+        if: runner.os != 'Linux'
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v4.3.5
+        env:
+          CIBW_BUILD: "cp310-*"
+          CIBW_ARCHS: ${{ matrix.archs }}
+          CIBW_BEFORE_ALL_LINUX: >-
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+            sh -s -- -y --profile minimal
+          CIBW_ENVIRONMENT_LINUX: "PATH=$HOME/.cargo/bin:$PATH"
+          CIBW_TEST_COMMAND: >-
+            python -c "import sqac, sqac.simd; assert sqac.simd.HAS_SIMD"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
