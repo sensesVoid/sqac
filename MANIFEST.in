@@ -1,0 +1,6 @@
+include LICENSE
+include README.md
+include CHANGELOG.md
+include sqac-simd/Cargo.toml
+include sqac-simd/Cargo.lock
+recursive-include sqac-simd/src *.rs
