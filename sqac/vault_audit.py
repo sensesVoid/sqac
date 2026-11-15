@@ -51,7 +51,8 @@ def append_audit(
         try:
             lines = AUDIT_PATH.read_text(encoding="utf-8").strip().splitlines()
             if lines:
-                prev = _sha256_bytes(_canonical(json.loads(lines[-1])))
+                last_rec = json.loads(lines[-1])
+                prev = _sha256_bytes(_canonical({k: v for k, v in last_rec.items() if k != "prev"}))
         except Exception:
             prev = ""
 
@@ -95,5 +96,6 @@ def verify_audit_chain() -> bool:
         rec = json.loads(line)
         if rec.get("prev", "") != prev:
             return False
+        # Compute hash of this record (without prev) for next iteration
         prev = _sha256_bytes(_canonical({k: v for k, v in rec.items() if k != "prev"}))
     return True
