@@ -294,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
             if result.stdout:
                 print(result.stdout, end="")
             if result.stderr:
-                print(result.stderr, end="", file=_dbg.stderr)
+                print(result.stderr, end="", file=__import__("sys").stderr)
             return result.returncode
 
         elif args.vault_cmd == "audit":
