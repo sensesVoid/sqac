@@ -29,6 +29,7 @@ from pydantic import Field
 
 from mcp.server.mcpserver import MCPServer
 
+from sqac._version import __version__
 from sqac.continuity import (
     ContinuityStore,
     bootstrap_packet,
@@ -60,7 +61,7 @@ mcp = MCPServer(
         "ast_callees, ast_search (fuzzy symbol search), ast_stats."
     ),
     instructions=server_instructions(),
-    version="0.1.0",
+    version=__version__,
 )
 
 # Register graph tools (code intelligence)

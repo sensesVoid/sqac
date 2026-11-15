@@ -15,6 +15,7 @@ from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from .format import compact_cartridge, _HAS_LZ4
 from .store import SqacStore, _HAS_SIMD
+from ._version import __version__
 from .rack import CartridgeRack
 from .offloader import ContextOffloader
 
@@ -97,7 +98,7 @@ def _get_store(name: Optional[str] = None) -> SqacStore:
         return s
     raise HTTPException(404, "no cartridge loaded")
 
-app = FastAPI(title="SQAC Server", version="0.1.0")
+app = FastAPI(title="SQAC Server", version=__version__)
 
 class SearchRequest(BaseModel):
     query: str; top_k: int = Field(3, ge=1, le=50); kind: Optional[str] = None
@@ -555,7 +556,7 @@ footer{{margin-top:24px;padding-top:12px;border-top:1px solid #21263d;color:#484
 <tr><td>GET</td><td>/graph</td><td>3D graph visualization</td></tr>
 </table>
 
-<footer>SQAC v0.1.0 — VSA memory cartridges for LLMs — <a href="/health" style="color:#58a6ff">Health</a> · <a href="/metrics" style="color:#58a6ff">Metrics</a> · <a href="/docs" style="color:#58a6ff">API Docs</a></footer>
+<footer>SQAC v{__version__} — VSA memory cartridges for LLMs — <a href="/health" style="color:#58a6ff">Health</a> · <a href="/metrics" style="color:#58a6ff">Metrics</a> · <a href="/docs" style="color:#58a6ff">API Docs</a></footer>
 </body></html>"""
     return HTMLResponse(dashboard_html)
 
