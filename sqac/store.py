@@ -24,13 +24,9 @@ from typing import Any, Optional
 from .encoder import BSCEncoder, MiniLMSimHashEncoder
 from .static_encoder import StaticSimHashEncoder
 
-# Optional Rust SIMD acceleration — 100-300x faster for fuzzy scan
-try:
-    import sqac_simd as _simd
-    _HAS_SIMD = True
-except ImportError:
-    _simd = None
-    _HAS_SIMD = False
+# Bundled Rust SIMD acceleration — 100-300x faster for fuzzy scan
+from .simd import HAS_SIMD as _HAS_SIMD
+from .simd import backend as _simd
 
 from .format import (
     _HAS_LZ4,
