@@ -50,10 +50,9 @@ Every token you put into an LLM's context costs GPU memory. A 1M-token conversat
 ### Install
 
 ```bash
-pip install sqac                  # core: numpy only — gives you the `sqac` CLI
+pip install sqac                  # core: numpy + bundled Rust SIMD (prebuilt wheels)
 pip install sqac[mcp]             # + the MCP server for LLM integration
 pip install sqac[server]          # + HTTP API server (FastAPI + uvicorn)
-pip install sqac[simd]            # + Rust SIMD for 261x faster fuzzy scan
 pip install sqac[all]             # everything
 ```
 
@@ -895,16 +894,16 @@ SQAC is a **memory layer** — it gives any LLM access to knowledge it doesn't h
 | lz4 compression | 15x at scale (payload JSON) |
 | Memory per entry (lexical) | **3.4 KiB/entry** (10K), **4.1 KiB/entry** (25K) |
 | Memory per entry (semantic) | **7.1 KiB/entry** (5K vectors) |
-| Runtime deps | numpy. That's it. |
-| Rust SIMD deps | pyo3 + packed_simd2 (optional, auto-detected) |
+| Runtime deps | numpy + tree-sitter-language-pack |
+| Rust SIMD deps | pyo3 (bundled in wheels, auto-detected) |
 
 ### Rust SIMD: 261x faster fuzzy scan
 
-SQAC ships an optional Rust extension (`sqac-simd/`) that accelerates the XOR+popcount inner loop:
+SQAC bundles a Rust extension (`sqac._simd`) that accelerates the XOR+popcount inner loop:
 
 - **AVX2 + POPCNT** on x86_64 (256-bit lanes, 32 bytes/iteration)
 - **NEON** on AArch64 (128-bit lanes, 16 bytes/iteration)
-- Falls back to NumPy when Rust isn't installed
+- Prebuilt wheels include it; `SQAC_SKIP_RUST=1` forces the NumPy fallback
 
 ```python
 # Benchmark at 10K vectors (1024 dims)
@@ -915,12 +914,10 @@ SQAC ships an optional Rust extension (`sqac-simd/`) that accelerates the XOR+po
 
 At 100K rules (which would be 18 seconds in Python), Rust SIMD brings it to **~70ms**. At 25K: **13ms**.
 
-Build it:
+Source builds compile it automatically when Rust is installed. To skip it:
 
 ```bash
-pip install maturin
-cd sqac-simd && maturin build --release
-pip install target/wheels/sqac_simd-*.whl
+SQAC_SKIP_RUST=1 pip install --no-binary sqac sqac
 ```
 
 ### Whole-system benchmarks
@@ -1104,7 +1101,7 @@ SQAC stands on published work. Every link verified; no folklore citations.
 
 ---
 
-**Status:** research-grade, under active development. Core stable and tested (307/307 tests passing). Published to PyPI: `pip install sqac`.
+**Status:** 0.2.0 — production-oriented, under active development. Core stable and tested. Published to PyPI: `pip install sqac`.
 
 *Built as an implementation of the SQ thesis — see `docs/THESIS.md` for the full research narrative.*
 

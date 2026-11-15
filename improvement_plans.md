@@ -1,14 +1,6 @@
 # SQAC Improvement Plans — Road to v1.0
 
-> **Current**: v0.1.8 (production-usable with caveats)  
-> **Target**: v1.0 (stable, documented, encrypted, cross-platform)  
-> **Milestones**: v0.2.0 → v0.3.0 → v1.0
-
----
-
-# SQAC Improvement Plans — Road to v1.0
-
-> **Current**: v0.1.10 (semantic tier unblocked)  
+> **Current**: v0.2.0 (bundled SIMD + CI/CD)  
 > **Target**: v1.0 (stable, documented, encrypted, cross-platform)  
 > **Milestones**: v0.2.0 → v0.3.0 → v1.0
 
@@ -40,7 +32,7 @@
 
 ---
 
-### 2. No ARM64 SIMD Wheels
+### 2. ARM64 SIMD Wheels — IN PROGRESS (0.2.0)
 **Impact**: `pip install sqac[simd]` fails on Apple Silicon / ARM servers — falls back to NumPy (500ms vs 10ms at 10K).
 
 **Fix**:
@@ -173,11 +165,9 @@ sqac migrate session.sqac session_v2.sqac --from-version 1 --to-version 2
 
 ## 📋 Sprint Plan
 
-## 📋 Sprint Plan
-
 ### Sprint 1 (v0.2.0 — 1 week)
 - [x] Pin `numpy<2` in `pyproject.toml` ✅ **DONE** (v0.1.10)
-- [ ] Add ARM64 wheel build workflow
+- [x] Add ARM64 wheel build workflow (0.2.0; verify on first release)
 - [ ] Implement `age` encryption for `save/load`
 - [ ] Fix MCP connection cleanup
 

@@ -2,6 +2,45 @@
 
 All notable changes to SQAC (Symbolic Query Addressable Cartridge) are documented here.
 
+## [0.2.0] — 2026-11-15
+
+### Added
+- Bundled Rust SIMD extension (`sqac._simd`) built into the main wheel with abi3.
+- GitHub Actions CI matrix (3 OS × Python 3.10–3.13), NumPy-fallback job,
+  cibuildwheel builds, and Trusted Publishing releases.
+
+### Changed
+- `numpy<2` pin removed; NumPy 2 and Python 3.13 are supported.
+- `sentence-transformers` removed from optional extras (unused).
+- Version is single-sourced from `sqac/_version.py`.
+- `tree-sitter-language-pack` is now a declared runtime dependency.
+
+### Fixed
+- `sqac/autobuild.py` parses on Python 3.10/3.11.
+- Removed host-specific `target-cpu=native` from the Rust release profile.
+- Windows cartridge writes use a sidecar lock, so atomic replace works.
+- `extract_config` handles CRLF files.
+
+## [0.1.10] — 2026-09-09
+### Changed
+- Semantic tier unblocked by pinning `numpy<2`; README benchmarks refreshed.
+
+## [0.1.9] — 2026-09-09
+### Changed
+- Renamed `codegraph` to `graph`; improved Windows compatibility and `.gitignore` handling.
+
+## [0.1.8] — 2026-09-09
+### Added
+- Major retrieval optimizations and a checkpoint recovery system.
+
+## [0.1.7] — 2026-09-08
+### Fixed
+- Server session cartridge access and graph endpoint.
+
+## [0.1.6] — 2026-09-08
+### Security
+- Credential detection; removed test secrets from the repository.
+
 ## [0.1.5] — 2026-09-08
 
 ### Added
