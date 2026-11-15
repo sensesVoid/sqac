@@ -1,79 +1,55 @@
 # SQAC Improvement Plans — Road to v1.0
 
-> **Current**: v0.2.0 (bundled SIMD + CI/CD)  
-> **Target**: v1.0 (stable, documented, encrypted, cross-platform)  
-> **Milestones**: v0.2.0 → v0.3.0 → v1.0
+> **Current**: 0.2.0 in progress on `feat/0.2.0-simd-ci` (PR [#1](https://github.com/sensesVoid/sqac/pull/1), CI running)  
+> **Target**: v1.0 (stable, documented, agent/vault/cloud-ready, cross-platform)  
+> **Milestones**: 0.2.0 (SIMD+CI) → 0.3.0 (vault) → 0.4.0 (agent) → 0.5.0 (R2 sync) → 1.0.0 (hardening)
+
+Roadmap aligned with `docs/superpowers/specs/2026-11-15-sqac-v1-design.md`.
 
 ---
 
-## 🔴 Blockers (Must Fix Before v0.2.0)
+## 0.2.0 — Bundled SIMD & CI/CD (in progress)
 
-### 1. ~~Semantic Tier Broken — numpy 2.x / scipy Incompatibility~~ ✅ **DONE** (v0.1.10)
-**Impact**: `pip install sqac[all]` installs but semantic encoder crashes at runtime (`ModuleNotFoundError: scipy`).
+### 1. ~~Semantic tier / NumPy compatibility~~ ✅ **DONE** (v0.1.10, carried forward)
+- Runtime deps now `numpy>=1.24` (NumPy 2 supported) + `tree-sitter-language-pack>=1.0,<1.24` (Python 3.10-safe cap).
 
-**Root Cause**: `scipy` wheels compiled against numpy 1.x; current env had numpy 2.5.3.
+### 2. Bundled Rust SIMD + cross-platform wheels ✅ **IMPLEMENTED** (verify in CI/release)
+- `sqac._simd` bundled via setuptools-rust/pyo3 0.30 (abi3), `SQAC_SKIP_RUST=1` NumPy fallback, legacy `sqac_simd` fallback.
+- cibuildwheel matrix: Linux x86_64/aarch64 (QEMU), macOS x86_64/arm64, Windows AMD64 (`.github/workflows/wheels.yml`).
+- **Pending:** green Wheels/CI on PR #1 and first tagged release artifacts.
 
-**Fix Applied**: Pin `numpy<2` in `pyproject.toml` (v0.1.10). Added `semantic` extra with `transformers>=4.30`, `torch`, `sentence-transformers`.
-
-**Verified**:
-- MiniLM encoder works (paraphrase queries pass)
-- Static encoder tests pass (9/9)
-- Semantic tier tests pass (4/4)
-- All 307 tests passing
-
-**Original Fix Options** (kept for reference):
-| Option | Effort | Trade-off |
-|--------|--------|-----------|
-| Pin `numpy<2` in `pyproject.toml` | 5 min | Works now; defers upgrade |
-| Upgrade scipy/scikit-learn to numpy 2 compatible | 1-2 hrs | Future-proof; may break other deps |
-| Vendor minimal scipy subset | 1 day | Zero deps; maintenance burden |
-
-**Recommended**: Pin `numpy<2` for v0.2.0, schedule upgrade for v0.3.0.
+### 3. CI/CD, packaging, and release automation ✅ **IMPLEMENTED** (verify in CI)
+- CI matrix (3 OS × py3.10–3.13) + NumPy-fallback job, Rust tests/clippy, ruff (`.github/workflows/ci.yml`).
+- Trusted Publishing release workflow + Dependabot + `docs/PUBLISHING.md`.
+- Single-sourced version (`0.2.0`), metadata fixes, Windows sidecar-lock/CRLF fixes, Python 3.10/3.11 autobuild fix.
+- **Pending:** green PR checks, merge, optional TestPyPI dry-run, tag `v0.2.0`.
 
 ---
 
-### 2. ARM64 SIMD Wheels — IN PROGRESS (0.2.0)
-**Impact**: `pip install sqac[simd]` fails on Apple Silicon / ARM servers — falls back to NumPy (500ms vs 10ms at 10K).
+## 0.3.0 — Vault cartridge (next, per v1 design)
 
-**Fix**:
-- Set up `cibuildwheel` in GitHub Actions (macOS + Linux ARM64)
-- Cross-compile `sqac-simd` with `cargo build --target aarch64-unknown-linux-gnu`
-- Test on macOS runner (`macos-14`)
-
-**Files**: `.github/workflows/build.yml`, `sqac-simd/Cargo.toml`
+- **Reference-only secret vault**: `vault` cartridge type (header v5), AES-256-GCM, OS keychain + Argon2id passphrase, `vault:NAME` references.
+- **No plaintext exfiltration**: `vault exec` (env injection) and `vault_http` proxy; no MCP `get`/`resolve`/raw export of values; audit log without values.
+- **Rack isolation**: vaults never indexed in semantic/fuzzy tiers or shared search; keychain vaults local-only, `--portable` vaults sync as ciphertext.
+- **CLI/MCP**: `sqac vault create/unlock/lock/set/list/rm/rotate/exec/export/import` + proxy tools.
 
 ---
 
-### 3. No Cartridge Encryption
-**Impact**: All cartridges (including session memory with secrets) stored as plaintext `.sqac` files.
+## 0.4.0 — Agent cartridge (per v1 design)
 
-**Threat Model**:
-- Laptop theft → full conversation history exposed
-- Shared CI runners → cross-project memory leak
-- Backup leakage → PII in cartridges
+- `agent` cartridge type: persona + working state, `set` upserts/singletons/append lists, type-based rack isolation.
 
-**Fix Options**:
-| Approach | Library | Overhead |
-|----------|---------|----------|
-| `age` (Rust) | `age` crate | ~5ms encrypt/decrypt |
-| `cryptography` (Fernet) | Python | ~2ms |
-| `libsodium` (secretbox) | `pynacl` | ~1ms |
+## 0.5.0 — Cloudflare R2 sync (per v1 design)
 
-**Recommended**: `age` — single binary, modern, streaming, integrates with Rust SIMD crate.
+- `StorageBackend` seam, local cache, explicit sync allowlist (memory/agents/vaults; continuity opt-in; never audit/config/session/checkpoints), conflict abort with force flags, ciphertext-only vault sync.
 
-**Implementation**:
-```python
-# store.py: add encrypt/decrypt to save/load
-def save(self, path, ..., passphrase=None):
-    if passphrase:
-        # age encrypt stream
-    else:
-        # current plaintext
-```
+## 1.0.0 — Hardening
+
+- Format/version fuzzing and migration tooling, Windows lock/audit hardening, docs site, security review, scale benchmarks, CI release gates verified on tags.
 
 ---
 
-## 🟡 High Priority (v0.3.0)
+## Backlog (carry-over)
 
 ### 4. Cartridge Migration Tooling
 **Need**: `sqac migrate <old_cartridge> <new_cartridge> --format-version 2`
@@ -163,50 +139,18 @@ sqac migrate session.sqac session_v2.sqac --from-version 1 --to-version 2
 
 ---
 
-## 📋 Sprint Plan
+## Next actions (0.2.0 completion)
 
-### Sprint 1 (v0.2.0 — 1 week)
-- [x] Pin `numpy<2` in `pyproject.toml` ✅ **DONE** (v0.1.10)
-- [x] Add ARM64 wheel build workflow (0.2.0; verify on first release)
-- [ ] Implement `age` encryption for `save/load`
-- [ ] Fix MCP connection cleanup
+- [ ] **PR #1 CI green**: `CI` (43678897713/latest) and `Wheels` (43678897752/latest) must pass after workflow fixes.
+- [ ] **Merge** `feat/0.2.0-simd-ci` → `main` (on approval).
+- [ ] **TestPyPI dry-run**: `Release` workflow dispatch with `testpypi=true` (requires Trusted Publishing + `testpypi` environment).
+- [ ] **Release**: tag/push `v0.2.0` → PyPI publish + GitHub Release; post-release `pip install --no-cache-dir sqac==0.2.0` smoke.
+- [ ] **Plan 0.3.0 (vault)**: break `docs/superpowers/specs/2026-11-15-sqac-v1-design.md` §9 into an implementation plan (cartridge v5, crypto, CLI/MCP, rack isolation, tests).
 
-### Sprint 2 (v0.3.0 — 2 weeks)
-- [ ] `sqac migrate` command
-- [ ] Windows CI + watchdog testing
-- [ ] MCP auth + timeout handling
-- [ ] Tiered storage prototype (background compaction)
+## Notes
 
-### Sprint 3 (v1.0 — 3 weeks)
-- [ ] Comprehensive docs (mkdocs + GitHub Pages)
-- [ ] Scale benchmarks (100K, 1M entries)
-- [ ] Cartridge signing (cosign)
-- [ ] Cross-CLI integration tests (opencode ↔ claude-code ↔ codex)
+- **v1 sequencing** (approved): vault → agent → R2 → hardening (see design doc). Encryption for secrets lives in the `vault` cartridge, not blanket encryption of memory cartridges.
+- **Resolved in 0.2.0**: pyo3 upgraded to 0.30/abi3; `tree-sitter-language-pack` declared as a runtime dep (capped for py3.10).
+- **Open debt**: format fuzzing/migration, docs site, security review of `credentials.py`/`injection.py`, tiered storage/scale, MCP remote auth/hardening, distributed rack, model swap, signing — tracked for 0.3.0–1.0.0/backlog above.
 
----
-
-## 🎯 Success Criteria for v1.0
-
-| Metric | Target |
-|--------|--------|
-| `pip install sqac[all]` | Works on Linux/macOS/Windows, x86_64/ARM64 |
-| Cold start latency | <2s (including model download) |
-| Fuzzy search 100K entries | <50ms (SIMD) |
-| Semantic search 25K entries | <27ms |
-| Encryption overhead | <10ms per save/load |
-| Migration success rate | 100% (automated tests) |
-| Documentation coverage | 100% public API + CLI |
-| Test matrix | 3 OS × 2 arch × 3 Python versions |
-
----
-
-## 📝 Notes
-
-- **Priority order** is flexible — adjust based on user feedback
-- **Technical debt**: `sqac-simd` crate needs `pyo3` 0.22 upgrade (currently 0.21)
-- **Dependencies**: Consider vendoring `tree-sitter-language-pack` to avoid system deps
-- **Security**: Audit `credentials.py` / `injection.py` for bypasses
-
----
-
-*Generated 2026-09-09 — update as work progresses*
+*Updated 2026-11-15 — reflects PR #1 / 0.2.0 progress*
