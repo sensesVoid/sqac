@@ -29,7 +29,7 @@ jobs:
         with:
           workspaces: sqac-simd
       - name: Install package and tools
-        run: python -m pip install -e ".[mcp,server,compress]" ruff
+        run: python -m pip install -e ".[mcp,server,compress]" pytest ruff
       - name: Assert bundled SIMD
         run: python -c "import sqac.simd as s; assert s.HAS_SIMD, 'bundled SIMD missing'"
       - name: Python tests
@@ -53,7 +53,7 @@ jobs:
       - name: Install without Rust
         env:
           SQAC_SKIP_RUST: "1"
-        run: python -m pip install -e ".[mcp,compress]"
+        run: python -m pip install -e ".[mcp,server,compress]" pytest
       - name: Assert fallback
         run: python -c "import sqac.simd as s; assert not s.HAS_SIMD, 'SIMD unexpectedly present'"
       - name: Python tests
