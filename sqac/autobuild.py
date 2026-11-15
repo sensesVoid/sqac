@@ -299,6 +299,7 @@ def _npm_deps(obj: dict) -> str:
 
 def extract_config(rel: str, text: str) -> list[Unit]:
     low = rel.lower()
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     if rel.endswith("package.json"):
         try:
             obj = json.loads(text)
@@ -345,9 +346,10 @@ def extract_config(rel: str, text: str) -> list[Unit]:
                 ln = ln.strip()
                 if "=" in ln:
                     k, _, v = ln.partition("=")
+                    script_value = v.strip().strip('"')
                     units.append(Unit(f"{rel}#script:{k.strip()}", "fact",
                                       f"console script {k.strip()}",
-                                      f"[{rel}] `{k.strip()}` -> `{v.strip().strip('\"')}`"))
+                                      f"[{rel}] `{k.strip()}` -> `{script_value}`"))
         return units
     if rel.endswith("requirements.txt"):
         deps = [ln.strip() for ln in text.splitlines()

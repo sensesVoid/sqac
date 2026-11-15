@@ -39,6 +39,7 @@ Thumbs.db
 .sqac-graph/
 *.sqac
 *.sqac.tmp
+*.sqac.lock
 
 # Cargo
 sqac-simd/target/
