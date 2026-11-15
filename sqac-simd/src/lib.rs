@@ -121,7 +121,7 @@ fn xor_popcount(a: &[u8], b: &[u8]) -> u32 {
 
     #[cfg(target_arch = "aarch64")]
     {
-        return unsafe { xor_popcount_neon(a, b) };
+        unsafe { xor_popcount_neon(a, b) }
     }
 
     // Portable fallback (x86_64 without AVX2, and other architectures)
@@ -132,6 +132,7 @@ fn xor_popcount(a: &[u8], b: &[u8]) -> u32 {
 }
 
 /// Portable XOR+popcount — works everywhere.
+#[cfg(not(target_arch = "aarch64"))]
 #[inline]
 fn xor_popcount_portable(a: &[u8], b: &[u8]) -> u32 {
     a.iter().zip(b.iter()).map(|(x, y)| (x ^ y).count_ones()).sum()
