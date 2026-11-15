@@ -5,7 +5,7 @@ Public API:
     ContextOffloader   — ephemeral turn bucket (observe/save/recall)
     CartridgeRack      — named cartridges + kind-based routing
     BSCEncoder         — zero-dependency binary spatter-code encoder
-    read/write         — .sqac binary format v1
+    read/write         — .sqac binary format v4
     extract_project_units / build_store / track_once / track
                         — project auto-build and realtime tracking
 """
@@ -35,7 +35,7 @@ from .store import (
     resolve_kind,
 )
 
-__version__ = "0.1.6"
+from ._version import __version__
 
 _KVCACHE_NAMES = frozenset(
     {
@@ -61,6 +61,7 @@ def __getattr__(name: str):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
+    "__version__",
     "SqacStore",
     "ContextOffloader",
     "CartridgeRack",

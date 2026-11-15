@@ -330,6 +330,11 @@ class TestGraduationPass(unittest.TestCase):
             self.assertEqual(r2["promoted"], 0)
 
     def test_graduated_facts_searchable_in_target(self):
+        from sqac.encoder import MiniLMSimHashEncoder
+        from sqac.static_encoder import StaticSimHashEncoder
+
+        if not (StaticSimHashEncoder.available() or MiniLMSimHashEncoder.available()):
+            self.skipTest("semantic encoder unavailable")
         with tempfile.TemporaryDirectory() as td:
             off = _make_bucket(td)
             rack = CartridgeRack(td, default="durable")

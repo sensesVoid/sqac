@@ -73,8 +73,8 @@ fn pack_and_similarity(
         let k_obj = keys_src.get_item(idx)?;
         let c_obj = ckeys_src.get_item(idx)?;
         
-        let k_bytes: &Bound<'_, PyBytes> = k_obj.downcast()?;
-        let c_bytes: &Bound<'_, PyBytes> = c_obj.downcast()?;
+        let k_bytes: &Bound<'_, PyBytes> = k_obj.cast()?;
+        let c_bytes: &Bound<'_, PyBytes> = c_obj.cast()?;
         
         let k = k_bytes.as_bytes();
         let c = c_bytes.as_bytes();
@@ -121,14 +121,18 @@ fn xor_popcount(a: &[u8], b: &[u8]) -> u32 {
 
     #[cfg(target_arch = "aarch64")]
     {
-        return unsafe { xor_popcount_neon(a, b) };
+        unsafe { xor_popcount_neon(a, b) }
     }
 
-    // Portable fallback
-    xor_popcount_portable(a, b)
+    // Portable fallback (x86_64 without AVX2, and other architectures)
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        xor_popcount_portable(a, b)
+    }
 }
 
 /// Portable XOR+popcount — works everywhere.
+#[cfg(not(target_arch = "aarch64"))]
 #[inline]
 fn xor_popcount_portable(a: &[u8], b: &[u8]) -> u32 {
     a.iter().zip(b.iter()).map(|(x, y)| (x ^ y).count_ones()).sum()
@@ -222,10 +226,10 @@ unsafe fn xor_popcount_neon(a: &[u8], b: &[u8]) -> u32 {
 
 /// Module definition for Python
 #[pymodule]
-fn sqac_simd(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _simd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bulk_similarity, m)?)?;
     m.add_function(wrap_pyfunction!(pack_and_similarity, m)?)?;
-    m.add("__version__", "0.1.0")?;
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
 
@@ -271,9 +275,6 @@ mod tests {
 
     #[test]
     fn test_matches_python_popcount() {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
         // Generate deterministic pseudo-random data
         let mut a = vec![0u8; 128];
         let mut b = vec![0u8; 128];

@@ -129,8 +129,9 @@ class TestServerHelpers(unittest.TestCase):
             with self.assertRaises(Exception, msg=f"accepted {bad!r}"):
                 p._cartridge_path(bad)
         ok = p._cartridge_path("memory")
-        self.assertTrue(str(ok).startswith(self.tmp.name))
-        self.assertTrue(str(ok).endswith("memory.sqac"))
+        base = __import__("pathlib").Path(self.tmp.name).resolve()
+        self.assertEqual(ok.parent, base)
+        self.assertEqual(ok.name, "memory.sqac")
 
     def test_verify_key_uses_compare_digest(self):
         # Passing key works, wrong key 401s.

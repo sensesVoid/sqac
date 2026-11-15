@@ -7,6 +7,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.so
+*.pyd
 
 # IDE
 .idea/
@@ -17,6 +18,7 @@ __pycache__/
 # Environment
 .env
 .venv/
+.venv-*/
 venv/
 .envsitter/
 
@@ -39,6 +41,7 @@ Thumbs.db
 .sqac-graph/
 *.sqac
 *.sqac.tmp
+*.sqac.lock
 
 # Cargo
 sqac-simd/target/

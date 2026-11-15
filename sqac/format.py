@@ -102,6 +102,13 @@ def _get_thread_lock(path: Path) -> threading.Lock:
         return _thread_locks[key]
 
 
+def _lock_path(path: Path) -> Path:
+    """Sidecar lock on Windows; the target itself elsewhere."""
+    if sys.platform == "win32":
+        return path.with_name(path.name + ".lock")
+    return path
+
+
 def _acquire_file_lock(fd, exclusive: bool) -> bool:
     """Acquire a file lock. Returns True on success, False if would block.
     
@@ -152,7 +159,7 @@ def locked_cartridge(path: Path, timeout: float = 10.0) -> Generator[None, None,
     tlock = _get_thread_lock(path)
     tlock.acquire()
     try:
-        fd = open(path, "a+b")
+        fd = open(_lock_path(path), "a+b")
         try:
             # Wait with exponential backoff for the file lock
             start = time.time()
@@ -452,7 +459,7 @@ def read_cartridge(path: str | Path, locked: bool = False) -> Cartridge:
     """
     path = Path(path)
     if locked:
-        fd = open(path, "rb")
+        fd = open(_lock_path(path), "a+b")
         try:
             # Wait with backoff for shared lock
             start = time.time()
@@ -473,7 +480,8 @@ def read_cartridge(path: str | Path, locked: bool = False) -> Cartridge:
                 f"cannot lock {path} for reading: another process is writing"
             )
         try:
-            blob = fd.read()
+            with open(path, "rb") as f:
+                blob = f.read()
         finally:
             _release_shared_lock(fd)
             fd.close()

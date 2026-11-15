@@ -17,6 +17,7 @@ import functools
 import hashlib
 import re
 import time
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -24,13 +25,9 @@ from typing import Any, Optional
 from .encoder import BSCEncoder, MiniLMSimHashEncoder
 from .static_encoder import StaticSimHashEncoder
 
-# Optional Rust SIMD acceleration — 100-300x faster for fuzzy scan
-try:
-    import sqac_simd as _simd
-    _HAS_SIMD = True
-except ImportError:
-    _simd = None
-    _HAS_SIMD = False
+# Bundled Rust SIMD acceleration — 100-300x faster for fuzzy scan
+from .simd import HAS_SIMD as _HAS_SIMD
+from .simd import backend as _simd
 
 from .format import (
     _HAS_LZ4,
@@ -202,11 +199,20 @@ class SqacStore:
                 elif MiniLMSimHashEncoder.available():
                     self._sem_encoder = MiniLMSimHashEncoder(dims=self.dims)
                 else:
-                    raise RuntimeError(
-                        "semantic=True needs the static model files (see "
-                        "sqac/static_encoder.py) or torch+transformers for MiniLM"
-                    )
-            self.semantic = True
+                    if semantic_model is None:
+                        warnings.warn(
+                            "semantic=True requested but no semantic encoder is "
+                            "available; falling back to lexical-only",
+                            RuntimeWarning,
+                            stacklevel=2,
+                        )
+                        self._sem_encoder = None
+                    else:
+                        raise RuntimeError(
+                            "semantic=True needs the static model files (see "
+                            "sqac/static_encoder.py) or torch+transformers for MiniLM"
+                        )
+            self.semantic = self._sem_encoder is not None
 
         self._entries: list[dict[str, Any]] = []  # live entries
         self._exact: dict[str, int] = {}  # normalized key -> entry idx

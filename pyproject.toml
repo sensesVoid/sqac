@@ -1,36 +1,61 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77", "wheel", "setuptools-rust>=1.13"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "sqac"
-version = "0.1.10"
+dynamic = ["version"]
 description = "Symbolic Query Addressable Cartridge — hot-swappable VSA memory for LLMs"
 license = "BUSL-1.1"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.10"
 keywords = ["memory", "vector-symbolic-architecture", "llm", "rag", "in-context-learning"]
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = ["numpy<2"]
+dependencies = [
+    "numpy>=1.24",
+    "tree-sitter-language-pack>=1.0,<1.24",
+]
+
+[project.urls]
+Homepage = "https://github.com/sensesVoid/sqac"
+Repository = "https://github.com/sensesVoid/sqac"
+Issues = "https://github.com/sensesVoid/sqac/issues"
 
 [project.optional-dependencies]
-mcp = ["mcp>=1.0"]
+mcp = ["mcp>=2.0,<3"]
 server = ["fastapi", "uvicorn"]
-simd = ["sqac-simd"]
 compress = ["lz4"]
-semantic = ["transformers>=4.30", "torch", "sentence-transformers"]
-all = ["mcp>=1.0", "fastapi", "uvicorn", "lz4", "transformers>=4.30", "torch", "sentence-transformers"]
+semantic = ["transformers>=4.30", "torch"]
+all = ["mcp>=2.0,<3", "fastapi", "uvicorn", "lz4", "transformers>=4.30", "torch"]
 
 [project.scripts]
 sqac = "sqac.cli:main"
 sqac-mcp = "sqac_mcp:main"
 sqac-server = "sqac.server:main"
 
+[tool.setuptools.dynamic]
+version = {attr = "sqac._version.__version__"}
+
 [tool.setuptools.packages.find]
 include = ["sqac*"]
 
 [tool.setuptools]
 py-modules = ["sqac_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E9", "F821", "F822", "F823"]

@@ -289,6 +289,11 @@ class TestExtractProjectUnits(unittest.TestCase):
             self.assertTrue(any("pyproject.toml" in s for s in sources))
             self.assertTrue(any("AGENTS.md" in s for s in sources))
 
+    def test_pyproject_crlf(self):
+        from sqac.autobuild import extract_config
+        units = extract_config("pyproject.toml", '[project]\r\nname = "x"\r\n')
+        self.assertTrue(units)
+
     def test_deduplication(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
