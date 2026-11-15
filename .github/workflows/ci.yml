@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test-${{ matrix.os }}-py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-15]
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: sqac-simd
+      - name: Install package and tools
+        run: python -m pip install -e ".[mcp,server,compress]" ruff
+      - name: Assert bundled SIMD
+        run: python -c "import sqac.simd as s; assert s.HAS_SIMD, 'bundled SIMD missing'"
+      - name: Python tests
+        run: python -m pytest -q
+      - name: Rust tests
+        run: cargo test --manifest-path sqac-simd/Cargo.toml --no-default-features
+      - name: Rust clippy
+        run: cargo clippy --manifest-path sqac-simd/Cargo.toml --no-default-features -- -D warnings
+      - name: Lint
+        run: ruff check sqac tests sqac_mcp.py
+
+  numpy-fallback:
+    name: numpy-fallback
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install without Rust
+        env:
+          SQAC_SKIP_RUST: "1"
+        run: python -m pip install -e ".[mcp,compress]"
+      - name: Assert fallback
+        run: python -c "import sqac.simd as s; assert not s.HAS_SIMD, 'SIMD unexpectedly present'"
+      - name: Python tests
+        run: python -m pytest -q
