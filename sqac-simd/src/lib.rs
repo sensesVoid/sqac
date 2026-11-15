@@ -124,8 +124,11 @@ fn xor_popcount(a: &[u8], b: &[u8]) -> u32 {
         return unsafe { xor_popcount_neon(a, b) };
     }
 
-    // Portable fallback
-    xor_popcount_portable(a, b)
+    // Portable fallback (x86_64 without AVX2, and other architectures)
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        xor_popcount_portable(a, b)
+    }
 }
 
 /// Portable XOR+popcount — works everywhere.
