@@ -17,6 +17,7 @@ import functools
 import hashlib
 import re
 import time
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -198,11 +199,20 @@ class SqacStore:
                 elif MiniLMSimHashEncoder.available():
                     self._sem_encoder = MiniLMSimHashEncoder(dims=self.dims)
                 else:
-                    raise RuntimeError(
-                        "semantic=True needs the static model files (see "
-                        "sqac/static_encoder.py) or torch+transformers for MiniLM"
-                    )
-            self.semantic = True
+                    if semantic_model is None:
+                        warnings.warn(
+                            "semantic=True requested but no semantic encoder is "
+                            "available; falling back to lexical-only",
+                            RuntimeWarning,
+                            stacklevel=2,
+                        )
+                        self._sem_encoder = None
+                    else:
+                        raise RuntimeError(
+                            "semantic=True needs the static model files (see "
+                            "sqac/static_encoder.py) or torch+transformers for MiniLM"
+                        )
+            self.semantic = self._sem_encoder is not None
 
         self._entries: list[dict[str, Any]] = []  # live entries
         self._exact: dict[str, int] = {}  # normalized key -> entry idx
