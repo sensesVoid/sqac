@@ -40,6 +40,7 @@ from sqac.dms import DMS
 from sqac.rack import CartridgeRack
 from sqac.offloader import ContextOffloader
 from sqac.graph_mcp import register_graph_tools
+from sqac.vault_mcp import register_vault_tools
 
 SERVER_NAME = "sqac_mcp"
 DEFAULT_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
@@ -66,6 +67,9 @@ mcp = MCPServer(
 
 # Register graph tools (code intelligence)
 register_graph_tools(mcp)
+
+# Register vault tools (reference-only, no plaintext exfiltration)
+register_vault_tools(mcp)
 
 
 @dataclass
