@@ -42,10 +42,6 @@ jobs:
             archs: "x86_64"
           - os: ubuntu-latest
             archs: "aarch64"
-          - os: macos-15-intel
-            archs: "x86_64"
-          - os: macos-15
-            archs: "arm64"
           - os: windows-latest
             archs: "AMD64"
     steps:
