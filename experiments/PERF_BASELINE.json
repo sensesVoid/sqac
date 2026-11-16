@@ -1,0 +1,10 @@
+{
+  "size": 5000,
+  "build_s": 5.822,
+  "load_s": 0.125,
+  "exact_ms": 36.476,
+  "fuzzy_hit_ms": 38.165,
+  "fuzzy_miss_ms": 33.354,
+  "peak_rss_mb": 56.3,
+  "file_mb": 2.42
+}
