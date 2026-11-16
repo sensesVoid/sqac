@@ -14,9 +14,59 @@ from .format import (
     write_cartridge,
 )
 from .store import SqacStore, Hit
+from .vault_crypto import (
+    VaultCryptoError as DecryptionError,
+    generate_nonce,
+    generate_dek,
+    wrap_dek,
+    unwrap_dek,
+    derive_kek_argon2id,
+    keychain_get,
+    keychain_set,
+    keychain_delete,
+    _b64,
+    _unb64,
+)
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-# ── constants ──────────────────────────────────────────────────────────────
+# Magic bytes for encrypted agent cartridges
+_AGENT_MAGIC = b"SQAE"
+_AGENT_AAD = b"sqac-agent-v1"
 
+
+def _encrypt_blob(plaintext: bytes, kek: bytes, kdf_byte: int, salt: bytes) -> bytes:
+    """Encrypt plaintext with AES-256-GCM. Returns magic + kdf + salt + nonce + ct."""
+    aesgcm = AESGCM(kek)
+    nonce = generate_nonce()
+    ct = aesgcm.encrypt(nonce, plaintext, _AGENT_AAD)
+    return _AGENT_MAGIC + bytes([kdf_byte]) + salt + nonce + ct
+
+
+def _decrypt_blob(blob: bytes, kek: bytes) -> bytes:
+    """Decrypt an encrypted agent cartridge. Raises DecryptionError on failure."""
+    if not blob.startswith(_AGENT_MAGIC):
+        raise DecryptionError("not an encrypted agent cartridge")
+    off = len(_AGENT_MAGIC)
+    kdf_byte = blob[off]
+    off += 1
+    salt = blob[off:off + 16]
+    off += 16
+    nonce = blob[off:off + 12]
+    off += 12
+    ct = blob[off:]
+    aesgcm = AESGCM(kek)
+    try:
+        return aesgcm.decrypt(nonce, ct, _AGENT_AAD)
+    except Exception as exc:
+        raise DecryptionError(f"agent decryption failed: {exc}") from exc
+
+
+def _derive_kek_passphrase(passphrase: str, salt: bytes) -> bytes:
+    from .vault_crypto import derive_kek_argon2id
+    return derive_kek_argon2id(passphrase, salt)
+
+
+# Constants
 AGENT_DIR = Path.home() / ".sqacm" / "agents"
 ACTIVE_AGENT_PATH = Path.home() / ".sqacm" / "agent_active"
 SINGLETON_SECTIONS = {"identity", "instruction", "preference"}
@@ -38,18 +88,23 @@ def _gen_key(section: str) -> str:
 class AgentCartridge:
     """Persona + working state cartridge."""
 
-    def __init__(self, path, name: str, role: str = "", semantic: bool = False):
+    def __init__(self, path, name: str, role: str = "", semantic: bool = False,
+                 encrypted: bool = False, passphrase: Optional[str] = None):
         self.path = Path(path)
         self.name = name
         self.role = role
         self.semantic = semantic
+        self._encrypted = encrypted
+        self._passphrase = passphrase
         self._store: Optional[SqacStore] = None
 
     @classmethod
-    def create(cls, path, name: str, role: str = "", semantic: bool = False) -> "AgentCartridge":
+    def create(cls, path, name: str, role: str = "", semantic: bool = False,
+               encrypt: bool = False, passphrase: Optional[str] = None) -> "AgentCartridge":
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        agent = cls(path, name, role, semantic)
+        agent = cls(path, name, role, semantic, encrypted=encrypt,
+                    passphrase=passphrase)
         # Create empty cartridge with agent header
         hdr = CartridgeHeader(
             version=WRITE_VERSION,
@@ -63,6 +118,7 @@ class AgentCartridge:
                     "created": _now(),
                     "updated": _now(),
                 },
+                "encrypted": encrypt,
             },
         )
         write_cartridge(str(path), hdr, {}, [])
@@ -73,8 +129,51 @@ class AgentCartridge:
         return agent
 
     @classmethod
-    def load(cls, path, semantic: bool = False) -> "AgentCartridge":
+    def load(cls, path, semantic: bool = False,
+             passphrase: Optional[str] = None) -> "AgentCartridge":
         path = Path(path)
+        raw = path.read_bytes()
+        encrypted = raw.startswith(_AGENT_MAGIC)
+        if encrypted:
+            # Decrypt to a temp file for loading
+            import tempfile
+            # Determine name from header (need to decrypt first)
+            # Use passphrase or env var
+            pw = passphrase or __import__("os").environ.get("SQAC_AGENT_PASSPHRASE")
+            # Try to get name from filename
+            name = path.stem
+            # Create a temporary agent to decrypt
+            tmp_agent = cls(path, name, "", semantic, encrypted=True,
+                           passphrase=pw)
+            try:
+                plaintext = tmp_agent._decrypt_file(pw)
+            except DecryptionError:
+                raise
+            # Write plaintext to temp file
+            tmp_fd, tmp_path = tempfile.mkstemp(suffix=".sqac")
+            import os as _os
+            _os.close(tmp_fd)
+            Path(tmp_path).write_bytes(plaintext)
+            try:
+                cart = read_cartridge(tmp_path)
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+            h = cart.header
+            agent_info = h.extra.get("agent", {})
+            name = agent_info.get("name", path.stem)
+            role = agent_info.get("role", "")
+            agent = cls(path, name, role, semantic, encrypted=True,
+                        passphrase=pw)
+            # Load store from decrypted data by writing to temp again
+            tmp_fd2, tmp_path2 = tempfile.mkstemp(suffix=".sqac")
+            _os.close(tmp_fd2)
+            Path(tmp_path2).write_bytes(plaintext)
+            try:
+                agent._store = SqacStore.load(tmp_path2)
+            finally:
+                Path(tmp_path2).unlink(missing_ok=True)
+            agent._store._description = f"agent:{name}"
+            return agent
         cart = read_cartridge(str(path))
         h = cart.header
         agent_info = h.extra.get("agent", {})
@@ -85,11 +184,58 @@ class AgentCartridge:
         agent._store._description = f"agent:{name}"
         return agent
 
-    @property
-    def store(self) -> SqacStore:
-        if self._store is None:
-            self._store = SqacStore.load(str(self.path))
-        return self._store
+    def _get_kek(self, passphrase: Optional[str] = None) -> tuple[bytes, int, bytes]:
+        """Return (kek, kdf_byte, salt). kdf_byte: 0=keychain, 1=argon2id."""
+        pw = passphrase or self._passphrase
+        if pw is not None:
+            salt = secrets.token_bytes(16)
+            kek = derive_kek_argon2id(pw, salt)
+            return kek, 1, salt
+        # keychain mode
+        hex_key = keychain_get(service="sqac-agent", username=self.name)
+        if hex_key is None:
+            # generate and store
+            master_key = secrets.token_bytes(32)
+            keychain_set(service="sqac-agent", username=self.name, value=master_key.hex())
+            hex_key = master_key.hex()
+        salt = secrets.token_bytes(16)
+        return bytes.fromhex(hex_key), 0, salt
+
+    def _encrypt_file(self, passphrase: Optional[str] = None) -> None:
+        """Encrypt the cartridge file in place."""
+        raw = self.path.read_bytes()
+        kek, kdf_byte, salt = self._get_kek(passphrase)
+        encrypted = _encrypt_blob(raw, kek, kdf_byte, salt)
+        self.path.write_bytes(encrypted)
+
+    def _decrypt_file(self, passphrase: Optional[str] = None) -> bytes:
+        """Read and decrypt the cartridge file. Returns plaintext bytes."""
+        raw = self.path.read_bytes()
+        if not raw.startswith(_AGENT_MAGIC):
+            return raw  # not encrypted
+        # Need to determine kdf and get kek
+        kdf_byte = raw[4]
+        salt = raw[5:21]
+        if kdf_byte == 0:
+            # keychain mode
+            hex_key = keychain_get(service="sqac-agent", username=self.name)
+            if hex_key is None:
+                if passphrase is None:
+                    raise DecryptionError("agent locked: no keychain key and no passphrase")
+                # fall back to passphrase
+                kek = derive_kek_argon2id(passphrase, salt)
+            else:
+                kek = bytes.fromhex(hex_key)
+        else:
+            pw = passphrase or self._passphrase
+            if pw is None:
+                pw = None
+                import os as _os
+                pw = _os.environ.get("SQAC_AGENT_PASSPHRASE")
+            if pw is None:
+                raise DecryptionError("agent locked: passphrase required")
+            kek = derive_kek_argon2id(pw, salt)
+        return _decrypt_blob(raw, kek)
 
     def _save(self) -> None:
         self.store.save(str(self.path), name=self.name, description=f"agent:{self.name}")
@@ -103,7 +249,106 @@ class AgentCartridge:
             "created": cart.header.extra.get("agent", {}).get("created", _now()),
             "updated": _now(),
         }
+        cart.header.extra["encrypted"] = self._encrypted
         write_cartridge(str(self.path), cart.header, {}, cart.entries)
+        if self._encrypted:
+            self._encrypt_file(self._passphrase)
+
+    @property
+    def store(self) -> SqacStore:
+        if self._store is None:
+            if self._encrypted and self.path.read_bytes().startswith(_AGENT_MAGIC):
+                plaintext = self._decrypt_file(self._passphrase)
+                import tempfile, os as _os
+                fd, tmp = tempfile.mkstemp(suffix=".sqac")
+                _os.close(fd)
+                Path(tmp).write_bytes(plaintext)
+                try:
+                    self._store = SqacStore.load(tmp)
+                finally:
+                    Path(tmp).unlink(missing_ok=True)
+            else:
+                self._store = SqacStore.load(str(self.path))
+            self._store._description = f"agent:{self.name}"
+        return self._store
+
+    def encrypt(self, passphrase: Optional[str] = None) -> None:
+        """Encrypt this agent cartridge in place."""
+        if self._encrypted:
+            return
+        self._passphrase = passphrase
+        self._encrypted = True
+        self._save()
+
+    def decrypt(self, passphrase: Optional[str] = None) -> None:
+        """Decrypt this agent cartridge in place."""
+        if not self._encrypted:
+            return
+        self._passphrase = passphrase
+        self._encrypted = False
+        # Read current (encrypted) file, decrypt, write plaintext
+        plaintext = self._decrypt_file(passphrase)
+        self.path.write_bytes(plaintext)
+        # Reload store
+        self._store = None
+
+    def rotate_key(self, old_passphrase: str, new_passphrase: str) -> None:
+        """Rotate the encryption key."""
+        if not self._encrypted:
+            raise ValueError("agent is not encrypted")
+        plaintext = self._decrypt_file(old_passphrase)
+        self._passphrase = new_passphrase
+        self._encrypted = True
+        self.path.write_bytes(plaintext)
+        self._store = None
+        self._save()
+        """Set an entry in a section. Returns entry index."""
+        if section not in ALL_SECTIONS:
+            raise ValueError(f"unknown section: {section}")
+        if tags is None:
+            tags = []
+
+        if key is not None:
+            # Upsert by key
+            for i, e in enumerate(self.store._entries):
+                if e.get("meta", {}).get("key") == key and e.get("meta", {}).get("section") == section:
+                    self.store._entries[i]["content"] = content
+                    self.store._entries[i]["meta"]["priority"] = priority
+                    self.store._entries[i]["meta"]["tags"] = tags
+                    self.store._entries[i]["meta"]["updated"] = _now()
+                    self._save()
+                    return i
+            # Not found, add new
+            key = key
+
+        if key is None and section in SINGLETON_SECTIONS:
+            # Replace single existing entry for this section
+            for i, e in enumerate(self.store._entries):
+                if e.get("meta", {}).get("section") == section:
+                    self.store._entries[i]["content"] = content
+                    self.store._entries[i]["meta"]["priority"] = priority
+                    self.store._entries[i]["meta"]["tags"] = tags
+                    self.store._entries[i]["meta"]["updated"] = _now()
+                    self._save()
+                    return i
+            # No existing, generate key
+            key = f"{section}-0"
+
+        if key is None and section in LIST_SECTIONS:
+            key = _gen_key(section)
+
+        if key is None:
+            key = f"{section}-0"
+
+        idx = self.store.add(
+            content,
+            key=key,
+            kind="fact",
+            source="agent",
+            meta={"section": section, "priority": priority, "status": "open", "tags": tags, "key": key, "updated": _now()},
+        )
+        self._save()
+        return idx
 
     def set(self, section: str, content: str, key: Optional[str] = None, priority: int = 1, tags: Optional[list] = None) -> int:
         """Set an entry in a section. Returns entry index."""
