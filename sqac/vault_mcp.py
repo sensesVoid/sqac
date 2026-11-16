@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from mcp.server.mcpserver import MCPServer
 
@@ -53,7 +53,6 @@ def vault_http(name: str, method: str, url: str, body: Optional[str] = None, hea
     path = _vault_path()
     if not path.exists():
         return {"ok": False, "error": "vault_not_found"}
-    passphrase = os.environ.get("SQAC_VAULT_PASSPHRASE")
     try:
         v = v or _open_vault()
     except Exception:

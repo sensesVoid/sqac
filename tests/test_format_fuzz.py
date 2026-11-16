@@ -6,7 +6,7 @@ import struct
 import tempfile
 import unittest
 
-from sqac.format import FormatError, read_cartridge, write_cartridge, CartridgeHeader, Entry, VERSION
+from sqac.format import FormatError, read_cartridge, write_cartridge, CartridgeHeader, Entry
 
 
 class TestFormatFuzz(unittest.TestCase):

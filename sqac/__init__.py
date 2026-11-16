@@ -15,7 +15,6 @@ from .autobuild import (
     extract_project_units,
     track,
     track_once,
-    _sync_rack,
 )
 from .continuity import ContinuityStore, bootstrap_packet, detect_host, server_instructions
 from .dms import DMS, UtilityWeights
@@ -92,7 +91,6 @@ __all__ = [
     "build_store",
     "track_once",
     "track",
-    "_sync_rack",
     "ContinuityStore",
     "bootstrap_packet",
     "detect_host",

@@ -1,6 +1,5 @@
 """Windows lock audit tests."""
 
-import os
 import tempfile
 import threading
 import unittest
@@ -12,7 +11,6 @@ from sqac.format import (
     write_cartridge,
     read_cartridge,
     locked_cartridge,
-    CartridgeLockError,
     compact_cartridge,
 )
 

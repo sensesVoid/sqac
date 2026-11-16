@@ -203,7 +203,7 @@ def main(argv: list[str] | None = None) -> int:
     p_ai.add_argument("name", help="agent name")
     p_ai.add_argument("--role", default="", help="agent role")
 
-    p_al = agent_sub.add_parser("list", help="list agents")
+    agent_sub.add_parser("list", help="list agents")
 
     p_au = agent_sub.add_parser("use", help="set active agent")
     p_au.add_argument("name", help="agent name")
@@ -246,7 +246,7 @@ def main(argv: list[str] | None = None) -> int:
     p_ci.add_argument("--region", default=None, help="region")
     p_ci.add_argument("--account-id", default=None, help="account ID (R2) or project ref (Supabase)")
 
-    p_cs = cloud_sub.add_parser("status", help="show sync status")
+    cloud_sub.add_parser("status", help="show sync status")
 
     p_csync = cloud_sub.add_parser("sync", help="sync cartridges")
     p_csync.add_argument("--push", action="store_true", help="push only")
@@ -396,7 +396,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Vault commands
     if args.cmd == "vault":
-        from .vault import Vault, create_vault, open_vault, parse_vault_ref
+        from .vault import Vault, create_vault, open_vault
         import getpass, sys as _sys
 
         if args.vault_cmd == "init":
@@ -443,7 +443,7 @@ def main(argv: list[str] | None = None) -> int:
                 pass
             val = val.rstrip("\n")
             entry_type = args.entry_type
-            meta = v.put(name, val, entry_type=entry_type, label=args.label, policy={"allowed_hosts": args.allowed_hosts, "auth": "bearer"})
+            v.put(name, val, entry_type=entry_type, label=args.label, policy={"allowed_hosts": args.allowed_hosts, "auth": "bearer"})
             print(f"stored: {name} ({entry_type})")
             return 0
 
@@ -639,7 +639,7 @@ def main(argv: list[str] | None = None) -> int:
                 pass
 
     elif args.cmd == "checkpoint":
-        from .checkpoint import CheckpointCartridge, manual_checkpoint
+        from .checkpoint import CheckpointCartridge
         from .offloader import ContextOffloader
         out_dir = Path(args.out_dir).expanduser()
         checkpoint_path = out_dir / "checkpoint.sqac"

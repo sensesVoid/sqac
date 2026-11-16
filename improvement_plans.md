@@ -59,6 +59,10 @@ dependencies; upgrade them at your convenience
   format already carries the vault name in AAD.
 - **Performance gate** — benchmark thresholds become blocking (regression > 20%)
   once the 1.0 benchmark baseline is recorded.
+- **Package hygiene** — relocate `sqac/RESEARCH.md` into `docs/` and move the
+  benchmark/POC scripts (`tests/bench_rack.py`, `tests/bench_skill_store.py`,
+  `tests/poc_quant_encoder.py`) into `experiments/` (requires updating ~3
+  docstring references).
 
 ## Known limitations (honest record)
 

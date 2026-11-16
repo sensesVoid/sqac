@@ -32,7 +32,6 @@ from .simd import backend as _simd
 from .format import (
     _HAS_LZ4,
 
-    VERSION,
     CartridgeHeader,
     Entry,
     FormatError,
@@ -349,7 +348,6 @@ class SqacStore:
             self._entries.append(e)
             norm = e["key_norm"]
             idx = len(self._entries) - 1
-            key_text = norm  # reconstruct from normalized key
             self._keys.append(self.encoder.encode_bits(norm))
             self._ckeys.append(self.encoder.encode_bits(e["content"]))
             if self.semantic and self._sem_encoder:
@@ -512,7 +510,6 @@ class SqacStore:
         (content, semantic key/content) are stored in a per-entry raw
         binary block.
         """
-        key_len = self.dims // 8
         entries = []
         for idx, (e, kbits, ckbits) in enumerate(zip(self._entries, self._keys, self._ckeys)):
             payload = {

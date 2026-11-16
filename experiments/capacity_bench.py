@@ -93,9 +93,19 @@ def _peak_rss_mb() -> float:
             ]
 
         psapi = ctypes.WinDLL("psapi")
+        kernel32 = ctypes.WinDLL("kernel32")
+        # Proper prototypes: without restype/argtypes the pseudo-HANDLE from
+        # GetCurrentProcess is truncated and GetProcessMemoryInfo fails.
+        kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+        psapi.GetProcessMemoryInfo.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(PROCESS_MEMORY_COUNTERS),
+            wintypes.DWORD,
+        ]
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
         counters = PROCESS_MEMORY_COUNTERS()
         counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
-        handle = ctypes.WinDLL("kernel32").GetCurrentProcess()
+        handle = kernel32.GetCurrentProcess()
         if psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
             return counters.PeakWorkingSetSize / (1024.0 * 1024.0)
     except Exception:
