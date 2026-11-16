@@ -234,6 +234,29 @@ def main(argv: list[str] | None = None) -> int:
     p_asearch.add_argument("query", help="search query")
     p_asearch.add_argument("--name", default=None, help="agent name (default: active)")
 
+    # Cloud subcommands
+    p_cloud = sub.add_parser("cloud", help="cloud sync (R2/S3/Supabase/etc.)")
+    cloud_sub = p_cloud.add_subparsers(dest="cloud_cmd", required=True)
+
+    p_ci = cloud_sub.add_parser("init", help="initialize cloud config")
+    p_ci.add_argument("--provider", default="r2", choices=["r2", "s3", "supabase", "minio", "b2", "spaces", "custom"])
+    p_ci.add_argument("--bucket", required=True, help="bucket name")
+    p_ci.add_argument("--prefix", default="v1", help="remote prefix (default: v1)")
+    p_ci.add_argument("--endpoint", default=None, help="custom endpoint URL")
+    p_ci.add_argument("--region", default=None, help="region")
+    p_ci.add_argument("--account-id", default=None, help="account ID (R2) or project ref (Supabase)")
+
+    p_cs = cloud_sub.add_parser("status", help="show sync status")
+
+    p_csync = cloud_sub.add_parser("sync", help="sync cartridges")
+    p_csync.add_argument("--push", action="store_true", help="push only")
+    p_csync.add_argument("--pull", action="store_true", help="pull only")
+    p_csync.add_argument("--dry-run", action="store_true", help="show what would happen")
+    p_csync.add_argument("--force-local", action="store_true", help="force local version on conflict")
+    p_csync.add_argument("--force-remote", action="store_true", help="force remote version on conflict")
+    p_csync.add_argument("--allow-local-only-vault", action="store_true", help="allow syncing keychain vaults")
+    p_csync.add_argument("names", nargs="*", help="cartridge names to sync")
+
     p_mcp_setup = sub.add_parser("mcp", help="MCP server wiring for agent CLIs")
     p_mcp_setup.add_argument("action", choices=["setup"], help="generate/install per-CLI wiring")
     p_mcp_setup.add_argument("--dir", default="~/.sqacm", help="shared memory dir (default: ~/.sqacm)")
@@ -299,6 +322,55 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             for h in hits:
                 print(f"[{h.mode} {h.confidence:.3f}] {h.content}")
+            return 0
+
+        return 0
+
+    # Cloud commands
+    if args.cmd == "cloud":
+        from .cloud import cloud_init, load_cloud_config, SyncEngine
+        from pathlib import Path as _Path
+
+        if args.cloud_cmd == "init":
+            config = cloud_init(provider=args.provider, bucket=args.bucket, prefix=args.prefix, endpoint_url=args.endpoint, region=args.region, account_id=args.account_id)
+            print(f"cloud initialized: provider={config['provider']}, bucket={config['bucket']}")
+            return 0
+
+        config = load_cloud_config()
+        if config is None:
+            print("cloud not initialized; run: sqac cloud init --provider <name> --bucket <bucket>")
+            return 1
+
+        from .cloud import create_backend_from_config
+        backend = create_backend_from_config(config)
+        sqac_dir = _Path.home() / ".sqacm"
+        engine = SyncEngine(backend, sqac_dir, config)
+
+        if args.cloud_cmd == "status":
+            objects = engine.status()
+            for obj in objects:
+                print(f"{obj.remote_key}: {obj.status}")
+            if not objects:
+                print("no syncable objects found")
+            return 0
+
+        if args.cloud_cmd == "sync":
+            direction = "both"
+            if args.push and not args.pull:
+                direction = "push"
+            elif args.pull and not args.push:
+                direction = "pull"
+
+            if direction in ("push", "both"):
+                results = engine.push(names=args.names or None, dry_run=args.dry_run, force_local=args.force_local, force_remote=args.force_remote)
+                for r in results:
+                    print(f"{r['key']}: {r['action']} {r.get('reason', r.get('etag', ''))}")
+
+            if direction in ("pull", "both"):
+                results = engine.pull(names=args.names or None, dry_run=args.dry_run, force_local=args.force_local, force_remote=args.force_remote)
+                for r in results:
+                    print(f"{r['key']}: {r['action']} {r.get('reason', r.get('size', ''))}")
+
             return 0
 
         return 0
