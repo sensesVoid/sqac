@@ -61,10 +61,12 @@ def test_canonical_ref_with_vault():
     assert canonical_ref("mysecret", vault="work") == "vault:work/mysecret"
 
 
-def test_cross_vault_isolation(tmp_path):
+def test_cross_vault_isolation(tmp_path, monkeypatch):
     reg = VaultRegistry(tmp_path / "vaults")
-    reg.init("work", mode="keychain")
-    reg.init("personal", mode="keychain")
+    # Portable mode + env passphrase: works headless (no OS keychain on CI)
+    reg.init("work", mode="portable", passphrase="pw")
+    reg.init("personal", mode="portable", passphrase="pw")
+    monkeypatch.setenv("SQAC_VAULT_PASSPHRASE", "pw")
     # Store a secret in personal vault
     v = reg.open("personal")
     v.put("api_key", "secret-value")
