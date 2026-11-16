@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.0] — 2026-11-15 (in progress)
+
+### Added
+- Vault cartridge (v5 format): encrypted secret/PII storage with AES-256-GCM.
+- `vault` CLI: init, put, list, rm, exec, audit, scan, import-env, rotate.
+- MCP tools: vault_list, vault_meta, vault_http (host-allowlisted proxy), vault_audit.
+- PII detection (email, phone, SSN, credit card, IP, IBAN) with Luhn validation.
+- Hash-chained audit log (vault-audit.jsonl) with tamper evidence.
+- Rack/search isolation: vault and agent cartridges excluded from default search.
+- Reference-only access: no MCP tool returns plaintext; `vault exec` injects env vars with redaction.
+
+### Security
+- Keychain (default) and Argon2id passphrase modes; keychain vaults are local-only.
+- Value cap: 64 KB per entry; names validated against PII patterns.
+- HTTP proxy: HTTPS only, exact host allowlist, redirect policy, 1 MB response cap.
+
+---
+
 All notable changes to SQAC (Symbolic Query Addressable Cartridge) are documented here.
 
 ## [0.2.0] — 2026-11-15

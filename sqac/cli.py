@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time as time_module
 from pathlib import Path
@@ -162,6 +163,38 @@ def main(argv: list[str] | None = None) -> int:
     p_graph_watch.add_argument("root", nargs="?", default=".", help="project root (default: .)")
     p_graph_watch.add_argument("--interval", type=float, default=5.0, help="poll interval in seconds")
 
+    # Vault subcommands
+    p_vault = sub.add_parser("vault", help="encrypted secret/PII vault")
+    vault_sub = p_vault.add_subparsers(dest="vault_cmd", required=True)
+
+    p_vi = vault_sub.add_parser("init", help="create the vault")
+    p_vi.add_argument("--portable", action="store_true", help="use passphrase (portable) instead of keychain")
+
+    p_vp = vault_sub.add_parser("put", help="store a secret")
+    p_vp.add_argument("name", help="entry name")
+    p_vp.add_argument("--type", dest="entry_type", default="secret", choices=["secret", "pii"])
+    p_vp.add_argument("--label", default="")
+    p_vp.add_argument("--allowed-host", action="append", default=[], dest="allowed_hosts")
+    p_vp.add_argument("--from-env", default=None)
+    p_vp.add_argument("--from-file", default=None)
+
+    p_vl = vault_sub.add_parser("list", help="list vault entries (metadata only)")
+    p_vl.add_argument("--json", action="store_true", dest="as_json")
+
+    p_vr = vault_sub.add_parser("rm", help="remove a vault entry")
+    p_vr.add_argument("name")
+
+    p_ve = vault_sub.add_parser("exec", help="run a command with vault secrets injected")
+    p_ve.add_argument("--env", action="append", default=[], help="VAR=vault:NAME")
+    p_ve.add_argument("--no-redact", action="store_true")
+    p_ve.add_argument("command", nargs=argparse.REMAINDER, help="command to run")
+
+    p_va = vault_sub.add_parser("audit", help="show audit log")
+    p_va.add_argument("--tail", type=int, default=20)
+
+    p_vs = vault_sub.add_parser("scan", help="scan cartridges for PII/secrets")
+    p_vs.add_argument("cartridges", nargs="*")
+
     p_mcp_setup = sub.add_parser("mcp", help="MCP server wiring for agent CLIs")
     p_mcp_setup.add_argument("action", choices=["setup"], help="generate/install per-CLI wiring")
     p_mcp_setup.add_argument("--dir", default="~/.sqacm", help="shared memory dir (default: ~/.sqacm)")
@@ -171,6 +204,120 @@ def main(argv: list[str] | None = None) -> int:
                              help="install AGENTS.md memory hook into this project (path)")
 
     args = ap.parse_args(argv)
+
+    # Vault commands
+    if args.cmd == "vault":
+        from .vault import Vault, create_vault, open_vault, parse_vault_ref
+        import getpass, sys as _sys
+
+        if args.vault_cmd == "init":
+            import os as _os
+            mode = "portable" if args.portable else "keychain"
+            pw = _os.environ.get("SQAC_VAULT_PASSPHRASE")
+            if mode == "portable" and pw is None:
+                if _sys.stdin.isatty():
+                    pw = getpass.getpass("Vault passphrase: ")
+                else:
+                    pw = _sys.stdin.read().strip()
+            from .vault import DEFAULT_VAULT_PATH
+            if mode == "portable":
+                Vault.create(DEFAULT_VAULT_PATH, mode="portable", passphrase=pw)
+            else:
+                Vault.create(DEFAULT_VAULT_PATH, mode="keychain")
+            print("vault initialized")
+            return 0
+
+        v = open_vault()
+        if v is None:
+            # Auto-create
+            try:
+                v = create_vault(mode="keychain")
+            except Exception:
+                pw = getpass.getpass("Vault passphrase: ")
+                v = create_vault(mode="portable", passphrase=pw)
+
+        if args.vault_cmd == "put":
+            name = args.name
+            if args.from_env:
+                val = os.environ.get(args.from_env, "")
+                if not val:
+                    print(f"env var {args.from_env} not set or empty")
+                    return 1
+            elif args.from_file:
+                val = Path(args.from_file).read_text(encoding="utf-8")
+            else:
+                if _sys.stdin.isatty():
+                    val = getpass.getpass(f"Value for {name}: ")
+                else:
+                    val = _sys.stdin.read()
+            if not val.endswith("\n"):
+                pass
+            val = val.rstrip("\n")
+            entry_type = args.entry_type
+            meta = v.put(name, val, entry_type=entry_type, label=args.label, policy={"allowed_hosts": args.allowed_hosts, "auth": "bearer"})
+            print(f"stored: {name} ({entry_type})")
+            return 0
+
+        elif args.vault_cmd == "list":
+            entries = v.list()
+            if args.as_json:
+                import json
+                print(json.dumps(entries, indent=2))
+            else:
+                for e in entries:
+                    print(f"{e['name']}  [{e['entry_type']}]  {e.get('label', '')}")
+            return 0
+
+        elif args.vault_cmd == "rm":
+            if v.remove(args.name):
+                print(f"removed: {args.name}")
+                return 0
+            else:
+                print(f"not found: {args.name}")
+                return 1
+
+        elif args.vault_cmd == "exec":
+            mapping = {}
+            for spec in args.env:
+                if "=" not in spec:
+                    print(f"invalid --env spec: {spec} (expected VAR=vault:NAME)")
+                    return 1
+                var, ref = spec.split("=", 1)
+                mapping[var] = ref
+            cmd = args.command
+            while cmd and cmd[0] == "--":
+                cmd = cmd[1:]
+            if not cmd:
+                print("no command specified")
+                return 1
+            result = v.exec_env(mapping, cmd, redact=not args.no_redact)
+            if result.stdout:
+                print(result.stdout, end="")
+            if result.stderr:
+                print(result.stderr, end="", file=__import__("sys").stderr)
+            return result.returncode
+
+        elif args.vault_cmd == "audit":
+            from .vault_audit import read_audit
+            entries = read_audit(tail=args.tail)
+            for e in entries:
+                print(f"{e['ts']}  {e['op']:6s}  {e['name']:20s}  {'ok' if e['success'] else 'FAIL'}")
+            return 0
+
+        elif args.vault_cmd == "scan":
+            paths = args.cartridges or []
+            if not paths:
+                # scan all .sqac in cwd
+                paths = [str(p) for p in Path(".").glob("*.sqac")]
+            findings = v.scan(paths)
+            if not findings:
+                print("no PII/secrets found in scanned cartridges")
+            else:
+                for f in findings:
+                    print(f"{f['cartridge']}: {f['type']} at {f['start']}-{f['end']}")
+            return 0
+
+        return 0
 
     if args.cmd == "teach":
         store = _open(args.db)

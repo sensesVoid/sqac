@@ -354,9 +354,11 @@ class CartridgeRack:
             if rack_name in self._stores:
                 continue
             try:
-                self._stores[rack_name] = SqacStore.load(
-                    p, fuzzy_threshold=self.min_confidence
-                )
+                store = SqacStore.load(p, fuzzy_threshold=self.min_confidence)
+                if getattr(store, "cartridge_type", "memory") in ("vault", "agent"):
+                    logging.info("rack: skipping %s (cartridge_type=%s)", p.name, store.cartridge_type)
+                    continue
+                self._stores[rack_name] = store
                 self._paths[rack_name] = p
                 # Track shard under the base name
                 base = _base_name(stem) if _is_shard_name(stem) else rack_name
@@ -575,12 +577,15 @@ class CartridgeRack:
                         if pp == p and n not in targets and n in self._stores:
                             targets.append(n)
             return targets
-        # Search all cartridges
+        # Search all cartridges — skip vault/agent types (reference-only)
         all_names = self.names()
         # Dedupe: only include the active store for each base, plus all shards
         seen_bases: set[str] = set()
         targets = []
         for n in all_names:
+            store = self._stores.get(n)
+            if store is not None and getattr(store, "cartridge_type", "memory") in ("vault", "agent"):
+                continue
             base = _base_name(n) if _is_shard_name(n) else n
             if base not in seen_bases:
                 seen_bases.add(base)

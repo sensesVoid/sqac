@@ -30,6 +30,10 @@ Version history:
       kind-filtered retrieval and kind-aware ranking policy. v2 files read
       as kind=generic; v3 files are refused by v2 readers via the version
       check (flag semantics changed).
+  v4: lz4 compression on binvec blocks (FLAG_COMPRESSED).
+  v5: vault cartridges (FLAG_ENCRYPTED entries, header type 'vault',
+      encrypted payload). Old readers (<=v4) refuse v5 before parsing
+      entries via the version check.
 """
 
 from __future__ import annotations
@@ -55,12 +59,15 @@ else:
     _HAS_FCNTL = True
 
 MAGIC = b"SQAC"
-VERSION = 4  # v4 adds lz4 compression on binvec blocks
+VERSION = 5  # v5 adds vault cartridges (encrypted entries, header type)
+WRITE_VERSION = 4  # default write version for memory/agent cartridges
+VAULT_WRITE_VERSION = 5  # vault cartridges write v5
 
 # Entry flag bits
 FLAG_DELETED = 0x0001  # tombstone: entry ignored by reads
 FLAG_BINVEC = 0x0002   # raw binary vector block present (v2+)
 FLAG_COMPRESSED = 0x0004  # binvec is lz4-compressed (v4+)
+FLAG_ENCRYPTED = 0x0008  # entry payload is encrypted (v5 vault+)
 FLAG_KIND_SHIFT = 4    # bits 4-11: knowledge kind, uint8 (v3+)
 FLAG_KIND_MASK = 0xFF << FLAG_KIND_SHIFT
 
@@ -221,7 +228,7 @@ def _release_shared_lock(fd):
 class CartridgeHeader:
     """Fixed metadata describing the cartridge."""
 
-    version: int = VERSION
+    version: int = WRITE_VERSION
     dims: int = 1024
     vocab_fingerprint: str = ""
     encoder_name: str = "bsc-ngram-v1"
@@ -229,6 +236,11 @@ class CartridgeHeader:
     name: str = ""
     description: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def cartridge_type(self) -> str:
+        """Cartridge type: 'memory' (default), 'agent', or 'vault'."""
+        return str(self.extra.get("cartridge_type", "memory"))
 
     def fingerprint_seed(self) -> str:
         """Canonical string hashed into the vocab fingerprint."""
@@ -302,6 +314,7 @@ class Entry:
     deleted: bool = False
     binvec: bytes = b""
     kind: int = 0  # knowledge kind (0 = generic; v2 files read as 0)
+    encrypted: bool = False  # FLAG_ENCRYPTED set when payload is ciphertext (v5 vault+)
 
 
 def pack_bits(bits) -> bytearray:
@@ -374,6 +387,8 @@ def write_cartridge(
         flags = FLAG_DELETED if e.deleted else 0
         if e.binvec:
             flags |= FLAG_BINVEC
+        if e.encrypted:
+            flags |= FLAG_ENCRYPTED
         flags |= (e.kind & 0xFF) << FLAG_KIND_SHIFT
         pb = json.dumps(e.payload, ensure_ascii=False).encode("utf-8")
         # Compress the payload JSON with lz4 block (no frame overhead)
@@ -541,6 +556,7 @@ def read_cartridge(path: str | Path, locked: bool = False) -> Cartridge:
                 deleted=bool(flags & FLAG_DELETED),
                 binvec=binvec,
                 kind=(flags & FLAG_KIND_MASK) >> FLAG_KIND_SHIFT,
+                encrypted=bool(flags & FLAG_ENCRYPTED),
             )
         )
 

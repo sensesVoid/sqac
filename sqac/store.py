@@ -179,6 +179,7 @@ class SqacStore:
         self.semantic_threshold = semantic_threshold
         self.semantic = False
         self._sem_encoder = None
+        self.cartridge_type = "memory"
         self.format_version = VERSION  # v2 writes raw binary vectors; 1 = legacy hex
         # Query cache: maps (query_hash, tier) -> (packed_bits, write_version)
         self._cache_size = cache_size
@@ -575,6 +576,7 @@ class SqacStore:
             semantic="|sem-v1:" in h.encoder_name,
         )
         store._description = h.description
+        store.cartridge_type = h.cartridge_type
         if store.semantic:
             store._sem_encoder = _make_sem_encoder(
                 h.encoder_name.split("|sem-v1:", 1)[1].split(":", 1)[0], h.dims
