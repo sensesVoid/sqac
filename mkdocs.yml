@@ -11,15 +11,15 @@ theme:
     - search.suggest
     - content.code.copy
 nav:
-  - Home: README.md
-  - Vault: docs/VAULT.md
-  - Agent: docs/AGENT.md
-  - Cloud: docs/CLOUD.md
-  - Format: docs/FORMAT.md
-  - MCP: docs/MCP.md
-  - Release: docs/RELEASE.md
+  - Home: index.md
+  - Vault: VAULT.md
+  - Agent: AGENT.md
+  - Cloud: CLOUD.md
+  - Format: FORMAT.md
+  - MCP: MCP.md
+  - Release: RELEASE.md
   - Security: SECURITY.md
-  - Research: docs/RESEARCH-unlimited-context.md
+  - Research: RESEARCH-unlimited-context.md
 markdown_extensions:
   - admonition
   - pymdownx.details
