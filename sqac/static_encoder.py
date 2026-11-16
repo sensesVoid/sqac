@@ -6,7 +6,7 @@ Replaces the torch+MiniLM stack with a pure-numpy int8 static model
   - Model: 7.6MB int8 (vs 90MB fp32 MiniLM) — a token embedding table +
     tokenizer, nothing else. No attention, no torch, no onnxruntime.
   - Latency: ~0.1ms/sentence CPU (vs 10-20ms MiniLM).
-  - Quality on SQAC's calibration tasks (tests/poc_quant_encoder.py):
+  - Quality on SQAC's calibration tasks (experiments/poc_quant_encoder.py):
     x86→ARM64 0.64 (MiniLM 0.65), db→repository 0.68 (MiniLM 0.56 —
     potion CATCHES the case MiniLM misses), paraphrase 0.66, floor ~0.5.
 
@@ -22,7 +22,7 @@ similarity drift vs fp32: <0.001 on every calibration pair.
 Model files are NOT bundled with the package (size). Point
 SQAC_STATIC_MODEL_DIR at a directory containing model.safetensors +
 tokenizer.json (default: ./sqac/models/potion-8m, populate with
-tests/poc_quant_encoder.py or hf_hub_download of minishlab/potion-base-8M).
+experiments/poc_quant_encoder.py or hf_hub_download of minishlab/potion-base-8M).
 """
 
 from __future__ import annotations
