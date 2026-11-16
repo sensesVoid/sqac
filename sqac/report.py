@@ -7,6 +7,7 @@ import os
 import platform
 import subprocess
 import sys
+from pathlib import Path
 from typing import Optional
 
 
@@ -48,10 +49,11 @@ def collect_diagnostics() -> dict:
 
     # Cartridge stats
     try:
-        from pathlib import Path as _Path
+        from sqac.store import SqacStore
+        from pathlib import Path
         diag["cartridge_count"] = 0
         # Count .sqac files in default dir
-        mem_dir = _Path(os.environ.get("SQAC_MEM_DIR", str(_Path.home() / ".sqacm")))
+        mem_dir = Path(os.environ.get("SQAC_MEM_DIR", str(Path.home() / ".sqacm")))
         if mem_dir.exists():
             diag["cartridge_count"] = len(list(mem_dir.rglob("*.sqac")))
     except Exception:
@@ -116,3 +118,12 @@ def create_issue(title: str, body: str, labels: Optional[list[str]] = None) -> s
     if result.returncode != 0:
         raise RuntimeError(f"gh issue create failed: {result.stderr}")
     return result.stdout.strip()
+
+
+def report_bug(title: str, description: str = "", labels: Optional[list[str]] = None) -> str:
+    """Collect diagnostics and file a bug report on GitHub."""
+    diag = collect_diagnostics()
+    body = f"## Description\n\n{description}\n\n{format_diagnostics(diag)}\n\n## Reproduction Steps\n\n<!-- Add steps to reproduce -->\n\n## Expected Behavior\n\n<!-- What should happen -->\n\n## Actual Behavior\n\n<!-- What actually happened -->\n"
+    if labels is None:
+        labels = ["bug"]
+    return create_issue(title, body, labels)
