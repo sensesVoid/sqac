@@ -44,23 +44,32 @@ VAULT_NAME = "default"
 
 # ── reference parsing ──────────────────────────────────────────────────────
 
-_REF_RE = re.compile(r"^(?:vault://|vault:)(.+)$")
-_BRACED_RE = re.compile(r"^\$\{vault:(.+)\}$")
+_REF_RE = re.compile(r"^(?:vault://|vault:)(?:(?P<vault>[^/]+)/)?(?P<name>.+)$")
+_BRACED_RE = re.compile(r"^\$\{vault:(?:(?P<vault>[^/]+)/)?(?P<name>.+)\}$")
 
 
-def parse_vault_ref(s: str) -> Optional[str]:
-    """Parse a vault reference. Returns the name or None if not a ref."""
+def parse_vault_ref(s: str) -> Optional[tuple[Optional[str], str]]:
+    """Parse a vault reference.
+
+    Returns ``(vault_name, secret_name)`` where *vault_name* is ``None``
+    when the ref does not specify a vault (``vault:NAME``), or ``None``
+    when *s* is not a vault reference at all.
+    """
     s = s.strip()
     m = _REF_RE.match(s)
     if m:
-        return m.group(1)
+        v = m.group("vault")
+        return (v, m.group("name")) if v else (None, m.group("name"))
     m = _BRACED_RE.match(s)
     if m:
-        return m.group(1)
+        v = m.group("vault")
+        return (v, m.group("name")) if v else (None, m.group("name"))
     return None
 
 
-def canonical_ref(name: str) -> str:
+def canonical_ref(name: str, vault: Optional[str] = None) -> str:
+    if vault:
+        return f"vault:{vault}/{name}"
     return f"vault:{name}"
 
 
@@ -112,7 +121,9 @@ class Vault:
             self._meta[p.get("name", "")] = i
 
     @classmethod
-    def create(cls, path, mode: str = "keychain", passphrase: Optional[str] = None, master_key: Optional[bytes] = None) -> "Vault":
+    def create(cls, path, mode: str = "keychain", passphrase: Optional[str] = None,
+               master_key: Optional[bytes] = None, provider: Optional[str] = None,
+               provider_ref: Optional[str] = None) -> "Vault":
         """Create a new vault cartridge."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -122,7 +133,17 @@ class Vault:
         wrap_nonce = ""
         wrapped_dek = ""
 
-        if mode == "keychain":
+        if mode == "provider":
+            from .providers import fetch as _fetch_provider
+            if provider is None or provider_ref is None:
+                raise ValueError("provider and provider_ref required for provider mode")
+            master_key = _fetch_provider(provider, provider_ref)
+            wn, wct = wrap_dek(dek, master_key)
+            wrap_nonce = wn
+            wrapped_dek = wct
+            kdf = "provider"
+            salt_b64 = ""
+        elif mode == "keychain":
             if master_key is None:
                 # Generate a random master key and store in keychain
                 master_key = secrets.token_bytes(32)
@@ -172,11 +193,13 @@ class Vault:
             "parallelism": 4,
             "wrap_nonce": wrap_nonce,
             "wrapped_dek": wrapped_dek,
-            "keychain_service": "sqac-vault",
             "created": _now(),
         }
         if kdf == "keychain":
             vault_extra["keychain_service"] = "sqac-vault"
+        elif kdf == "provider":
+            vault_extra["provider"] = provider
+            vault_extra["provider_ref"] = provider_ref
 
         hdr = CartridgeHeader(
             version=VAULT_WRITE_VERSION,
@@ -221,6 +244,17 @@ class Vault:
             else:
                 master_key = bytes.fromhex(hex_key)
                 kek = master_key
+        elif kdf == "provider":
+            from .providers import fetch as _fetch_provider
+            provider = vinfo.get("provider")
+            provider_ref = vinfo.get("provider_ref")
+            if provider is None or provider_ref is None:
+                raise VaultCryptoError("vault locked: missing provider info")
+            try:
+                master_key = _fetch_provider(provider, provider_ref)
+            except Exception as e:
+                raise VaultCryptoError(f"vault locked: provider fetch failed: {e}")
+            kek = master_key
         else:
             if passphrase is None:
                 passphrase = os.environ.get("SQAC_VAULT_PASSPHRASE")
@@ -402,10 +436,17 @@ class Vault:
         # Resolve only listed variables
         resolved: dict[str, str] = {}
         for var, ref in mapping.items():
-            name = parse_vault_ref(ref)
-            if name is None:
+            parsed = parse_vault_ref(ref)
+            if parsed is None:
                 raise ValueError(f"not a vault reference: {ref!r}")
-            resolved[var] = self.resolve(name)
+            vault_name, name = parsed
+            # Multi-vault: resolve from the named vault if specified
+            if vault_name is not None:
+                from .vault_registry import VaultRegistry
+                reg = VaultRegistry()
+                resolved[var] = reg.resolve(name, vault=vault_name)
+            else:
+                resolved[var] = self.resolve(name)
 
         # Build child env: copy current, strip SQAC_VAULT_*, inject resolved
         child_env = {k: v for k, v in os.environ.items() if not k.startswith("SQAC_VAULT_")}

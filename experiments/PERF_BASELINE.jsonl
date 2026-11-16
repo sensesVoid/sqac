@@ -1,0 +1,1 @@
+{"build_s": 5.822, "exact_hits": 3, "exact_min_ms": 32.491, "exact_ms": 36.476, "file_mb": 2.42, "first_query_ms": 28.218, "fuzzy_hit_hits": 3, "fuzzy_hit_min_ms": 28.905, "fuzzy_hit_ms": 38.165, "fuzzy_miss_hits": 0, "fuzzy_miss_min_ms": 28.05, "fuzzy_miss_ms": 33.354, "load_s": 0.125, "loaded_entries": 5000, "peak_rss_mb": 56.3, "save_s": 0.102, "size": 5000}

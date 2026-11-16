@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0] — 2026-11-16
+
+### Added
+- Multi-vault support: named vaults under `~/.sqacm/vaults/`, `--vault` global flag, `vault init/list-vaults/use` subcommands, `vault:VAULT/NAME` reference syntax (backward compatible with `vault:NAME`).
+- External secret providers: 1Password (`op`) and Bitwarden (`bw`) CLI wrappers for vault master keys. Zero new Python dependencies. Provider KDF mode stored in vault header.
+- Agent-cartridge encryption: opt-in AES-256-GCM encryption at rest via `--encrypt` flag. `sqac agent encrypt/decrypt/key rotate` commands. Plaintext agents remain first-class.
+- Blocking performance gate: `experiments/perf_gate.py` compares against `experiments/PERF_BASELINE.json` (5K-entry baseline), fails CI on >20% regression. Median-of-3 to reduce runner noise.
+- Docs site: MkDocs Material on GitHub Pages (`mkdocs.yml`), deployed on release tags.
+- Package hygiene: relocated `sqac/RESEARCH.md` → `docs/RESEARCH-unlimited-context.md`, moved benchmark scripts to `experiments/`.
+
+### Security
+- Cross-vault AAD isolation: ciphertext copied between vaults fails decryption.
+- Provider CLI errors surface install hints and locked-state guidance.
+
 ## [1.0.0] — 2026-11-16
 
 ### Added

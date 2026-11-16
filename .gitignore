@@ -55,3 +55,6 @@ graph_preview.png
 graph_preview.svg
 standalone_dashboard.html
 standalone_graph.html
+
+# MkDocs build output
+site/

@@ -33,6 +33,7 @@ def _open(path: str) -> SqacStore:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="sqac", description="SQAC — Symbolic Query Addressable Cartridge")
+    ap.add_argument("--vault", default=None, help="vault name to use (default: active vault)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def add_db(p):
@@ -168,7 +169,13 @@ def main(argv: list[str] | None = None) -> int:
     vault_sub = p_vault.add_subparsers(dest="vault_cmd", required=True)
 
     p_vi = vault_sub.add_parser("init", help="create the vault")
+    p_vi.add_argument("name", nargs="?", default="default", help="vault name (default: default)")
     p_vi.add_argument("--portable", action="store_true", help="use passphrase (portable) instead of keychain")
+    p_vi.add_argument("--provider", choices=["1password", "bitwarden"], default=None, help="use external secret provider")
+
+    p_vlv = vault_sub.add_parser("list-vaults", help="list named vaults")
+    p_vu = vault_sub.add_parser("use", help="set the active vault")
+    p_vu.add_argument("name", help="vault name")
 
     p_vp = vault_sub.add_parser("put", help="store a secret")
     p_vp.add_argument("name", help="entry name")
@@ -402,26 +409,70 @@ def main(argv: list[str] | None = None) -> int:
         if args.vault_cmd == "init":
             import os as _os
             mode = "portable" if args.portable else "keychain"
+            if args.provider:
+                mode = "provider"
             pw = _os.environ.get("SQAC_VAULT_PASSPHRASE")
             if mode == "portable" and pw is None:
                 if _sys.stdin.isatty():
                     pw = getpass.getpass("Vault passphrase: ")
                 else:
                     pw = _sys.stdin.read().strip()
-            from .vault import DEFAULT_VAULT_PATH
-            if mode == "portable":
-                Vault.create(DEFAULT_VAULT_PATH, mode="portable", passphrase=pw)
+            from .vault_registry import VaultRegistry
+            reg = VaultRegistry()
+            name = getattr(args, "name", "default")
+            if mode == "provider":
+                from .providers import available_providers
+                if args.provider not in available_providers():
+                    print(f"provider not available: {args.provider}")
+                    print(f"available: {available_providers()}")
+                    print(f"install the {args.provider} CLI first")
+                    return 1
+                import os as _os2
+                ref = _os2.environ.get("SQAC_VAULT_PROVIDER_REF")
+                if ref is None:
+                    ref = input(f"{args.provider} reference (e.g. op://vault/item/field): ").strip()
+                reg.init(name, mode="provider", provider=args.provider,
+                         provider_ref=ref)
+            elif mode == "portable":
+                reg.init(name, mode="portable", passphrase=pw)
             else:
-                Vault.create(DEFAULT_VAULT_PATH, mode="keychain")
-            print("vault initialized")
+                reg.init(name, mode="keychain")
+            print(f"vault initialized: {name}")
             return 0
 
-        v = open_vault()
+        if args.vault_cmd == "list-vaults":
+            from .vault_registry import VaultRegistry
+            reg = VaultRegistry()
+            vaults = reg.list_vaults()
+            active = reg.active()
+            for v in vaults:
+                marker = " (active)" if v == active else ""
+                print(f"  {v}{marker}")
+            if "default" not in vaults and not (reg.path_for("default") if False else False):
+                print(f"  default{' (active)' if active == 'default' else ''}")
+            return 0
+
+        if args.vault_cmd == "use":
+            from .vault_registry import VaultRegistry
+            reg = VaultRegistry()
+            reg.set_active(args.name)
+            print(f"active vault: {args.name}")
+            return 0
+
+        # Resolve vault from --vault flag or active
+        from .vault_registry import VaultRegistry
+        reg = VaultRegistry()
+        vname = getattr(args, "vault", None) or reg.active()
+        try:
+            v = reg.open(vname)
+        except Exception:
+            v = None
         if v is None:
-            # Auto-create
+            # Auto-create default
             try:
-                v = create_vault(mode="keychain")
+                v = reg.init("default", mode="keychain")
             except Exception:
+                v = reg.init("default", mode="portable", passphrase="")
                 pw = getpass.getpass("Vault passphrase: ")
                 v = create_vault(mode="portable", passphrase=pw)
 

@@ -12,6 +12,8 @@ Aligned with `docs/superpowers/specs/2026-11-15-sqac-v1-design.md`.
 | **0.4.0** | Agent cartridge (persona + working state, bootstrap, type-based rack isolation) | Released |
 | **0.5.0** | Cloud sync (provider-agnostic S3: R2/S3/Supabase/MinIO/B2/Spaces, push/pull/status, conflict handling) | Released |
 | **0.5.1** | Hotfix: `cryptography>=42` as core dependency | Released |
+| **1.0.0** | Hardening: format caps + fuzz, credential/injection adversarial tests, Windows lock audit, cross-CLI integration, README revamp, docs pages, `sqac report` | Released to PyPI |
+| **1.1.0** | Multi-vault, external secret providers (1P + Bitwarden), agent-cartridge encryption (opt-in), blocking perf gate, docs site, package hygiene | In progress |
 
 ## In flight — 1.0.0 hardening
 
