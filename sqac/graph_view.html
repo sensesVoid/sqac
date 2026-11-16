@@ -7,6 +7,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#000;color:#c9d1d9;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 canvas{display:block}
 #ui{position:fixed;top:0;left:0;width:100%;pointer-events:none;z-index:10}
 #header{padding:12px 20px;display:flex;align-items:center;gap:12px;pointer-events:auto;flex-wrap:wrap}
@@ -51,7 +52,9 @@ canvas{display:block}
 </style>
 </head>
 <body>
+<a href="#main-content" class="skip-link" style="position:absolute;left:-9999px;top:0;z-index:100;padding:8px 16px;background:#161b22;color:#58a6ff;text-decoration:none;font-size:.85rem" onfocus="this.style.left='0'" onblur="this.style.left='-9999px'">Skip to graph</a>
 <div id="loading">⚡ Loading hyperdimensional graph...</div>
+<div id="main-content" tabindex="-1">
 <div id="ui">
   <div id="header">
     <h1>⚡ SQAC Graph</h1>
@@ -68,11 +71,11 @@ canvas{display:block}
   <span class="val" id="edge-val">0.50</span>
 </div>
 <div id="controls">
-  <button id="btn-auto" class="active" onclick="toggleAutoRotate()">Auto Rotate</button>
+  <button id="btn-auto" class="active" onclick="toggleAutoRotate()" aria-pressed="true">Auto Rotate</button>
   <button onclick="resetCamera()">Reset View</button>
-  <button id="btn-force" onclick="toggleForce()">Force Layout</button>
-  <button id="btn-clusters" class="active" onclick="toggleClusters()">Clusters</button>
-  <button id="btn-labels" onclick="toggleLabels()">Labels</button>
+  <button id="btn-force" onclick="toggleForce()" aria-pressed="false">Force Layout</button>
+  <button id="btn-clusters" class="active" onclick="toggleClusters()" aria-pressed="true">Clusters</button>
+  <button id="btn-labels" onclick="toggleLabels()" aria-pressed="false">Labels</button>
   <button onclick="toggleTimeline()">Timeline</button>
   <button onclick="exportImage()">📸 Export</button>
 </div>
@@ -412,6 +415,12 @@ function buildGraph(data, animate = true) {
   buildClusterHulls(positions, assignments, centers);
 
   document.getElementById('loading').style.display = 'none';
+  if (!nodes || nodes.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#8b949e;font-size:1rem;z-index:30;text-align:center';
+    empty.textContent = 'No entries in this cartridge. Use sqac teach to add data.';
+    document.body.appendChild(empty);
+  }
 }
 
 // ── Force-directed layout ───────────────────────────────────────────
