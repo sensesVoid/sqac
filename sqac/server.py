@@ -333,6 +333,7 @@ def graph_endpoint(req: GraphRequest, _=Depends(_verify_key)):
     # --- Build node list ---
     nodes = []
     kind_colors = {"fact": "#58a6ff", "skill": "#f0883e", "doc": "#3fb950", "turn": "#bc8cff", "generic": "#8b949e"}
+    cartridge_name = getattr(store, "_name", None) or req.cartridge or "memory"
     for i, idx in enumerate(alive):
         entry = store._entries[idx]
         kind = entry.get("kind", "generic")
@@ -347,14 +348,33 @@ def graph_endpoint(req: GraphRequest, _=Depends(_verify_key)):
             "source": entry.get("source", ""),
             "color": kind_colors.get(kind, "#8b949e"),
             "position": [round(float(pos[i, 0]), 3), round(float(pos[i, 1]), 3), round(float(pos[i, 2]), 3)],
+            "is_cartridge": False,
         })
+
+    # --- Add cartridge as center node ---
+    cartridge_id = n
+    nodes.append({
+        "id": cartridge_id,
+        "key": cartridge_name,
+        "content": f"Cartridge: {cartridge_name} ({len(store)} entries, {n} alive)",
+        "kind": "cartridge",
+        "source": "cartridge",
+        "color": "#f0e68c",
+        "position": [0.0, 0.0, 0.0],
+        "is_cartridge": True,
+    })
+
+    # Connect every entry to the cartridge center
+    cartridge_edges = [{"source": i, "target": cartridge_id, "similarity": 1.0} for i in range(n)]
+    all_edges_out = [{"source": e[0], "target": e[1], "similarity": round(e[2], 4)} for e in edges] + cartridge_edges
 
     return {
         "nodes": nodes,
-        "edges": [{"source": e[0], "target": e[1], "similarity": round(e[2], 4)} for e in edges],
+        "edges": all_edges_out,
         "dims": store.dims,
         "total_entries": len(store),
         "alive_entries": n,
+        "cartridge": cartridge_name,
     }
 
 
