@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0] — 2026-11-16 (in progress)
+
+### Added
+- Agent cartridge: persona + working state (identity, instruction, preference, goal, decision, note).
+- `agent` CLI: init, list, use, show, set, note, done, bootstrap, search.
+- MCP tools: agent_bootstrap, agent_update, agent_done, agent_search, agent_list, agent_use, agent_show.
+- `mem_bootstrap` prepends active agent packet (SQAC_AGENT=0 to disable).
+- Type-based rack isolation: agent/vault cartridges excluded from default search.
+
+### Privacy
+- Agent state is plaintext in v1; docs flag it. Encryption can reuse vault crypto later.
+
+---
+
 ## [0.3.0] — 2026-11-15 (in progress)
 
 ### Added

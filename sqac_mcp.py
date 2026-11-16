@@ -41,6 +41,7 @@ from sqac.rack import CartridgeRack
 from sqac.offloader import ContextOffloader
 from sqac.graph_mcp import register_graph_tools
 from sqac.vault_mcp import register_vault_tools
+from sqac.agent_mcp import register_agent_tools
 
 SERVER_NAME = "sqac_mcp"
 DEFAULT_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
@@ -70,6 +71,9 @@ register_graph_tools(mcp)
 
 # Register vault tools (reference-only, no plaintext exfiltration)
 register_vault_tools(mcp)
+
+# Register agent tools (persona + working state)
+register_agent_tools(mcp)
 
 
 @dataclass

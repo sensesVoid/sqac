@@ -125,6 +125,46 @@ The cartridge is **one file you own**: back it up, diff it, version it, email it
 
 ---
 
+## SQAC Replaces Agent-Facing `.md` Files
+
+> **The new framing:** Your codebase doesn't need scattered `AGENTS.md`, `CLAUDE.md`, skill definitions, and session notes. SQAC replaces all of them with structured, queryable cartridges — giving your LLM a memory it can carry in a file.
+
+```
+BEFORE (scattered .md files)              AFTER (SQAC cartridges)
+─────────────────────────────             ─────────────────────────
+AGENTS.md          (context rules)        facts.sqac      (atomic facts)
+CLAUDE.md          (persona + rules)     agent.sqac      (persona + state)
+.opencode/skills/  (skill definitions)   skills.sqac     (trigger + steps)
+docs/notes/        (scratchpads)         docs.sqac       (reference Q&A)
+session-notes.md   (handoff notes)       session.sqac    (turns → facts)
+
+→ 5+ files, duplicated content,       → 1 cartridge per kind, structured,
+  grep to find anything, agents           exact/fuzzy/semantic retrieval,
+  re-read entire files every session      budgeted bootstrap packet
+```
+
+### Why this matters
+
+- **No duplication**: `agent set identity "..."` replaces in place. No more copying the same rules across `AGENTS.md`, `CLAUDE.md`, and `.cursorrules`.
+- **Token-efficient**: Agents load a ~4000-char bootstrap packet instead of reading entire `.md` files into context every session.
+- **Cross-CLI**: One cartridge shared across opencode, Claude Code, Codex, Cursor — no per-tool config files.
+- **Structured retrieval**: `mem_search("deployment target")` returns ranked hits with confidence — no grep, no "did I miss a file?"
+- **Kind routing**: Writes auto-route to the right cartridge (facts/skills/docs/agent) by knowledge type.
+
+### What stays as `.md`
+
+Human-facing documentation (README, CHANGELOG, architecture docs, API references) remains markdown — those exist for human review in PRs and ecosystem consumption (PyPI, GitHub Pages). SQAC replaces the **agent-facing** `.md` files, not the human-facing ones.
+
+### Cartridge types
+
+| Type | Purpose | Header version |
+|------|---------|----------------|
+| `memory` | Facts, skills, docs (default) | v4 |
+| `agent` | Persona + working state (0.4.0) | v4 |
+| `vault` | Encrypted secrets/PII (0.3.0) | v5 |
+
+---
+
 ## Core Concepts
 
 ### Cartridge
@@ -946,30 +986,39 @@ We publish our negative results too — they're part of the record.
 
 ## Security — What SQAC protects against (and what it doesn't)
 
-### ⚠️ Do NOT store credentials in SQAC
+### Secrets and Credentials
 
-**SQAC is not a secrets manager.** `.sqac` files are plaintext with no encryption at rest. Anyone with file read access can see all stored content. Do not store:
+**Regular memory cartridges are plaintext.** `.sqac` files have no encryption at rest -- anyone with file read access can see all stored content. Do not store secrets in memory cartridges:
 
 - API keys, tokens, or secrets
 - Passwords or connection strings
 - Private keys or certificates
 - JWT tokens or session cookies
 
-**Use instead:** environment variables, `.env` files (gitignored), or a dedicated secrets manager (HashiCorp Vault, AWS Secrets Manager, etc.).
+**Use the Vault cartridge instead.** SQAC includes an encrypted vault (v0.3.0+) designed specifically for secrets and PII:
 
-SQAC includes a **credential detector** that rejects content matching common secret patterns (AWS keys, GitHub tokens, OpenAI/Anthropic keys, Stripe keys, private keys, passwords, connection strings, JWTs). You'll get a clear error message if you try to store something that looks like a credential.
+```bash
+sqac vault init                    # create encrypted vault (keychain mode)
+sqac vault put openai --type secret # store a secret (AES-256-GCM encrypted)
+sqac vault exec --env KEY=vault:openai -- curl https://api.openai.com  # use without exposing
+```
+
+The vault uses AES-256-GCM encryption with OS keychain or Argon2id passphrase. Values are never returned by MCP tools -- only injected via `vault exec` (env var) or `vault_http` (host-allowlisted proxy).
+
+**Credential detector**: SQAC rejects content matching common secret patterns in memory cartridges and suggests using the vault instead.
 
 ```python
 from sqac import SqacStore
 store = SqacStore()
 store.add("sk_live_abc123...", key="stripe-key")
-# → CredentialError: Content appears to contain credentials (Stripe Key).
-#   SQAC is not a secrets manager — use environment variables.
+# -> CredentialError: Content appears to contain credentials (Stripe Key).
+#   Use 'sqac vault put' instead.
 ```
 
-If you need to reference a secret, store the *reference* (e.g., `"Stripe key lives in STRIPE_SECRET_KEY env var"`) rather than the value.
+If you need to reference a secret in memory, store the *reference* (e.g., `"Stripe key lives in vault:stripe"`) rather than the value.
 
 ---
+
 
 ## Security — Prompt Injection Defense
 
@@ -1101,7 +1150,7 @@ SQAC stands on published work. Every link verified; no folklore citations.
 
 ---
 
-**Status:** 0.2.0 — production-oriented, under active development. Core stable and tested. Published to PyPI: `pip install sqac`.
+**Status:** 0.4.0-dev — vault + agent cartridges. Core stable and tested (323+ tests). Published to PyPI: `pip install sqac`.
 
 *Built as an implementation of the SQ thesis — see `docs/THESIS.md` for the full research narrative.*
 
