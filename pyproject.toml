@@ -34,7 +34,8 @@ mcp = ["mcp>=2.0,<3"]
 server = ["fastapi", "uvicorn"]
 compress = ["lz4"]
 semantic = ["transformers>=4.30", "torch"]
-all = ["mcp>=2.0,<3", "fastapi", "uvicorn", "lz4", "transformers>=4.30", "torch"]
+cloud = ["boto3>=1.34"]
+all = ["mcp>=2.0,<3", "fastapi", "uvicorn", "lz4", "transformers>=4.30", "torch", "boto3>=1.34"]
 
 [project.scripts]
 sqac = "sqac.cli:main"
