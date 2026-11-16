@@ -506,12 +506,11 @@ class SqacStore:
     # ── persistence ──────────────────────────────────────────────────────
 
     def save(self, path: str | Path, name: str = "", description: str = "") -> None:
-        """Write the store as a .sqac cartridge (atomic replace).
+        """Persist to a .sqac file.
 
-        v2 layout: auxiliary packed vectors (content, semantic key/content)
-        go into a per-entry raw binary block — ~2x smaller than the v1
-        hex-in-JSON encoding. Use format_version=1 to emit the legacy
-        layout (readable by pre-v2 runtimes).
+        Writes the current v2 binary layout: auxiliary packed vectors
+        (content, semantic key/content) are stored in a per-entry raw
+        binary block.
         """
         key_len = self.dims // 8
         entries = []

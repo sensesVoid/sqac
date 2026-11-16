@@ -13,6 +13,9 @@
 - Cross-CLI integration tests (4 tests).
 - `CONTRIBUTING.md` with development setup, testing, code style, PR process.
 - `sqac report` CLI command for filing GitHub issues with diagnostics.
+- Dedicated docs: `docs/VAULT.md`, `docs/AGENT.md`, `docs/CLOUD.md`, `docs/FORMAT.md`, `docs/MCP.md`, `docs/RELEASE.md`, root `SECURITY.md`.
+- README reframed around "SQAC replaces agent-facing `.md` files" with a source-aligned CLI reference.
+- Cross-platform capacity benchmark (`experiments/capacity_bench.py` runs on Windows; 100K-entry measurement).
 
 ### Security
 - Hardened `read_cartridge`: rejects huge counts, caps payload sizes, handles decompression errors.
@@ -24,18 +27,17 @@
 
 ---
 
-## [0.5.0] — 2026-11-16 (in progress)
+## [0.5.0] — 2026-11-16
 
 ### Added
 - Cloud sync: provider-agnostic S3 storage backend (R2, S3, Supabase, MinIO, B2, Spaces).
 - Sync engine: push/pull/status/conflict detection with force flags.
-- Cloud CLI: init, status, sync with --provider, --bucket, --dry-run.
-- MCP tools: cloud_status, cloud_sync.
-- Bug reporting: sqac report CLI command with diagnostics.
+- Cloud CLI: `init`, `status`, `sync` with provider/bucket options and dry-run/force flags.
+- MCP tools: `cloud_status`, `cloud_sync`.
 
 ---
 
-## [0.4.0] — 2026-11-16 (in progress)
+## [0.4.0] — 2026-11-16
 
 ### Added
 - Agent cartridge: persona + working state (identity, instruction, preference, goal, decision, note).
@@ -49,7 +51,7 @@
 
 ---
 
-## [0.3.0] — 2026-11-15 (in progress)
+## [0.3.0] — 2026-11-15
 
 ### Added
 - Vault cartridge (v5 format): encrypted secret/PII storage with AES-256-GCM.
