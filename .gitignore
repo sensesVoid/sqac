@@ -39,6 +39,7 @@ Thumbs.db
 # SQAC specific
 .sqac/
 .sqac-graph/
+.codegraph/
 *.sqac
 *.sqac.tmp
 *.sqac.lock
