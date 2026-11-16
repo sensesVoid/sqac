@@ -1,4 +1,4 @@
-"""Agent cartridge: persona + working state with typed sections."""
+﻿"""Agent cartridge: persona + working state with typed sections."""
 
 from __future__ import annotations
 
@@ -83,7 +83,7 @@ def _gen_key(section: str) -> str:
     return f"{section}-{secrets.token_hex(4)}"
 
 
-# ── AgentCartridge ─────────────────────────────────────────────────────────
+# â”€â”€ AgentCartridge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class AgentCartridge:
     """Persona + working state cartridge."""
@@ -302,54 +302,6 @@ class AgentCartridge:
         self.path.write_bytes(plaintext)
         self._store = None
         self._save()
-        """Set an entry in a section. Returns entry index."""
-        if section not in ALL_SECTIONS:
-            raise ValueError(f"unknown section: {section}")
-        if tags is None:
-            tags = []
-
-        if key is not None:
-            # Upsert by key
-            for i, e in enumerate(self.store._entries):
-                if e.get("meta", {}).get("key") == key and e.get("meta", {}).get("section") == section:
-                    self.store._entries[i]["content"] = content
-                    self.store._entries[i]["meta"]["priority"] = priority
-                    self.store._entries[i]["meta"]["tags"] = tags
-                    self.store._entries[i]["meta"]["updated"] = _now()
-                    self._save()
-                    return i
-            # Not found, add new
-            key = key
-
-        if key is None and section in SINGLETON_SECTIONS:
-            # Replace single existing entry for this section
-            for i, e in enumerate(self.store._entries):
-                if e.get("meta", {}).get("section") == section:
-                    self.store._entries[i]["content"] = content
-                    self.store._entries[i]["meta"]["priority"] = priority
-                    self.store._entries[i]["meta"]["tags"] = tags
-                    self.store._entries[i]["meta"]["updated"] = _now()
-                    self._save()
-                    return i
-            # No existing, generate key
-            key = f"{section}-0"
-
-        if key is None and section in LIST_SECTIONS:
-            key = _gen_key(section)
-
-        if key is None:
-            key = f"{section}-0"
-
-        idx = self.store.add(
-            content,
-            key=key,
-            kind="fact",
-            source="agent",
-            meta={"section": section, "priority": priority, "status": "open", "tags": tags, "key": key, "updated": _now()},
-        )
-        self._save()
-        return idx
-
     def set(self, section: str, content: str, key: Optional[str] = None, priority: int = 1, tags: Optional[list] = None) -> int:
         """Set an entry in a section. Returns entry index."""
         if section not in ALL_SECTIONS:
@@ -494,7 +446,7 @@ class AgentCartridge:
         self._save()
 
 
-# ── module-level helpers ───────────────────────────────────────────────────
+# â”€â”€ module-level helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _agent_path(name: str) -> Path:
     return AGENT_DIR / f"{name}.sqac"
