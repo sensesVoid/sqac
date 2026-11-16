@@ -231,8 +231,10 @@ HAS_SIMD = backend is not None
 
 ### 8.6 Acceptance
 
-- Fresh install on clean Windows 11 x64, Ubuntu 24.04 x64, macOS 14 arm64:
+- Fresh install on clean Windows 11 x64, Ubuntu 24.04 x64:
   `sqac stats` reports `"simd": true`.
+- macOS and aarch64 (Linux) wheels are deferred to v1.0; source builds with
+  Rust installed still produce native wheels for those platforms.
 - `pip install --no-binary sqac sqac` on a machine without Rust still imports and
   falls back to NumPy.
 - Benchmark does not regress: 25K fuzzy scan ≤ 20 ms with SIMD.
@@ -493,19 +495,39 @@ class StorageBackend(Protocol):
     def list(self, prefix: str = "") -> list[ObjectInfo]: ...
 ```
 
-- `LocalBackend` (tests + future), `R2Backend` (boto3 S3 API, optional extra
-  `cloudflare = ["boto3>=1.34"]`), `FakeBackend` (tests, supports conditional put).
-- R2 endpoint `https://<account_id>.r2.cloudflarestorage.com`, region `auto`,
-  signature v4, path-style addressing.
+- `LocalBackend` (tests + future), `S3Backend` (boto3 S3 API, optional extra
+  `cloud = ["boto3>=1.34"]`), `FakeBackend` (tests, supports conditional put).
+- S3Backend is provider-agnostic: accepts `endpoint_url`, `region`, `access_key_id`,
+  `secret_access_key`, and `bucket`. Works with any S3-compatible provider.
+- Built-in provider presets (auto-fill endpoint/region):
+  - `r2`: Cloudflare R2 — `https://<account_id>.r2.cloudflarestorage.com`, region `auto`
+  - `s3`: AWS S3 — `https://s3.<region>.amazonaws.com`, region from config
+  - `supabase`: Supabase Storage — `https://<project_ref>.supabase.co/storage/v1/s3`, region `auto`
+  - `minio`: self-hosted MinIO — user-provided endpoint, region `us-east-1`
+  - `b2`: Backblaze B2 — `https://s3.<region>.backblazeb2.com`, region from config
+  - `spaces`: DigitalOcean Spaces — `https://<region>.digitaloceanspaces.com`, region from config
+- All providers use signature v4 and path-style addressing. Provider-specific
+  quirks (e.g., R2 has no egress fees, Supabase S3 gateway rate limits) are
+  documented per-provider in docs/CLOUD.md.
+- `sqac cloud init --provider <name>` walks through provider-specific setup and
+  verifies a `head_bucket`. Auto-detects provider from env vars when possible
+  (e.g., `SQAC_R2_ACCOUNT_ID` → r2, `SUPABASE_URL` → supabase).
 
 ### 11.2 Config and credentials
 
-- `~/.sqacm/cloud.json`: `{account_id, bucket, prefix, sync_mode, exclude}`.
-- Credentials in the OS keychain (service `sqac-r2`) or env
-  `SQAC_R2_ACCESS_KEY_ID`, `SQAC_R2_SECRET_ACCESS_KEY`, `SQAC_R2_ACCOUNT_ID`.
-- `sqac cloud init` writes config and verifies a `head_bucket`; `sqac cloud status`
+- `~/.sqacm/cloud.json`: `{provider, endpoint_url, bucket, prefix, region, sync_mode, exclude}`.
+  The `provider` field selects the preset; `endpoint_url` and `region` are auto-filled
+  from the preset but can be overridden (e.g., for MinIO or custom S3-compatible stores).
+- Credentials in the OS keychain (service `sqac-cloud`) or env vars:
+  - Generic: `SQAC_CLOUD_ACCESS_KEY_ID`, `SQAC_CLOUD_SECRET_ACCESS_KEY`
+  - Provider-specific aliases also accepted: `SQAC_R2_*`, `SQAC_S3_*`, `SUPABASE_*`,
+    `AWS_*` (checked in priority order; first match wins).
+  - `SQAC_CLOUD_ACCOUNT_ID` for R2 (used to build endpoint).
+- `sqac cloud init [--provider r2|s3|supabase|minio|b2|spaces]` walks through
+  provider-specific setup and verifies a `head_bucket`; `sqac cloud status`
   shows connectivity, object count, and last sync.
-- Never write credentials into `cloud.json`.
+- Never write credentials into `cloud.json`. Only non-secret config (provider, bucket,
+  prefix, region, sync_mode, exclude) is persisted.
 
 ### 11.3 Sync engine
 

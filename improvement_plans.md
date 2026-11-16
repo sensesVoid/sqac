@@ -15,7 +15,7 @@ Roadmap aligned with `docs/superpowers/specs/2026-11-15-sqac-v1-design.md`.
 
 ### 2. Bundled Rust SIMD + cross-platform wheels ✅ **IMPLEMENTED** (verify in CI/release)
 - `sqac._simd` bundled via setuptools-rust/pyo3 0.30 (abi3), `SQAC_SKIP_RUST=1` NumPy fallback, legacy `sqac_simd` fallback.
-- cibuildwheel matrix: Linux x86_64/aarch64 (QEMU), macOS x86_64/arm64, Windows AMD64 (`.github/workflows/wheels.yml`).
+- cibuildwheel matrix: Linux x86_64, Windows AMD64 (`.github/workflows/wheels.yml`). aarch64 (Linux) and macOS wheels deferred to v1.0.0 (QEMU builds too slow).
 - **Pending:** green Wheels/CI on PR #1 and first tagged release artifacts.
 
 ### 3. CI/CD, packaging, and release automation ✅ **IMPLEMENTED** (verify in CI)
