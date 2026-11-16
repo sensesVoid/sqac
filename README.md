@@ -1,6 +1,6 @@
 # SQAC replaces agent-facing `.md` files
 
-![SQAC Banner](sqac.png)
+![SQAC Banner](https://raw.githubusercontent.com/sensesVoid/sqac/main/sqac.png)
 
 **Give your LLM a memory it can carry in a file.** SQAC (Symbolic Query Addressable Cartridge) turns facts, skills, session context, agent personas, and secrets into portable `.sqac` cartridges that any LLM can query at runtime — no retraining, no vector database, no GPU required.
 
