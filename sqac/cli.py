@@ -195,6 +195,45 @@ def main(argv: list[str] | None = None) -> int:
     p_vs = vault_sub.add_parser("scan", help="scan cartridges for PII/secrets")
     p_vs.add_argument("cartridges", nargs="*")
 
+    # Agent subcommands
+    p_agent = sub.add_parser("agent", help="agent persona + working state")
+    agent_sub = p_agent.add_subparsers(dest="agent_cmd", required=True)
+
+    p_ai = agent_sub.add_parser("init", help="create an agent")
+    p_ai.add_argument("name", help="agent name")
+    p_ai.add_argument("--role", default="", help="agent role")
+
+    p_al = agent_sub.add_parser("list", help="list agents")
+
+    p_au = agent_sub.add_parser("use", help="set active agent")
+    p_au.add_argument("name", help="agent name")
+
+    p_as = agent_sub.add_parser("show", help="show agent bootstrap")
+    p_as.add_argument("name", nargs="?", default=None, help="agent name (default: active)")
+
+    p_aset = agent_sub.add_parser("set", help="set a section")
+    p_aset.add_argument("section", help="section: identity/instruction/preference/goal/decision/note")
+    p_aset.add_argument("content", help="content")
+    p_aset.add_argument("--key", default=None, help="upsert key")
+    p_aset.add_argument("--priority", type=int, default=1)
+    p_aset.add_argument("--name", default=None, help="agent name (default: active)")
+
+    p_an = agent_sub.add_parser("note", help="add a note")
+    p_an.add_argument("content", help="note content")
+    p_an.add_argument("--name", default=None, help="agent name (default: active)")
+
+    p_ad = agent_sub.add_parser("done", help="mark a goal/decision as done")
+    p_ad.add_argument("key_or_query", help="key or search query")
+    p_ad.add_argument("--name", default=None, help="agent name (default: active)")
+
+    p_ab = agent_sub.add_parser("bootstrap", help="show agent bootstrap packet")
+    p_ab.add_argument("--max-chars", type=int, default=4000)
+    p_ab.add_argument("--name", default=None, help="agent name (default: active)")
+
+    p_asearch = agent_sub.add_parser("search", help="search agent memory")
+    p_asearch.add_argument("query", help="search query")
+    p_asearch.add_argument("--name", default=None, help="agent name (default: active)")
+
     p_mcp_setup = sub.add_parser("mcp", help="MCP server wiring for agent CLIs")
     p_mcp_setup.add_argument("action", choices=["setup"], help="generate/install per-CLI wiring")
     p_mcp_setup.add_argument("--dir", default="~/.sqacm", help="shared memory dir (default: ~/.sqacm)")
@@ -204,6 +243,65 @@ def main(argv: list[str] | None = None) -> int:
                              help="install AGENTS.md memory hook into this project (path)")
 
     args = ap.parse_args(argv)
+
+    # Agent commands
+    if args.cmd == "agent":
+        from sqac.agent import (
+            create_agent, load_agent, list_agents, get_active_agent, set_active_agent,
+        )
+
+        if args.agent_cmd == "init":
+            create_agent(args.name, role=args.role)
+            print(f"agent created: {args.name}")
+            return 0
+
+        if args.agent_cmd == "list":
+            for name in list_agents():
+                marker = " *" if name == get_active_agent() else ""
+                print(f"{name}{marker}")
+            return 0
+
+        if args.agent_cmd == "use":
+            set_active_agent(args.name)
+            print(f"active agent: {args.name}")
+            return 0
+
+        agent_name = args.name if getattr(args, "name", None) else get_active_agent()
+        if agent_name is None:
+            print("no active agent; use 'sqac agent use <name>' or 'sqac agent init <name>'")
+            return 1
+        ag = load_agent(agent_name)
+
+        if args.agent_cmd in ("show", "bootstrap"):
+            max_chars = getattr(args, "max_chars", 4000)
+            print(ag.bootstrap(max_chars=max_chars))
+            return 0
+
+        if args.agent_cmd == "set":
+            idx = ag.set(args.section, args.content, key=args.key, priority=args.priority)
+            print(f"set {args.section}: entry {idx}")
+            return 0
+
+        if args.agent_cmd == "note":
+            idx = ag.note(args.content)
+            print(f"note added: entry {idx}")
+            return 0
+
+        if args.agent_cmd == "done":
+            ok = ag.complete(args.key_or_query)
+            print("completed" if ok else "not found or ambiguous")
+            return 0 if ok else 1
+
+        if args.agent_cmd == "search":
+            hits = ag.search(args.query)
+            if not hits:
+                print("no hit")
+                return 1
+            for h in hits:
+                print(f"[{h.mode} {h.confidence:.3f}] {h.content}")
+            return 0
+
+        return 0
 
     # Vault commands
     if args.cmd == "vault":
