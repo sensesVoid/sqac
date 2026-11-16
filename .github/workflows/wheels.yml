@@ -45,10 +45,10 @@ jobs:
             uses: "qemu"
           - os: windows-latest
             archs: "AMD64"
+          - os: macos-13
+            archs: "x86_64"
           - os: macos-14
             archs: "arm64"
-          - os: macos-14
-            archs: "x86_64"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
