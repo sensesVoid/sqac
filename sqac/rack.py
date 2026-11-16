@@ -398,7 +398,6 @@ class CartridgeRack:
             return self
         p.parent.mkdir(parents=True, exist_ok=True)
         store = SqacStore(semantic=self.semantic, fuzzy_threshold=self.min_confidence)
-        store.format_version = 3
         store.save(p, name=name, description=description)
         self._stores[name] = store
         self._paths[name] = p
@@ -476,7 +475,6 @@ class CartridgeRack:
         new_store = SqacStore(
             semantic=self.semantic, fuzzy_threshold=self.min_confidence
         )
-        new_store.format_version = 3
         self._stores[name] = new_store
         # paths[name] stays the same (original path)
         # 4. Register the shard store so search can find it
@@ -767,7 +765,6 @@ class CartridgeRack:
         compacted = SqacStore(
             semantic=self.semantic, fuzzy_threshold=self.min_confidence
         )
-        compacted.format_version = 3
         # Replay entries into the fresh store (rebuilds indices)
         for e in merged:
             meta = dict(e.get("meta", {}))

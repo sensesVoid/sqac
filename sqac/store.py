@@ -180,7 +180,6 @@ class SqacStore:
         self.semantic = False
         self._sem_encoder = None
         self.cartridge_type = "memory"
-        self.format_version = VERSION  # v2 writes raw binary vectors; 1 = legacy hex
         # Query cache: maps (query_hash, tier) -> (packed_bits, write_version)
         self._cache_size = cache_size
         self._query_cache: collections.OrderedDict[tuple[str, str], tuple[bytes, int]] = (
@@ -524,16 +523,10 @@ class SqacStore:
                 "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
                 **({"meta": e["meta"]} if e["meta"] else {}),
             }
-            if self.format_version >= 2:
-                binvec = bytes(ckbits)
-                if self.semantic:
-                    binvec += bytes(self._sem_keys[idx]) + bytes(self._sem_ckeys[idx])
-            else:
-                binvec = b""
-                payload["content_key"] = ckbits.hex()
-                if self.semantic:
-                    payload["sem_key"] = self._sem_keys[idx].hex()
-                    payload["sem_content_key"] = self._sem_ckeys[idx].hex()
+            # v2+: always write raw binary vectors (no hex fallback)
+            binvec = bytes(ckbits)
+            if self.semantic:
+                binvec += bytes(self._sem_keys[idx]) + bytes(self._sem_ckeys[idx])
             entries.append(
                 Entry(
                     key_bits=bytearray(kbits),
