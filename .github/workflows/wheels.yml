@@ -40,8 +40,15 @@ jobs:
         include:
           - os: ubuntu-latest
             archs: "x86_64"
+          - os: ubuntu-latest
+            archs: "aarch64"
+            uses: "qemu"
           - os: windows-latest
             archs: "AMD64"
+          - os: macos-14
+            archs: "arm64"
+          - os: macos-14
+            archs: "x86_64"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -58,9 +65,33 @@ jobs:
           CIBW_BEFORE_ALL_LINUX: >-
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
             sh -s -- -y --profile minimal
+          CIBW_BEFORE_ALL_LINUX_AARCH64: >-
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+            sh -s -- -y --profile minimal
+            rustup target add aarch64-unknown-linux-gnu
+          CIBW_ENVIRONMENT_LINUX: "PATH=$HOME/.cargo/bin:$PATH"
+          CIBW_ENVIRONMENT_LINUX_AARCH64: "PATH=$HOME/.cargo/bin:$PATH"
+          CIBW_BEFORE_ALL_MACOS: |
+            rustup toolchain install stable
+            rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          CIBW_TEST_COMMAND: >-
+            python -c "import sqac, sqac.simd; assert sqac.simd.HAS_SIMD"
+        if: matrix.uses != 'qemu' || runner.os == 'Linux'
+      - name: Build wheels (aarch64 via QEMU)
+        if: matrix.uses == 'qemu'
+        uses: pypa/cibuildwheel@v4.3.5
+        env:
+          CIBW_BUILD: "cp310-*"
+          CIBW_ARCHS: ${{ matrix.archs }}
+          CIBW_BEFORE_ALL_LINUX: >-
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+            sh -s -- -y --profile minimal
+            rustup target add aarch64-unknown-linux-gnu
           CIBW_ENVIRONMENT_LINUX: "PATH=$HOME/.cargo/bin:$PATH"
           CIBW_TEST_COMMAND: >-
             python -c "import sqac, sqac.simd; assert sqac.simd.HAS_SIMD"
+        uses: docker://tonistiigi/binfmt:latest
+        # QEMU user-mode for aarch64 on x86_64 runner
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}-${{ matrix.archs }}
