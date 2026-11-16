@@ -1,2 +1,0 @@
-# MCP server deps (core sqac needs numpy only).
-mcp>=2.0,<3

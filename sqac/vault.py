@@ -3,29 +3,24 @@
 from __future__ import annotations
 
 import base64
-import json
 import os
 import re
 import secrets
-import tempfile
 import time
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from .format import (
     CartridgeHeader,
     Entry,
     VAULT_WRITE_VERSION,
-    FLAG_ENCRYPTED,
     read_cartridge,
     write_cartridge,
 )
 from .vault_crypto import (
     generate_dek,
-    generate_nonce,
-    aad as make_aad,
     encrypt_value,
     decrypt_value,
     wrap_dek,
@@ -33,12 +28,10 @@ from .vault_crypto import (
     derive_kek_argon2id,
     keychain_get,
     keychain_set,
-    keychain_delete,
     KeychainUnavailable,
     VaultCryptoError,
     get_unlock_cache,
 )
-from .pii import detect_pii as _detect_pii
 
 
 # ── constants ──────────────────────────────────────────────────────────────
@@ -444,7 +437,7 @@ class Vault:
         secret = self.resolve(name)
 
         # Parse URL
-        from urllib.parse import urlparse, urlunparse
+        from urllib.parse import urlparse
         parsed = urlparse(url)
         if parsed.scheme != "https":
             raise ValueError("HTTPS required")

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sqac.vault import Vault, create_vault, open_vault
+from sqac.vault import Vault
 
 
 class TestVaultBasic(unittest.TestCase):

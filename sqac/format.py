@@ -40,7 +40,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import struct
 import sys
 import threading
@@ -517,32 +516,55 @@ def read_cartridge(path: str | Path, locked: bool = False) -> Cartridge:
     head_len, _resv = struct.unpack("<II", take(8))
     header = CartridgeHeader.from_json(take(head_len).decode("utf-8"))
 
+    MAX_DIMS = 8192
+    MAX_ENTRIES = 10_000_000
+    MAX_VOCAB = 1_000_000
+    MAX_TOKEN_LEN = 1024
+    MAX_PB_LEN = 64 * 1024 * 1024  # 64 MB per payload
+    MAX_BINVEC_LEN = 64 * 1024 * 1024  # 64 MB
+    MAX_DECOMPRESSED = 64 * 1024 * 1024  # 64 MB
+
     dims = header.dims
+    if dims < 8 or dims > MAX_DIMS or dims % 8 != 0:
+        raise FormatError(f"invalid dims: {dims}")
     key_len = dims // 8
-    if key_len * 8 != dims:
-        raise FormatError("dims must be a multiple of 8")
 
     (vocab_len,) = struct.unpack("<I", take(4))
+    if vocab_len > MAX_VOCAB:
+        raise FormatError(f"vocab_len too large: {vocab_len}")
     vocab: dict[str, int] = {}
     for _ in range(vocab_len):
         (tb_len,) = struct.unpack("<I", take(4))
+        if tb_len > MAX_TOKEN_LEN:
+            raise FormatError(f"token length too large: {tb_len}")
         token = take(tb_len).decode("utf-8")
         (idx,) = struct.unpack("<I", take(4))
         vocab[token] = idx
 
     (n_entries,) = struct.unpack("<Q", take(8))
+    if n_entries > MAX_ENTRIES:
+        raise FormatError(f"too many entries: {n_entries}")
     entries: list[Entry] = []
     for _ in range(n_entries):
         flags, pb_len = struct.unpack("<HI", take(6))
+        if pb_len > MAX_PB_LEN:
+            raise FormatError(f"payload too large: {pb_len}")
         key_bits = bytearray(take(key_len))
         binvec = b""
         if flags & FLAG_BINVEC:
             (bv_len,) = struct.unpack("<I", take(4))
+            if bv_len > MAX_BINVEC_LEN:
+                raise FormatError(f"binvec too large: {bv_len}")
             binvec = take(bv_len)
         raw_payload = take(pb_len)
         if flags & FLAG_COMPRESSED:
             if _HAS_LZ4:
-                raw_payload = _lz4_compress.decompress(raw_payload)
+                try:
+                    raw_payload = _lz4_compress.decompress(raw_payload)
+                except Exception as exc:
+                    raise FormatError(f"lz4 decompression failed: {exc}")
+                if len(raw_payload) > MAX_DECOMPRESSED:
+                    raise FormatError(f"decompressed payload too large: {len(raw_payload)}")
             else:
                 raise FormatError(
                     "cartridge uses lz4 compression but lz4 is not installed: "

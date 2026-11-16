@@ -16,13 +16,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
-import resource
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+try:
+    import resource  # POSIX: peak RSS via ru_maxrss
+except ImportError:  # pragma: no cover - Windows fallback
+    resource = None
 
 from sqac.store import SqacStore  # noqa: E402
 
@@ -63,6 +69,50 @@ def _key(idx: int) -> str:
     return f"{_lang.choice(_TOPICS)} {_lang.choice(_NOUNS)}-{idx} decision"
 
 
+def _peak_rss_mb() -> float:
+    """Peak RSS in MB. POSIX uses ru_maxrss; Windows falls back to
+    GetProcessMemoryInfo via ctypes (WorkingSetSize)."""
+    if resource is not None:
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        psapi = ctypes.WinDLL("psapi")
+        kernel32 = ctypes.WinDLL("kernel32")
+        # Proper prototypes: without restype/argtypes the pseudo-HANDLE from
+        # GetCurrentProcess is truncated and GetProcessMemoryInfo fails.
+        kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+        psapi.GetProcessMemoryInfo.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(PROCESS_MEMORY_COUNTERS),
+            wintypes.DWORD,
+        ]
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+        counters = PROCESS_MEMORY_COUNTERS()
+        counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
+        handle = kernel32.GetCurrentProcess()
+        if psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+            return counters.PeakWorkingSetSize / (1024.0 * 1024.0)
+    except Exception:
+        pass
+    return 0.0
+
+
 def bench(size: int) -> dict:
     row: dict = {"size": size}
     t0 = time.perf_counter()
@@ -73,7 +123,8 @@ def bench(size: int) -> dict:
     t2 = time.perf_counter()
     row["build_s"] = round(t2 - t1, 3)
 
-    cart = Path(f"/tmp/sqac_cap_{size}.sqac")
+    tmpdir = Path(os.environ.get("SQAC_BENCH_TMP", tempfile.gettempdir()))
+    cart = tmpdir / f"sqac_cap_{size}.sqac"
     store.save(cart, name=f"cap-{size}")
     t3 = time.perf_counter()
     row["save_s"] = round(t3 - t2, 3)
@@ -107,7 +158,7 @@ def bench(size: int) -> dict:
     cold.search(q, top_k=3, kind="turn")
     row["first_query_ms"] = round((time.perf_counter() - t) * 1000, 3)
 
-    row["peak_rss_mb"] = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1)
+    row["peak_rss_mb"] = round(_peak_rss_mb(), 1)
     cart.unlink()
     return row
 

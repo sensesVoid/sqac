@@ -8,9 +8,8 @@ import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
-from .storage import StorageBackend, ObjectInfo, create_backend
+from .storage import StorageBackend
 
 # ── config ─────────────────────────────────────────────────────────────────
 
@@ -149,7 +148,6 @@ class SyncEngine:
     def _is_keychain_vault(self, path: Path) -> bool:
         """Check if a vault uses keychain mode (local-only)."""
         try:
-            import json
             from .format import read_cartridge
             cart = read_cartridge(str(path))
             vinfo = cart.header.extra.get("vault", {})

@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
-import json
-import os
 import secrets
 import time
-import uuid
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from .format import (
     CartridgeHeader,
-    Entry,
     WRITE_VERSION,
     read_cartridge,
     write_cartridge,

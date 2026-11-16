@@ -32,7 +32,6 @@ from .simd import backend as _simd
 from .format import (
     _HAS_LZ4,
 
-    VERSION,
     CartridgeHeader,
     Entry,
     FormatError,
@@ -180,7 +179,6 @@ class SqacStore:
         self.semantic = False
         self._sem_encoder = None
         self.cartridge_type = "memory"
-        self.format_version = VERSION  # v2 writes raw binary vectors; 1 = legacy hex
         # Query cache: maps (query_hash, tier) -> (packed_bits, write_version)
         self._cache_size = cache_size
         self._query_cache: collections.OrderedDict[tuple[str, str], tuple[bytes, int]] = (
@@ -350,7 +348,6 @@ class SqacStore:
             self._entries.append(e)
             norm = e["key_norm"]
             idx = len(self._entries) - 1
-            key_text = norm  # reconstruct from normalized key
             self._keys.append(self.encoder.encode_bits(norm))
             self._ckeys.append(self.encoder.encode_bits(e["content"]))
             if self.semantic and self._sem_encoder:
@@ -507,14 +504,12 @@ class SqacStore:
     # ── persistence ──────────────────────────────────────────────────────
 
     def save(self, path: str | Path, name: str = "", description: str = "") -> None:
-        """Write the store as a .sqac cartridge (atomic replace).
+        """Persist to a .sqac file.
 
-        v2 layout: auxiliary packed vectors (content, semantic key/content)
-        go into a per-entry raw binary block — ~2x smaller than the v1
-        hex-in-JSON encoding. Use format_version=1 to emit the legacy
-        layout (readable by pre-v2 runtimes).
+        Writes the current v2 binary layout: auxiliary packed vectors
+        (content, semantic key/content) are stored in a per-entry raw
+        binary block.
         """
-        key_len = self.dims // 8
         entries = []
         for idx, (e, kbits, ckbits) in enumerate(zip(self._entries, self._keys, self._ckeys)):
             payload = {
@@ -524,16 +519,10 @@ class SqacStore:
                 "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
                 **({"meta": e["meta"]} if e["meta"] else {}),
             }
-            if self.format_version >= 2:
-                binvec = bytes(ckbits)
-                if self.semantic:
-                    binvec += bytes(self._sem_keys[idx]) + bytes(self._sem_ckeys[idx])
-            else:
-                binvec = b""
-                payload["content_key"] = ckbits.hex()
-                if self.semantic:
-                    payload["sem_key"] = self._sem_keys[idx].hex()
-                    payload["sem_content_key"] = self._sem_ckeys[idx].hex()
+            # v2+: always write raw binary vectors (no hex fallback)
+            binvec = bytes(ckbits)
+            if self.semantic:
+                binvec += bytes(self._sem_keys[idx]) + bytes(self._sem_ckeys[idx])
             entries.append(
                 Entry(
                     key_bits=bytearray(kbits),

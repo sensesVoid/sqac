@@ -101,7 +101,8 @@ def main() -> int:
     if args.limit:
         tasks = tasks[: args.limit]
 
-    out = args.out or f"results_{re.sub(r'[^\\w]+', '_', args.model)}.json"
+    safe_model = re.sub(r"[^\w]+", "_", args.model)
+    out = args.out or f"results_{safe_model}.json"
     records_by_q = {}
     prior_arms = set()
     if Path(out).exists():
