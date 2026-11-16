@@ -365,7 +365,8 @@ function buildGraph(data, animate = true) {
   // ── Nodes ──
   nodes.forEach((node, i) => {
     const color = new THREE.Color(node.color);
-    const geo = new THREE.SphereGeometry(NODE_BASE_SIZE, 24, 24);
+    const size = node.is_cartridge ? NODE_BASE_SIZE * 2.5 : NODE_BASE_SIZE;
+    const geo = new THREE.SphereGeometry(size, 24, 24);
     const mat = new THREE.MeshStandardMaterial({
       color, emissive: color, emissiveIntensity: 0.5,
       roughness: 0.3, metalness: 0.7, transparent: true, opacity: animate ? 0 : 0.9,
@@ -383,7 +384,7 @@ function buildGraph(data, animate = true) {
     nodeMeshes.push(mesh);
 
     // Glow
-    const glowGeo = new THREE.SphereGeometry(NODE_BASE_SIZE * 1.8, 12, 12);
+    const glowGeo = new THREE.SphereGeometry(size * 1.8, 12, 12);
     const glowMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.06, side: THREE.BackSide });
     const glow = new THREE.Mesh(glowGeo, glowMat);
     mesh.add(glow);
