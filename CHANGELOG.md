@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.0.0] — 2026-11-16
+
+### Added
+- Format hardening: caps on pb_len (64MB), decompressed payload (64MB), dims (8192), vocab (1M), entries (10M), token length (1024).
+- Format fuzz tests (truncation, corruption, version mismatch, huge counts).
+- Removed obsolete `format_version` attribute; always writes raw binary vectors (v2+).
+- Deleted duplicated `sqac/graph/graph/` package.
+- Adversarial credential detection tests (15 tests).
+- Adversarial prompt injection detection tests (23 tests).
+- Windows lock audit tests (5 tests).
+- Cross-CLI integration tests (4 tests).
+- `CONTRIBUTING.md` with development setup, testing, code style, PR process.
+- `sqac report` CLI command for filing GitHub issues with diagnostics.
+
+### Security
+- Hardened `read_cartridge`: rejects huge counts, caps payload sizes, handles decompression errors.
+- Credential detector: adversarial tests for base64, split tokens, homoglyphs, zero-width chars.
+- Prompt injection: adversarial tests for RTL overrides, tag chars, HTML comments, code blocks.
+
+### Changed
+- `cryptography>=42` is now a core dependency (vault is core feature).
+
+---
+
+## [0.5.0] — 2026-11-16 (in progress)
+
+### Added
+- Cloud sync: provider-agnostic S3 storage backend (R2, S3, Supabase, MinIO, B2, Spaces).
+- Sync engine: push/pull/status/conflict detection with force flags.
+- Cloud CLI: init, status, sync with --provider, --bucket, --dry-run.
+- MCP tools: cloud_status, cloud_sync.
+- Bug reporting: sqac report CLI command with diagnostics.
+
+---
+
 ## [0.4.0] — 2026-11-16 (in progress)
 
 ### Added
