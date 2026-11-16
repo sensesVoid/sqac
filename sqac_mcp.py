@@ -42,6 +42,7 @@ from sqac.offloader import ContextOffloader
 from sqac.graph_mcp import register_graph_tools
 from sqac.vault_mcp import register_vault_tools
 from sqac.agent_mcp import register_agent_tools
+from sqac.secret_mcp import register_secret_tools
 from sqac.cloud_mcp import register_cloud_tools
 
 SERVER_NAME = "sqac_mcp"
@@ -72,6 +73,9 @@ register_graph_tools(mcp)
 
 # Register vault tools (reference-only, no plaintext exfiltration)
 register_vault_tools(mcp)
+
+# Register secret-domain tools (reference-only, no plaintext exfiltration)
+register_secret_tools(mcp)
 
 # Register agent tools (persona + working state)
 register_agent_tools(mcp)

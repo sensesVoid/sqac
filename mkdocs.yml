@@ -13,6 +13,7 @@ theme:
 nav:
   - Home: README.md
   - Vault: docs/VAULT.md
+  - Secret: docs/SECRET.md
   - Agent: docs/AGENT.md
   - Cloud: docs/CLOUD.md
   - Format: docs/FORMAT.md

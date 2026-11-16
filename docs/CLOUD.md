@@ -45,7 +45,40 @@ sqac cloud sync
   are machine-specific), `archives/`
 - **Never:** `session*.sqac`, `checkpoint*.sqac`, `vault-audit.jsonl`,
   `cloud.json`, `.sync-state.json`, `cloud.log`, `agent_active`, `*.tmp`,
-  `*.lock`
+  `*.lock`, and anything under `secrets/`
+
+## Per-cartridge sync policy (authoritative)
+
+The path allowlist is only an *eligibility* filter. Every `.sqac` cartridge
+carries its own `extra.sync_policy`:
+
+| Value | Meaning |
+|-------|---------|
+| `write_through` | Eligible for sync (subject to the allowlist + vault/keychain rules) |
+| `never` | Hard deny — never pushed/pulled/created from remote |
+| `local_only` | Alias for `never` in v1.2 (reserved semantics) |
+
+When the field is absent, defaults apply: **`agent`, `vault` and `secret` →
+`never`**; memory/facts/skills/docs → `write_through`. Enforcement lives in
+the sync engine and is fail-closed:
+
+- Unreadable/corrupt/encrypted (SQAE/SQSE) headers resolve to `never`.
+- Push skips policy-denied cartridges entirely (even under `--force-local`).
+- Pull refuses to overwrite a policy-denied local cartridge, and refuses to
+  write a policy-denied *remote* cartridge (verified from downloaded bytes) —
+  `--force-remote` does not bypass either rule.
+- `secrets/` is hard-denied for new remote material; policy-verified
+  `write_through` `.sqac` cartridges are the only pullable exception, and
+  non-`.sqac` material in sensitive directories (`agents/`, `vaults/`,
+  `secrets/`) is refused by default.
+- `sqac cloud status --show-denied` lists local cartridges excluded by
+  policy (never synced).
+
+Operators who explicitly want an agent cartridge synced must opt in per
+cartridge: set `sync_policy: write_through` in the header (e.g. via
+`sqac agent bind --sync-policy write_through`). Note that *encrypted* agent
+cartridges can never have their policy verified remotely, so they are always
+treated as `never` on pull.
 
 Remote keys mirror the local relative path (`v1/facts/facts.sqac`,
 `v1/vaults/default.sqac`, `v1/agents/atlas.sqac`). Names given to
@@ -71,9 +104,12 @@ sqac cloud sync --force-remote   # resolve conflicts with remote content
 ## Vault behavior
 
 - Sync treats vault files as opaque bytes — no decryption, no key upload.
-- **Keychain-mode vaults are local-only:** push warns and skips them unless
-  `--allow-local-only-vault` is passed.
-- Portable (passphrase) vaults upload as ciphertext.
+- **Vault cartridges default to `sync_policy: never`** and never sync unless
+  the operator opts in: `sqac vault set-policy write_through` (or sets the
+  header manually). Keychain-mode vaults remain effectively local-only.
+- Encrypted agent cartridges can never have their policy verified remotely;
+  they are treated as `never` on pull regardless of header claims.
+- There is no force flag that overrides an effective `never` policy.
 
 ## MCP tools
 

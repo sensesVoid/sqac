@@ -1,4 +1,4 @@
-"""Agent cartridge: persona + working state with typed sections."""
+﻿"""Agent cartridge: persona + working state with typed sections."""
 
 from __future__ import annotations
 
@@ -83,38 +83,64 @@ def _gen_key(section: str) -> str:
     return f"{section}-{secrets.token_hex(4)}"
 
 
-# ── AgentCartridge ─────────────────────────────────────────────────────────
+# â”€â”€ AgentCartridge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class AgentCartridge:
     """Persona + working state cartridge."""
 
     def __init__(self, path, name: str, role: str = "", semantic: bool = False,
-                 encrypted: bool = False, passphrase: Optional[str] = None):
+                 encrypted: bool = False, passphrase: Optional[str] = None,
+                 model_profile_id: Optional[str] = None,
+                 secret_ref: Optional[str] = None,
+                 secret_refs: Optional[list[str]] = None,
+                 allowed_tools: Optional[list[str]] = None,
+                 sync_policy: str = "never",
+                 created: Optional[str] = None):
         self.path = Path(path)
         self.name = name
         self.role = role
         self.semantic = semantic
         self._encrypted = encrypted
         self._passphrase = passphrase
+        self.model_profile_id = model_profile_id
+        self.secret_ref = secret_ref
+        self.secret_refs = list(secret_refs or [])
+        if secret_ref and secret_ref not in self.secret_refs:
+            self.secret_refs = [secret_ref] + self.secret_refs
+        self.allowed_tools = list(allowed_tools or [])
+        self.sync_policy = sync_policy or "never"
+        self._created = created or _now()
         self._store: Optional[SqacStore] = None
 
     @classmethod
     def create(cls, path, name: str, role: str = "", semantic: bool = False,
-               encrypt: bool = False, passphrase: Optional[str] = None) -> "AgentCartridge":
+               encrypt: bool = False, passphrase: Optional[str] = None,
+               model_profile_id: Optional[str] = None,
+               secret_ref: Optional[str] = None,
+               secret_refs: Optional[list[str]] = None,
+               allowed_tools: Optional[list[str]] = None,
+               sync_policy: str = "never") -> "AgentCartridge":
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         agent = cls(path, name, role, semantic, encrypted=encrypt,
-                    passphrase=passphrase)
+                    passphrase=passphrase, model_profile_id=model_profile_id,
+                    secret_ref=secret_ref, secret_refs=secret_refs,
+                    allowed_tools=allowed_tools, sync_policy=sync_policy)
         # Create empty cartridge with agent header
         hdr = CartridgeHeader(
             version=WRITE_VERSION,
             dims=1024,
             extra={
                 "cartridge_type": "agent",
+                "sync_policy": agent.sync_policy,
                 "agent": {
-                    "schema": 1,
+                    "schema": 2,
                     "name": name,
                     "role": role,
+                    "model_profile_id": model_profile_id,
+                    "secret_ref": secret_ref,
+                    "secret_refs": list(agent.secret_refs),
+                    "allowed_tools": list(agent.allowed_tools),
                     "created": _now(),
                     "updated": _now(),
                 },
@@ -135,51 +161,65 @@ class AgentCartridge:
         raw = path.read_bytes()
         encrypted = raw.startswith(_AGENT_MAGIC)
         if encrypted:
-            # Decrypt to a temp file for loading
             import tempfile
-            # Determine name from header (need to decrypt first)
-            # Use passphrase or env var
             pw = passphrase or __import__("os").environ.get("SQAC_AGENT_PASSPHRASE")
-            # Try to get name from filename
             name = path.stem
-            # Create a temporary agent to decrypt
-            tmp_agent = cls(path, name, "", semantic, encrypted=True,
-                           passphrase=pw)
-            try:
-                plaintext = tmp_agent._decrypt_file(pw)
-            except DecryptionError:
-                raise
-            # Write plaintext to temp file
+            tmp_agent = cls(path, name, "", semantic, encrypted=True, passphrase=pw)
+            plaintext = tmp_agent._decrypt_file(pw)
             tmp_fd, tmp_path = tempfile.mkstemp(suffix=".sqac")
             import os as _os
             _os.close(tmp_fd)
             Path(tmp_path).write_bytes(plaintext)
             try:
                 cart = read_cartridge(tmp_path)
+                tmp_fd2, tmp_path2 = tempfile.mkstemp(suffix=".sqac")
+                _os.close(tmp_fd2)
+                Path(tmp_path2).write_bytes(plaintext)
+                try:
+                    store = SqacStore.load(tmp_path2)
+                finally:
+                    Path(tmp_path2).unlink(missing_ok=True)
             finally:
                 Path(tmp_path).unlink(missing_ok=True)
             h = cart.header
-            agent_info = h.extra.get("agent", {})
+            agent_info = h.extra.get("agent", {}) or {}
             name = agent_info.get("name", path.stem)
             role = agent_info.get("role", "")
-            agent = cls(path, name, role, semantic, encrypted=True,
-                        passphrase=pw)
-            # Load store from decrypted data by writing to temp again
-            tmp_fd2, tmp_path2 = tempfile.mkstemp(suffix=".sqac")
-            _os.close(tmp_fd2)
-            Path(tmp_path2).write_bytes(plaintext)
-            try:
-                agent._store = SqacStore.load(tmp_path2)
-            finally:
-                Path(tmp_path2).unlink(missing_ok=True)
+            secret_ref = agent_info.get("secret_ref")
+            secret_refs = list(agent_info.get("secret_refs") or [])
+            if secret_ref and secret_ref not in secret_refs:
+                secret_refs = [secret_ref] + secret_refs
+            agent = cls(
+                path, name, role, semantic, encrypted=True, passphrase=pw,
+                model_profile_id=agent_info.get("model_profile_id"),
+                secret_ref=secret_ref,
+                secret_refs=secret_refs,
+                allowed_tools=list(agent_info.get("allowed_tools") or []),
+                sync_policy=(h.extra.get("sync_policy") or "never"),
+                created=agent_info.get("created"),
+            )
+            agent._store = store
             agent._store._description = f"agent:{name}"
             return agent
+
         cart = read_cartridge(str(path))
         h = cart.header
-        agent_info = h.extra.get("agent", {})
+        agent_info = h.extra.get("agent", {}) or {}
         name = agent_info.get("name", path.stem)
         role = agent_info.get("role", "")
-        agent = cls(path, name, role, semantic)
+        secret_ref = agent_info.get("secret_ref")
+        secret_refs = list(agent_info.get("secret_refs") or [])
+        if secret_ref and secret_ref not in secret_refs:
+            secret_refs = [secret_ref] + secret_refs
+        agent = cls(
+            path, name, role, semantic,
+            model_profile_id=agent_info.get("model_profile_id"),
+            secret_ref=secret_ref,
+            secret_refs=secret_refs,
+            allowed_tools=list(agent_info.get("allowed_tools") or []),
+            sync_policy=(h.extra.get("sync_policy") or "never"),
+            created=agent_info.get("created"),
+        )
         agent._store = SqacStore.load(str(path))
         agent._store._description = f"agent:{name}"
         return agent
@@ -239,14 +279,18 @@ class AgentCartridge:
 
     def _save(self) -> None:
         self.store.save(str(self.path), name=self.name, description=f"agent:{self.name}")
-        # Re-write header with agent extra (save may overwrite header)
         cart = read_cartridge(str(self.path))
         cart.header.extra["cartridge_type"] = "agent"
+        cart.header.extra["sync_policy"] = self.sync_policy or "never"
         cart.header.extra["agent"] = {
-            "schema": 1,
+            "schema": 2,
             "name": self.name,
             "role": self.role,
-            "created": cart.header.extra.get("agent", {}).get("created", _now()),
+            "model_profile_id": self.model_profile_id,
+            "secret_ref": self.secret_ref,
+            "secret_refs": list(self.secret_refs),
+            "allowed_tools": list(self.allowed_tools),
+            "created": self._created,
             "updated": _now(),
         }
         cart.header.extra["encrypted"] = self._encrypted
@@ -271,6 +315,45 @@ class AgentCartridge:
                 self._store = SqacStore.load(str(self.path))
             self._store._description = f"agent:{self.name}"
         return self._store
+
+    def set_binding(self, model_profile_id: Optional[str] = None,
+                    secret_ref: Optional[str] = None,
+                    secret_refs: Optional[list[str]] = None,
+                    allowed_tools: Optional[list[str]] = None,
+                    sync_policy: Optional[str] = None) -> None:
+        """Update the agent's schema-v2 binding fields and persist.
+
+        ``secret_ref`` (single primary ref) is kept consistent with
+        ``secret_refs`` (the full allowlist). If only ``secret_ref`` is
+        given, it is added to the allowlist; if both are given they must
+        be consistent; if a new allowlist excludes the current primary,
+        the primary is cleared (fail closed).
+        """
+        if model_profile_id is not None:
+            self.model_profile_id = model_profile_id
+        if secret_ref is not None:
+            self.secret_ref = secret_ref
+        if secret_refs is not None:
+            self.secret_refs = list(secret_refs)
+        if self.secret_ref and self.secret_ref not in self.secret_refs:
+            if secret_refs is None:
+                # secret_ref given without refs: derive the allowlist
+                self.secret_refs = [self.secret_ref] + self.secret_refs
+            elif secret_ref is not None:
+                # both given and inconsistent: reject
+                raise ValueError(
+                    f"secret_ref {self.secret_ref!r} must be a member of secret_refs")
+            else:
+                # new allowlist excludes the current primary: drop it
+                # (fail closed — never keep a primary that is not allowed)
+                self.secret_ref = None
+        if allowed_tools is not None:
+            self.allowed_tools = list(allowed_tools)
+        if sync_policy is not None:
+            if sync_policy not in ("write_through", "never", "local_only"):
+                raise ValueError("sync_policy must be one of write_through|never|local_only")
+            self.sync_policy = sync_policy
+        self._save()
 
     def encrypt(self, passphrase: Optional[str] = None) -> None:
         """Encrypt this agent cartridge in place."""
@@ -302,54 +385,6 @@ class AgentCartridge:
         self.path.write_bytes(plaintext)
         self._store = None
         self._save()
-        """Set an entry in a section. Returns entry index."""
-        if section not in ALL_SECTIONS:
-            raise ValueError(f"unknown section: {section}")
-        if tags is None:
-            tags = []
-
-        if key is not None:
-            # Upsert by key
-            for i, e in enumerate(self.store._entries):
-                if e.get("meta", {}).get("key") == key and e.get("meta", {}).get("section") == section:
-                    self.store._entries[i]["content"] = content
-                    self.store._entries[i]["meta"]["priority"] = priority
-                    self.store._entries[i]["meta"]["tags"] = tags
-                    self.store._entries[i]["meta"]["updated"] = _now()
-                    self._save()
-                    return i
-            # Not found, add new
-            key = key
-
-        if key is None and section in SINGLETON_SECTIONS:
-            # Replace single existing entry for this section
-            for i, e in enumerate(self.store._entries):
-                if e.get("meta", {}).get("section") == section:
-                    self.store._entries[i]["content"] = content
-                    self.store._entries[i]["meta"]["priority"] = priority
-                    self.store._entries[i]["meta"]["tags"] = tags
-                    self.store._entries[i]["meta"]["updated"] = _now()
-                    self._save()
-                    return i
-            # No existing, generate key
-            key = f"{section}-0"
-
-        if key is None and section in LIST_SECTIONS:
-            key = _gen_key(section)
-
-        if key is None:
-            key = f"{section}-0"
-
-        idx = self.store.add(
-            content,
-            key=key,
-            kind="fact",
-            source="agent",
-            meta={"section": section, "priority": priority, "status": "open", "tags": tags, "key": key, "updated": _now()},
-        )
-        self._save()
-        return idx
-
     def set(self, section: str, content: str, key: Optional[str] = None, priority: int = 1, tags: Optional[list] = None) -> int:
         """Set an entry in a section. Returns entry index."""
         if section not in ALL_SECTIONS:
@@ -494,7 +529,7 @@ class AgentCartridge:
         self._save()
 
 
-# ── module-level helpers ───────────────────────────────────────────────────
+# â”€â”€ module-level helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _agent_path(name: str) -> Path:
     return AGENT_DIR / f"{name}.sqac"
@@ -524,6 +559,16 @@ def load_agent(name: str, semantic: bool = False) -> AgentCartridge:
     return AgentCartridge.load(path, semantic=semantic)
 
 
-def create_agent(name: str, role: str = "", semantic: bool = False) -> AgentCartridge:
+def create_agent(name: str, role: str = "", semantic: bool = False,
+                 model_profile_id: Optional[str] = None,
+                 secret_ref: Optional[str] = None,
+                 secret_refs: Optional[list[str]] = None,
+                 allowed_tools: Optional[list[str]] = None,
+                 sync_policy: str = "never") -> AgentCartridge:
     path = _agent_path(name)
-    return AgentCartridge.create(path, name, role, semantic)
+    return AgentCartridge.create(path, name, role, semantic,
+                                 model_profile_id=model_profile_id,
+                                 secret_ref=secret_ref,
+                                 secret_refs=secret_refs,
+                                 allowed_tools=allowed_tools,
+                                 sync_policy=sync_policy)

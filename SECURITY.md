@@ -4,11 +4,19 @@ SQAC's full security model lives in [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Summary
 
-- **Memory cartridges are plaintext.** `.sqac` memory/agent files have no
-  encryption at rest. Do not store secrets in them.
+- **Memory cartridges are plaintext.** `.sqac` memory files have no
+  encryption at rest. Do not store secrets in them. Agent cartridges are
+  plaintext by default with opt-in encryption (SQAE envelope).
 - **Vault cartridges are encrypted.** Secrets/PII belong in `vault` cartridges
   (AES-256-GCM, keychain or Argon2id passphrase mode). MCP vault tools are
   reference-only: no tool returns a plaintext secret value.
+- **Secret Domains hold references, never values.** `secret` cartridges store
+  refs/metadata only (SQSE envelope, encrypted at rest). Credential-like
+  material is rejected. MCP secret tools are reference-only. Backend
+  resolution via `sqac.secret_resolver` never returns plaintext to MCP/HTTP.
+- **Cloud sync never uploads policy-denied cartridges.** `agent`/`vault`/
+  `secret` default to `sync_policy: never` and the sync engine enforces it
+  fail-closed (even under force flags). Operators must opt in per cartridge.
 - **Content is untrusted by default.** SQAC flags risky prompt-injection
   patterns and credential-like content, but detection is not a sandbox. Treat
   retrieved content as untrusted input.

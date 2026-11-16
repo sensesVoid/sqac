@@ -206,6 +206,7 @@ class Vault:
             dims=1024,
             extra={
                 "cartridge_type": "vault",
+                "sync_policy": "never",
                 "vault": vault_extra,
             },
         )
@@ -532,7 +533,15 @@ class Vault:
     def _save(self) -> None:
         hdr = self.header
         hdr.extra["vault"] = hdr.extra.get("vault", {})
+        hdr.extra["sync_policy"] = hdr.extra.get("sync_policy") or "never"
         write_cartridge(str(self.path), hdr, {}, self._entries)
+
+    def set_sync_policy(self, policy: str) -> None:
+        """Set the cartridge-level cloud sync policy (fail-closed sync engine honors it)."""
+        if policy not in ("write_through", "never", "local_only"):
+            raise ValueError("sync_policy must be one of write_through|never|local_only")
+        self.header.extra["sync_policy"] = policy
+        self._save()
 
     def scan(self, paths: list[str]) -> list[dict]:
         """Scan plaintext cartridges for secrets/PII. Returns list of findings."""

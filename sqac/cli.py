@@ -202,6 +202,10 @@ def main(argv: list[str] | None = None) -> int:
     p_vs = vault_sub.add_parser("scan", help="scan cartridges for PII/secrets")
     p_vs.add_argument("cartridges", nargs="*")
 
+    p_vsp = vault_sub.add_parser("set-policy",
+        help="set cartridge sync policy (write_through|never|local_only); vaults never sync by default")
+    p_vsp.add_argument("policy", choices=["write_through", "never", "local_only"])
+
     # Agent subcommands
     p_agent = sub.add_parser("agent", help="agent persona + working state")
     agent_sub = p_agent.add_subparsers(dest="agent_cmd", required=True)
@@ -241,6 +245,63 @@ def main(argv: list[str] | None = None) -> int:
     p_asearch.add_argument("query", help="search query")
     p_asearch.add_argument("--name", default=None, help="agent name (default: active)")
 
+    p_ai.add_argument("--model-profile", default=None, help="model profile id to bind (schema v2)")
+    p_ai.add_argument("--secret-ref", default=None, help="primary secret ref to bind (schema v2)")
+    p_ai.add_argument("--secret-refs", action="append", default=[],
+                      help="additional allowed secret ref (repeatable, schema v2)")
+    p_ai.add_argument("--allowed-tools", action="append", default=[],
+                      help="allowed tool id (repeatable, schema v2)")
+    p_abind = agent_sub.add_parser("bind", help="set agent schema-v2 binding fields")
+    p_abind.add_argument("--name", default=None, help="agent name (default: active)")
+    p_abind.add_argument("--model-profile", default=None, help="model profile id to bind")
+    p_abind.add_argument("--secret-ref", default=None, help="primary secret ref")
+    p_abind.add_argument("--secret-refs", action="append", default=None,
+                         help="allowed secret ref (repeatable; replaces the list)")
+    p_abind.add_argument("--allowed-tools", action="append", default=None,
+                         help="allowed tool id (repeatable; replaces the list)")
+    p_abind.add_argument("--sync-policy", default=None,
+                         choices=["write_through", "never", "local_only"],
+                         help="cartridge sync policy (default: never)")
+
+    # Secret Domain subcommands
+    p_secret = sub.add_parser("secret", help="secret domain: refs/metadata only, never values")
+    secret_sub = p_secret.add_subparsers(dest="secret_cmd", required=True)
+
+    p_si = secret_sub.add_parser("init", help="create a secret domain")
+    p_si.add_argument("name", nargs="?", default="default", help="domain name (default: default)")
+    p_si.add_argument("--portable", action="store_true",
+                      help="use passphrase (portable) instead of keychain")
+    p_si.add_argument("--unencrypted", action="store_true",
+                      help="store refs unencrypted (development only)")
+
+    p_slist = secret_sub.add_parser("list", help="list secret refs in a domain (metadata only)")
+    p_slist.add_argument("--domain", default="default", help="domain name (default: default)")
+    p_slist.add_argument("--json", action="store_true", dest="as_json")
+
+    p_ssp = secret_sub.add_parser("put-ref", help="store a secret reference (never a value)")
+    p_ssp.add_argument("name", help="ref name (e.g. openrouter_api_key)")
+    p_ssp.add_argument("ref", help="resolution target: vault:NAME, vault:VAULT/NAME, provider:1password:<op://...>, provider:bitwarden:<id>, op://..., bw://...")
+    p_ssp.add_argument("--description", default="")
+    p_ssp.add_argument("--tag", action="append", default=[], dest="tags")
+    p_ssp.add_argument("--scope", action="append", default=[], dest="scopes")
+    p_ssp.add_argument("--domain", default="default", help="domain name (default: default)")
+
+    p_sgm = secret_sub.add_parser("get-meta", help="show metadata for a secret ref")
+    p_sgm.add_argument("name")
+    p_sgm.add_argument("--domain", default="default", help="domain name (default: default)")
+    p_sgm.add_argument("--json", action="store_true", dest="as_json")
+
+    p_srm = secret_sub.add_parser("rm", help="remove a secret reference")
+    p_srm.add_argument("name")
+    p_srm.add_argument("--domain", default="default", help="domain name (default: default)")
+
+    p_srn = secret_sub.add_parser("rename", help="rename a secret reference")
+    p_srn.add_argument("old")
+    p_srn.add_argument("new")
+    p_srn.add_argument("--domain", default="default", help="domain name (default: default)")
+
+    secret_sub.add_parser("list-domains", help="list secret domain names")
+
     # Cloud subcommands
     p_cloud = sub.add_parser("cloud", help="cloud sync (R2/S3/Supabase/etc.)")
     cloud_sub = p_cloud.add_subparsers(dest="cloud_cmd", required=True)
@@ -253,7 +314,9 @@ def main(argv: list[str] | None = None) -> int:
     p_ci.add_argument("--region", default=None, help="region")
     p_ci.add_argument("--account-id", default=None, help="account ID (R2) or project ref (Supabase)")
 
-    cloud_sub.add_parser("status", help="show sync status")
+    p_cstatus = cloud_sub.add_parser("status", help="show sync status")
+    p_cstatus.add_argument("--show-denied", action="store_true",
+                           help="also list local cartridges denied by sync_policy (never synced)")
 
     p_csync = cloud_sub.add_parser("sync", help="sync cartridges")
     p_csync.add_argument("--push", action="store_true", help="push only")
@@ -261,7 +324,6 @@ def main(argv: list[str] | None = None) -> int:
     p_csync.add_argument("--dry-run", action="store_true", help="show what would happen")
     p_csync.add_argument("--force-local", action="store_true", help="force local version on conflict")
     p_csync.add_argument("--force-remote", action="store_true", help="force remote version on conflict")
-    p_csync.add_argument("--allow-local-only-vault", action="store_true", help="allow syncing keychain vaults")
     p_csync.add_argument("names", nargs="*", help="cartridge names to sync")
 
     p_report = sub.add_parser("report", help="file a bug report on GitHub Issues")
@@ -286,8 +348,26 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         if args.agent_cmd == "init":
-            create_agent(args.name, role=args.role)
+            create_agent(args.name, role=args.role,
+                         model_profile_id=getattr(args, "model_profile", None),
+                         secret_ref=getattr(args, "secret_ref", None),
+                         secret_refs=getattr(args, "secret_refs", None) or None,
+                         allowed_tools=getattr(args, "allowed_tools", None) or None)
             print(f"agent created: {args.name}")
+            return 0
+
+        if args.agent_cmd == "bind":
+            bind_name = args.name or get_active_agent()
+            if bind_name is None:
+                print("no active agent; use 'sqac agent use <name>' or pass --name")
+                return 1
+            ag = load_agent(bind_name)
+            ag.set_binding(model_profile_id=args.model_profile,
+                           secret_ref=args.secret_ref,
+                           secret_refs=args.secret_refs,
+                           allowed_tools=args.allowed_tools,
+                           sync_policy=args.sync_policy)
+            print(f"agent binding updated: {bind_name}")
             return 0
 
         if args.agent_cmd == "list":
@@ -338,6 +418,110 @@ def main(argv: list[str] | None = None) -> int:
 
         return 0
 
+    # Secret Domain commands (reference-only; never plaintext)
+    if args.cmd == "secret":
+        import getpass
+        import json as _json
+        import os as _os
+        from .secret_domain import (
+            SecretDomain, create_domain, open_domain, list_domains,
+        )
+        from .vault_crypto import VaultCryptoError as _SecretLocked
+
+        def _passphrase(args) -> str | None:
+            env = _os.environ.get("SQAC_SECRET_PASSPHRASE")
+            if env:
+                return env
+            return None  # keychain mode
+
+        if args.secret_cmd == "init":
+            if args.unencrypted:
+                encrypted, portable = False, False
+            else:
+                encrypted, portable = True, args.portable
+            pw = None
+            if portable:
+                pw = _os.environ.get("SQAC_SECRET_PASSPHRASE")
+                if pw is None:
+                    try:
+                        pw = getpass.getpass("Secret domain passphrase: ")
+                    except (EOFError, KeyboardInterrupt):
+                        print("passphrase required (or set SQAC_SECRET_PASSPHRASE)")
+                        return 1
+            try:
+                create_domain(args.name, encrypted=encrypted, passphrase=pw)
+            except _SecretLocked as exc:
+                print(str(exc))
+                return 1
+            print(f"secret domain initialized: {args.name} (encrypted={encrypted})")
+            return 0
+
+        if args.secret_cmd == "list-domains":
+            for name in list_domains():
+                print(f"  {name}")
+            return 0
+
+        try:
+            domain = open_domain(args.domain, passphrase=_passphrase(args))
+        except FileNotFoundError as exc:
+            print(str(exc))
+            return 1
+        except _SecretLocked as exc:
+            print(str(exc))
+            return 1
+
+        if args.secret_cmd == "list":
+            rows = domain.list()
+            if getattr(args, "as_json", False):
+                print(_json.dumps(rows, indent=2))
+            else:
+                for r in rows:
+                    tags = ",".join(r.get("tags") or [])
+                    desc = f" — {r['description']}" if r.get("description") else ""
+                    print(f"{r['name']}: {r['ref_kind']} {r['ref']}{desc} tags=[{tags}]")
+                if not rows:
+                    print("no secret references")
+            return 0
+
+        if args.secret_cmd == "put-ref":
+            try:
+                meta = domain.put_ref(args.name, args.ref, description=args.description,
+                                      tags=args.tags, scopes=args.scopes)
+            except ValueError as exc:
+                print(f"rejected: {exc}")
+                return 1
+            print(f"stored ref: {meta['name']} -> {meta['ref']}")
+            return 0
+
+        if args.secret_cmd == "get-meta":
+            try:
+                meta = domain.get_ref_meta(args.name)
+            except KeyError as exc:
+                print(str(exc))
+                return 1
+            if getattr(args, "as_json", False):
+                print(_json.dumps(meta, indent=2))
+            else:
+                for k, v in meta.items():
+                    print(f"{k}: {v}")
+            return 0
+
+        if args.secret_cmd == "rm":
+            ok = domain.remove(args.name)
+            print("removed" if ok else f"not found: {args.name}")
+            return 0 if ok else 1
+
+        if args.secret_cmd == "rename":
+            try:
+                ok = domain.rename(args.old, args.new)
+            except ValueError as exc:
+                print(f"rejected: {exc}")
+                return 1
+            print(f"renamed {args.old} -> {args.new}" if ok else f"not found: {args.old}")
+            return 0 if ok else 1
+
+        return 0
+
     # Cloud commands
     if args.cmd == "cloud":
         from .cloud import cloud_init, load_cloud_config, SyncEngine
@@ -364,6 +548,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{obj.remote_key}: {obj.status}")
             if not objects:
                 print("no syncable objects found")
+            if getattr(args, "show_denied", False):
+                denied = engine.denied_objects()
+                for d in denied:
+                    print(f"{d['path']}: policy-denied ({d['sync_policy']}) — never synced")
+                if not denied:
+                    print("no policy-denied cartridges")
             return 0
 
         if args.cloud_cmd == "sync":
@@ -515,6 +705,11 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print(f"not found: {args.name}")
                 return 1
+
+        elif args.vault_cmd == "set-policy":
+            v.set_sync_policy(args.policy)
+            print(f"vault {vname}: sync_policy set to {args.policy}")
+            return 0
 
         elif args.vault_cmd == "exec":
             mapping = {}
