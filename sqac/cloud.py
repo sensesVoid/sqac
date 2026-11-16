@@ -25,6 +25,62 @@ SYNC_NEVER = {
     "cloud.json", ".sync-state.json", "cloud.log", "agent_active",
 }
 
+# Cartridge types that must never sync by default (security boundary).
+_NEVER_SYNC_TYPES = {"agent", "secret", "vault"}
+_VALID_SYNC_POLICIES = {"write_through", "never", "local_only"}
+
+
+def _effective_sync_policy(path: Path) -> str:
+    """Return effective cloud sync policy for a .sqac cartridge.
+
+    Precedence:
+      1. extra.sync_policy (write_through | never | local_only)
+      2. cartridge_type default (agent/secret/vault -> never)
+      3. write_through
+
+    Fail closed to 'never' on read/parse errors. local_only is treated as never.
+    """
+    if path.suffix.lower() != ".sqac":
+        return "write_through"
+    try:
+        from .format import read_cartridge
+        cart = read_cartridge(str(path))
+        extra = getattr(cart.header, "extra", None) or {}
+        policy = extra.get("sync_policy")
+        if isinstance(policy, str) and policy in _VALID_SYNC_POLICIES:
+            return "never" if policy == "local_only" else policy
+        ctype = extra.get("cartridge_type")
+        if ctype in _NEVER_SYNC_TYPES:
+            return "never"
+        return "write_through"
+    except Exception:
+        return "never"
+
+
+def _effective_sync_policy_bytes(data: bytes) -> str:
+    """Effective policy for remote cartridge bytes (fail closed).
+
+    Encrypted envelopes (SQAE/SQSE) are unreadable without keys, so their
+    policy cannot be verified -> 'never'. Plaintext SQAC cartridges are
+    parsed via a temp file.
+    """
+    tmp = None
+    try:
+        import tempfile
+        fd, tmp = tempfile.mkstemp(suffix=".sqac")
+        import os as _os
+        _os.write(fd, data)
+        _os.close(fd)
+        return _effective_sync_policy(Path(tmp))
+    except Exception:
+        return "never"
+    finally:
+        if tmp:
+            try:
+                Path(tmp).unlink(missing_ok=True)
+            except OSError:
+                pass
+
 
 def _sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -49,7 +105,8 @@ class SyncState:
     objects: dict[str, dict] = field(default_factory=dict)  # remote_key -> {sha256, etag, synced_at}
 
     @classmethod
-    def load(cls, path: Path = SYNC_STATE_PATH) -> "SyncState":
+    def load(cls, path: Path | None = None) -> "SyncState":
+        path = path or SYNC_STATE_PATH
         if not path.exists():
             return cls()
         try:
@@ -58,7 +115,8 @@ class SyncState:
         except Exception:
             return cls()
 
-    def save(self, path: Path = SYNC_STATE_PATH) -> None:
+    def save(self, path: Path | None = None) -> None:
+        path = path or SYNC_STATE_PATH
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"objects": self.objects}, indent=2), encoding="utf-8")
 
@@ -115,6 +173,10 @@ class SyncEngine:
         if name == "agent_active":
             return False
 
+        # Never sync secret-domain material, even if allowlists change
+        if top == "secrets":
+            return False
+
         # Always sync
         if top in SYNC_ALWAYS:
             return True
@@ -138,7 +200,10 @@ class SyncEngine:
                 rel = full.relative_to(self.sqac_dir).as_posix()
                 if not self._is_syncable(rel):
                     continue
-                # Keychain-mode vault check
+                # Per-cartridge sync policy (authoritative, fail-closed).
+                if full.suffix.lower() == ".sqac" and _effective_sync_policy(full) != "write_through":
+                    continue
+                # Keychain-mode vault check (defense in depth)
                 if rel.startswith("vaults/") and self._is_keychain_vault(full):
                     continue
                 sha = _sha256_file(full)
@@ -183,6 +248,22 @@ class SyncEngine:
             obj.etag = synced.get("etag", "")
             obj.synced_at = synced.get("synced_at", 0)
         return local_objects
+
+    def denied_objects(self) -> list[dict]:
+        """List local .sqac cartridges denied by sync_policy (they are never synced)."""
+        denied = []
+        for root, dirs, files in os.walk(self.sqac_dir):
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            for fname in files:
+                full = Path(root) / fname
+                if full.suffix.lower() != ".sqac":
+                    continue
+                rel = full.relative_to(self.sqac_dir).as_posix()
+                policy = _effective_sync_policy(full)
+                if policy != "write_through":
+                    denied.append({"path": rel, "sync_policy": policy,
+                                   "reason": "sync_policy_never"})
+        return denied
 
     def push(self, names: list[str] | None = None, dry_run: bool = False,
             force_local: bool = False, force_remote: bool = False) -> list[dict]:
@@ -236,7 +317,16 @@ class SyncEngine:
 
     def pull(self, names: list[str] | None = None, dry_run: bool = False,
              force_local: bool = False, force_remote: bool = False) -> list[dict]:
-        """Pull remote changes to local."""
+        """Pull remote changes to local.
+
+        Policy enforcement (fail closed):
+          * local policy-denied cartridges are never overwritten (force flags
+            do not bypass ``sync_policy: never``);
+          * remote cartridges whose policy cannot be verified/allowed are
+            never downloaded into place;
+          * sensitive directories (agents/vaults/secrets) only accept
+            policy-verified ``write_through`` .sqac cartridges.
+        """
         results = []
         remote_objects = self.backend.list("v1/")
         for info in remote_objects:
@@ -244,16 +334,38 @@ class SyncEngine:
             if not key.startswith("v1/"):
                 continue
             rel = key[3:]  # strip "v1/"
+            parts = Path(rel).parts
+            if parts and parts[0] == "secrets":
+                # Secret-domain material never syncs, even if explicitly opted in
+                results.append({"key": key, "action": "skip",
+                                "reason": "sensitive_directory_default_deny"})
+                continue
             if not self._is_syncable(rel):
                 continue
             local_path = self.sqac_dir / rel
 
-            # Keychain vault check
-            if rel.startswith("vaults/") and local_path.exists():
-                if self._is_keychain_vault(local_path):
-                    results.append({"key": key, "action": "skip", "reason": "keychain vault is local-only"})
+            # Name filter
+            if names:
+                base = Path(rel).stem
+                if base not in names and not any(n in rel for n in names):
                     continue
 
+            # Sensitive directories: non-.sqac material is default-deny.
+            parts = Path(rel).parts
+            sensitive = bool(parts) and parts[0] in {"agents", "vaults", "secrets"}
+            if sensitive and local_path.suffix.lower() != ".sqac":
+                results.append({"key": key, "action": "skip",
+                                "reason": "sensitive_directory_default_deny"})
+                continue
+
+            # Local policy wins (fail closed). Force flags do not bypass it.
+            if local_path.exists() and local_path.suffix.lower() == ".sqac":
+                if _effective_sync_policy(local_path) != "write_through":
+                    results.append({"key": key, "action": "skip", "reason": "sync_policy_never"})
+                    continue
+
+            # Remote policy check needs the bytes; download only when we get
+            # this far (already-in-sync fast path cannot have changed).
             synced = self.state.get(key)
             local_sha = _sha256_file(local_path) if local_path.exists() else None
 
@@ -261,18 +373,33 @@ class SyncEngine:
                 results.append({"key": key, "action": "skip", "reason": "already in sync"})
                 continue
 
-            # Conflict check
+            # Conflict check (force flags do not bypass sync_policy: never)
             if local_sha is not None and synced and local_sha != synced["sha256"] and info.etag != synced.get("etag", ""):
                 if not force_local and not force_remote:
                     results.append({"key": key, "action": "conflict", "reason": "both local and remote changed"})
                     continue
 
+            # Keychain vault check (defense in depth)
+            if rel.startswith("vaults/") and local_path.exists():
+                if self._is_keychain_vault(local_path):
+                    results.append({"key": key, "action": "skip", "reason": "keychain vault is local-only"})
+                    continue
+
+            # Download bytes and enforce the *remote* policy (fail closed).
+            data = self.backend.get(key)
+            if rel.lower().endswith(".sqac"):
+                if _effective_sync_policy_bytes(data) != "write_through":
+                    results.append({"key": key, "action": "skip", "reason": "sync_policy_never"})
+                    continue
+            elif sensitive:
+                results.append({"key": key, "action": "skip",
+                                "reason": "sensitive_directory_default_deny"})
+                continue
+
             if dry_run:
                 results.append({"key": key, "action": "would_pull", "etag": info.etag})
                 continue
 
-            # Download
-            data = self.backend.get(key)
             local_path.parent.mkdir(parents=True, exist_ok=True)
             local_path.write_bytes(data)
             new_sha = hashlib.sha256(data).hexdigest()

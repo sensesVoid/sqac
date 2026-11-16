@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.0] — 2026-11-16
+
+### Added
+- **Secret Domain cartridge** (`cartridge_type: secret`, `sqac secret init/list/put-ref/get-meta/rm/rename/list-domains`): encrypted (SQSE envelope, keychain or Argon2id portable mode) registry of secret *references and metadata only*. Credential-like material is rejected in every field; `secret:` indirection chains are rejected. Backends live under `~/.sqacm/secrets/<name>.sqac`.
+- **SecretResolver** (`sqac.secret_resolver.SecretResolver`): backend-only resolution of `vault:NAME`, `vault:VAULT/NAME`, `secret:DOMAIN/NAME`, `provider:1password:*`, `provider:bitwarden:*`, `op://`, `bw://` refs. Fail-closed agent allowlist enforcement (`agent_context.secret_refs`), cycle guard, hash-chained audit events without values.
+- **Secret Domain MCP tools** (reference-only): `secret_list`, `secret_meta`. No plaintext tools, ever.
+- **Agent schema v2** (additive): `model_profile_id`, `secret_ref`, `secret_refs`, `allowed_tools` header binding + `sync_policy`. Schema 1 cartridges remain readable and upgrade on save. `AgentCartridge.set_binding(...)`, `sqac agent bind`, `sqac agent init --model-profile/--secret-ref/--secret-refs/--allowed-tools`.
+- **Per-cartridge sync policy** enforced by the sync engine (authoritative): `extra.sync_policy` = `write_through | never | local_only`, fail-closed on unreadable/encrypted headers; `agent`/`vault`/`secret` default to `never`; `secrets/` is hard-denied; pull refuses to overwrite or create policy-denied cartridges; `sqac cloud status --show-denied` surfaces policy-denied local cartridges; `sqac vault set-policy` for opting in; `sqac agent bind --sync-policy` likewise.
+- `sqac cloud sync --allow-local-only-vault` removed (it was never wired up).
+
+### Security
+- **Behavior change:** agent/vault/secret cartridges no longer sync by default, even under `--force-remote`/`--force-local`. Operators must set `sync_policy: write_through` explicitly per cartridge. No data loss — denial skips sync; nothing is deleted.
+- Encrypted (SQAE/SQSE) cartridges can never have their policy verified remotely; they are treated as `never` on pull.
+- Vault create/save always writes `sync_policy: never` (opt-in only via `sqac vault set-policy`).
+- OpenAI project key (`sk-proj-*`) detection added to the credential scanner; high-entropy token heuristic added to Secret Domain field validation.
+
+### Changed
+- Cloud `SyncState` load/save now honor a module-level path override (testability; no behavior change).
+
 ## [1.1.0] — 2026-11-16
 
 ### Added

@@ -48,6 +48,17 @@ _KVCACHE_NAMES = frozenset(
     }
 )
 
+_V12_LAZY_NAMES = frozenset(
+    {
+        "SecretDomain",
+        "create_domain",
+        "open_domain",
+        "list_domains",
+        "SecretResolver",
+        "SecretResolutionError",
+    }
+)
+
 
 def __getattr__(name: str):
     """Lazily import sqac.kvcache names so `python -m sqac.kvcache` stays clean
@@ -57,6 +68,10 @@ def __getattr__(name: str):
         from . import kvcache
 
         return getattr(kvcache, name)
+    if name in _V12_LAZY_NAMES:
+        from . import secret_domain, secret_resolver
+
+        return getattr(secret_domain, name, None) or getattr(secret_resolver, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [

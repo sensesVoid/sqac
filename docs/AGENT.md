@@ -55,8 +55,51 @@ Closed goals and superseded singletons never duplicate — upsert replaces them.
 - Rack auto-load skips `agent` and `vault` cartridges **by header type** (not by
   name), so a normal memory cartridge named `agent` is unaffected and agent
   entries never leak into default `mem_search` results.
-- Agent state is plaintext in v1 (docs flag this); encryption can reuse vault
-  crypto later if requested.
+- Agents support opt-in AES-256-GCM file-level encryption at rest
+  (SQAE envelope; `sqac agent encrypt/decrypt/key rotate`).
+- Agent cartridges default to `sync_policy: never` — the cloud sync engine
+  never pushes or pulls them unless the operator opts in with
+  `sqac agent bind --sync-policy write_through`.
+
+## Schema v2 binding (Genos-ready)
+
+Agent cartridges carry an additive schema-v2 header extra (`schema: 2`):
+
+```json
+{
+  "cartridge_type": "agent",
+  "sync_policy": "never",
+  "agent": {
+    "schema": 2,
+    "name": "atlas",
+    "role": "assistant",
+    "model_profile_id": "openrouter-claude-3.5-sonnet",
+    "secret_ref": "secret:default/openrouter",
+    "secret_refs": ["secret:default/openrouter"],
+    "allowed_tools": ["mem_search", "mem_write"],
+    "created": "…",
+    "updated": "…"
+  }
+}
+```
+
+- `model_profile_id` — opaque id, resolved against the Genos config store.
+- `secret_ref` (primary, back-compat) / `secret_refs` (allowlist) — plaintext
+  secrets are never stored; these are pointers resolved by the backend
+  (see `docs/SECRET.md`). When an agent context is provided to the resolver,
+  refs outside `secret_refs` are denied (fail closed).
+- `allowed_tools` — advisory tool allowlist surfaced to the orchestrator.
+
+Schema 1 cartridges remain fully readable; the binding fields are filled on
+next save. Helpers: `agent.set_binding(...)`, and CLI:
+
+```bash
+sqac agent init atlas --role assistant \
+    --model-profile openrouter-claude-3.5-sonnet \
+    --secret-ref secret:default/openrouter \
+    --secret-refs secret:default/openrouter --allowed-tools mem_search
+sqac agent bind --name atlas --model-profile openrouter-gpt-5 --sync-policy never
+```
 
 ## MCP tools
 

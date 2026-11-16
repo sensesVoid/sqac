@@ -67,6 +67,17 @@ that auto-read resources.
 Deliberately absent: `vault_get`, `vault_resolve`, `vault_put`, `vault_exec`.
 See [VAULT.md](VAULT.md) for the full boundary.
 
+## Secret Domain tools (reference-only)
+
+| Tool | Purpose |
+|------|---------|
+| `secret_list` | List secret references in a domain (names, kinds, tags) |
+| `secret_meta` | One ref's metadata (label/kind/scopes/timestamps) — no value |
+
+Deliberately absent: `secret_resolve`, `secret_get`, `secret_put` — plaintext
+secret resolution is backend-only via `sqac.secret_resolver.SecretResolver`.
+See [SECRET.md](SECRET.md).
+
 ## Cloud tools
 
 | Tool | Purpose |

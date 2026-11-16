@@ -106,8 +106,9 @@ Conflict-aware, explicit allowlist, never silently overwrites. → [docs/CLOUD.m
 | Cartridge | Holds | encrypted |
 |---|---|---|
 | `memory` (default) | facts, skills, docs, session turns | no (plaintext by design) |
-| `agent` | persona + working state (identity, goals, decisions) | no |
+| `agent` | persona + working state (identity, goals, decisions) | opt-in (SQAE) |
 | `vault` | secrets, PII | yes (AES-256-GCM) |
+| `secret` | secret *references* + metadata (never values) | yes (SQSE) |
 
 Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fuzzy** matching (SIMD-accelerated), and optional **semantic** matching for paraphrases. No hit → no answer, never a confident guess.
 
@@ -120,6 +121,7 @@ sqac init .                         # auto-build memory from a codebase
 sqac track .                        # keep it in sync as the code changes
 sqac agent ...                      # agent personas + working state
 sqac vault ...                      # encrypted secrets/PII
+sqac secret ...                     # secret refs/metadata (never values)
 sqac cloud ...                      # S3-compatible sync
 sqac report "bug title" -d "..."    # file a GitHub issue with diagnostics
 sqac mcp setup --host <cli>         # wire memory into your agent
@@ -137,13 +139,13 @@ sqac mcp setup --host <cli>         # wire memory into your agent
 
 **Can I see what it remembers?** Yes — `sqac stats`, `sqac search`, the dashboard (`sqac dashboard`), and the 3D graph view (`sqac viz`) for people who enjoy watching their memory as a glowing particle system.
 
-**Is my data safe?** Memory cartridges are plaintext — treat them like a text file. Secrets live in vault cartridges (AES-256-GCM, keychain or passphrase). Cloud sync never uploads keychain vaults and never silently overwrites conflicts. See [docs/SECURITY.md](docs/SECURITY.md) for the full threat model, including what it does *not* protect against.
+**Is my data safe?** Memory cartridges are plaintext — treat them like a text file. Secrets live in vault cartridges (AES-256-GCM, keychain or passphrase). Secret references live in the Secret Domain — never values — and secret resolution happens only in the trusted backend. Cloud sync never uploads `agent`/`vault`/`secret` cartridges by default and never silently overwrites conflicts. See [docs/SECURITY.md](docs/SECURITY.md) for the full threat model, including what it does *not* protect against.
 
 **What's the catch?** Fuzzy search is O(n) per scan — sub-100 ms up to ~100K entries with SIMD, beyond that shard your memory (DMS eviction can help). It's memory, not a reasoning engine: it retrieves the right context, your model still has to think.
 
 ## Status
 
-- **Version:** 1.0.0 — 400 tests passing, 21 skipped
+- **Version:** 1.2.0 — 478 tests passing, 21 skipped
 - **Repository:** https://github.com/sensesVoid/sqac
 - **Issues:** https://github.com/sensesVoid/sqac/issues
 

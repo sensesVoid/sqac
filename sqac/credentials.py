@@ -65,6 +65,12 @@ _PATTERNS: list[tuple[str, re.Pattern, str, str]] = [
         "Use OPENAI_API_KEY environment variable.",
     ),
     (
+        "OpenAI Project Key",
+        re.compile(r'\b(sk-proj-[A-Za-z0-9\-_]{20,})\b'),
+        "critical",
+        "Use OPENAI_API_KEY environment variable.",
+    ),
+    (
         "Anthropic API Key",
         re.compile(r'\b(sk-ant-[A-Za-z0-9\-_]{40,})\b'),
         "critical",
