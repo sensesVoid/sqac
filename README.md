@@ -986,30 +986,39 @@ We publish our negative results too — they're part of the record.
 
 ## Security — What SQAC protects against (and what it doesn't)
 
-### ⚠️ Do NOT store credentials in SQAC
+### Secrets and Credentials
 
-**SQAC is not a secrets manager.** `.sqac` files are plaintext with no encryption at rest. Anyone with file read access can see all stored content. Do not store:
+**Regular memory cartridges are plaintext.** `.sqac` files have no encryption at rest -- anyone with file read access can see all stored content. Do not store secrets in memory cartridges:
 
 - API keys, tokens, or secrets
 - Passwords or connection strings
 - Private keys or certificates
 - JWT tokens or session cookies
 
-**Use instead:** environment variables, `.env` files (gitignored), or a dedicated secrets manager (HashiCorp Vault, AWS Secrets Manager, etc.).
+**Use the Vault cartridge instead.** SQAC includes an encrypted vault (v0.3.0+) designed specifically for secrets and PII:
 
-SQAC includes a **credential detector** that rejects content matching common secret patterns (AWS keys, GitHub tokens, OpenAI/Anthropic keys, Stripe keys, private keys, passwords, connection strings, JWTs). You'll get a clear error message if you try to store something that looks like a credential.
+```bash
+sqac vault init                    # create encrypted vault (keychain mode)
+sqac vault put openai --type secret # store a secret (AES-256-GCM encrypted)
+sqac vault exec --env KEY=vault:openai -- curl https://api.openai.com  # use without exposing
+```
+
+The vault uses AES-256-GCM encryption with OS keychain or Argon2id passphrase. Values are never returned by MCP tools -- only injected via `vault exec` (env var) or `vault_http` (host-allowlisted proxy).
+
+**Credential detector**: SQAC rejects content matching common secret patterns in memory cartridges and suggests using the vault instead.
 
 ```python
 from sqac import SqacStore
 store = SqacStore()
 store.add("sk_live_abc123...", key="stripe-key")
-# → CredentialError: Content appears to contain credentials (Stripe Key).
-#   SQAC is not a secrets manager — use environment variables.
+# -> CredentialError: Content appears to contain credentials (Stripe Key).
+#   Use 'sqac vault put' instead.
 ```
 
-If you need to reference a secret, store the *reference* (e.g., `"Stripe key lives in STRIPE_SECRET_KEY env var"`) rather than the value.
+If you need to reference a secret in memory, store the *reference* (e.g., `"Stripe key lives in vault:stripe"`) rather than the value.
 
 ---
+
 
 ## Security — Prompt Injection Defense
 
