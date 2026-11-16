@@ -27,7 +27,7 @@ jobs:
           tar -tf dist/*.tar.gz | grep -q "sqac-simd/Cargo.toml"
           tar -tf dist/*.tar.gz | grep -q "sqac-simd/Cargo.lock"
           tar -tf dist/*.tar.gz | grep -q "sqac-simd/src/lib.rs"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -61,7 +61,7 @@ jobs:
           CIBW_ENVIRONMENT_LINUX: "PATH=$HOME/.cargo/bin:$PATH"
           CIBW_TEST_COMMAND: >-
             python -c "import sqac, sqac.simd; assert sqac.simd.HAS_SIMD"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}-${{ matrix.archs }}
           path: wheelhouse/*.whl
