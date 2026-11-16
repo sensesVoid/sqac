@@ -257,6 +257,11 @@ def main(argv: list[str] | None = None) -> int:
     p_csync.add_argument("--allow-local-only-vault", action="store_true", help="allow syncing keychain vaults")
     p_csync.add_argument("names", nargs="*", help="cartridge names to sync")
 
+    p_report = sub.add_parser("report", help="file a bug report on GitHub Issues")
+    p_report.add_argument("title", help="issue title")
+    p_report.add_argument("--description", "-d", default="", help="bug description")
+    p_report.add_argument("--label", action="append", default=["bug"], help="labels (default: bug)")
+
     p_mcp_setup = sub.add_parser("mcp", help="MCP server wiring for agent CLIs")
     p_mcp_setup.add_argument("action", choices=["setup"], help="generate/install per-CLI wiring")
     p_mcp_setup.add_argument("--dir", default="~/.sqacm", help="shared memory dir (default: ~/.sqacm)")
@@ -374,6 +379,20 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         return 0
+
+    # Report command
+    if args.cmd == "report":
+        from .report import collect_diagnostics, format_diagnostics, create_issue
+        diag = collect_diagnostics()
+        body = "## Description\n\n" + args.description + "\n\n" + format_diagnostics(diag) + "\n\n## Reproduction Steps\n\n<!-- Add steps to reproduce -->\n\n## Expected Behavior\n\n<!-- What should happen -->\n\n## Actual Behavior\n\n<!-- What actually happened -->\n"
+        try:
+            url = create_issue(args.title, body, args.label)
+            print(f"issue created: {url}")
+            return 0
+        except Exception as e:
+            print(f"failed to create issue: {e}")
+            print("\nDiagnostics:\n" + format_diagnostics(diag))
+            return 1
 
     # Vault commands
     if args.cmd == "vault":
