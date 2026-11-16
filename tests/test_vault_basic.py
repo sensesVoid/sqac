@@ -55,9 +55,9 @@ class TestVaultBasic(unittest.TestCase):
 
     def test_parse_ref(self):
         from sqac.vault import parse_vault_ref, canonical_ref
-        self.assertEqual(parse_vault_ref("vault:openai"), "openai")
-        self.assertEqual(parse_vault_ref("${vault:openai}"), "openai")
-        self.assertEqual(parse_vault_ref("vault://openai"), "openai")
+        self.assertEqual(parse_vault_ref("vault:openai"), (None, "openai"))
+        self.assertEqual(parse_vault_ref("${vault:openai}"), (None, "openai"))
+        self.assertEqual(parse_vault_ref("vault://openai"), (None, "openai"))
         self.assertIsNone(parse_vault_ref("not-a-ref"))
         self.assertEqual(canonical_ref("openai"), "vault:openai")
 
