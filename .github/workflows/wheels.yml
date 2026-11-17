@@ -58,7 +58,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: dtolnay/rust-toolchain@stable
       - name: Build wheels
-        if: matrix.uses != 'qemu' || runner.os == 'Linux'
+        if: matrix.uses != 'qemu'
         uses: pypa/cibuildwheel@v4.3.5
         env:
           CIBW_BUILD: "cp310-*"
