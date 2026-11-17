@@ -44,10 +44,11 @@ jobs:
             archs: "aarch64"
           - os: windows-latest
             archs: "AMD64"
-          - os: macos-13
-            archs: "x86_64"
-          - os: macos-14
-            archs: "arm64"
+          # macOS wheel jobs omitted: no hosted-macOS runner allocation in this
+          # repo (queued for days / cancelled at 0s) and release.yml needs:
+          # wheels would block releases. macOS users install from sdist (pure
+          # Python + optional Rust accel). Re-add macos-13 / macos-14 entries
+          # when runner allocation is confirmed.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -65,9 +66,6 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
             sh -s -- -y --profile minimal
           CIBW_ENVIRONMENT_LINUX: "PATH=$HOME/.cargo/bin:$PATH"
-          CIBW_BEFORE_ALL_MACOS: |
-            rustup toolchain install stable
-            rustup target add aarch64-apple-darwin x86_64-apple-darwin
           CIBW_TEST_COMMAND: >-
             python -c "import sqac, sqac.simd; assert sqac.simd.HAS_SIMD"
       - uses: actions/upload-artifact@v4
