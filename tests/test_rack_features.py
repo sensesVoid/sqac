@@ -3,7 +3,6 @@
 Run: python -m pytest tests/test_rack_features.py -q
 """
 
-import os
 import tempfile
 import unittest
 from pathlib import Path

@@ -1,0 +1,28 @@
+site_name: SQAC
+site_description: Hot-swappable VSA memory cartridges for LLM agents
+site_url: https://sensesvoid.github.io/sqac/
+repo_url: https://github.com/sensesVoid/sqac
+repo_name: sensesVoid/sqac
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+nav:
+  - Home: index.md
+  - Vault: VAULT.md
+  - Secret: SECRET.md
+  - Agent: AGENT.md
+  - Cloud: CLOUD.md
+  - Format: FORMAT.md
+  - MCP: MCP.md
+  - Release: RELEASE.md
+  - Security: SECURITY.md
+  - Research: RESEARCH-unlimited-context.md
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - tables

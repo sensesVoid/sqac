@@ -15,7 +15,6 @@ from .autobuild import (
     extract_project_units,
     track,
     track_once,
-    _sync_rack,
 )
 from .continuity import ContinuityStore, bootstrap_packet, detect_host, server_instructions
 from .dms import DMS, UtilityWeights
@@ -49,6 +48,17 @@ _KVCACHE_NAMES = frozenset(
     }
 )
 
+_V12_LAZY_NAMES = frozenset(
+    {
+        "SecretDomain",
+        "create_domain",
+        "open_domain",
+        "list_domains",
+        "SecretResolver",
+        "SecretResolutionError",
+    }
+)
+
 
 def __getattr__(name: str):
     """Lazily import sqac.kvcache names so `python -m sqac.kvcache` stays clean
@@ -58,6 +68,10 @@ def __getattr__(name: str):
         from . import kvcache
 
         return getattr(kvcache, name)
+    if name in _V12_LAZY_NAMES:
+        from . import secret_domain, secret_resolver
+
+        return getattr(secret_domain, name, None) or getattr(secret_resolver, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
@@ -92,7 +106,6 @@ __all__ = [
     "build_store",
     "track_once",
     "track",
-    "_sync_rack",
     "ContinuityStore",
     "bootstrap_packet",
     "detect_host",

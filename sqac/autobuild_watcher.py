@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent, FileDeletedEvent, FileMovedEvent
+    from watchdog.events import FileSystemEventHandler
     _HAS_WATCHDOG = True
 except ImportError:
     _HAS_WATCHDOG = False

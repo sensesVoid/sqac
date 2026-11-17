@@ -18,6 +18,37 @@
 Fuzzy Hit = paraphrased query with trigram overlap (O(n) SIMD scan).
 Fuzzy Miss = distinctive no-match query (O(n) worst case, full scan).
 
+## 100K measured — Windows dev box (2026-11-16)
+
+Hardware: local Windows 11 x86_64 dev machine (not the cloud VM above), Rust SIMD
+active. Two runs: before and after vectorizing the encoder's majority-vote
+bundle step (numpy `unpackbits`/`packbits` fast path, bit-exact with the
+pure-Python fallback).
+
+| Entries | Build | Load | Exact | Fuzzy Hit | Fuzzy Miss | RSS | File |
+|---------|-------|------|-------|-----------|------------|-----|------|
+| 100,000 (pre-optimization)  | 1,671s | 1.75s | 543.7ms | 558.6ms | 493.2ms | n/a* | 48.5MB |
+| 100,000 (post-optimization) | **95.3s** | 1.82s | 543.3ms | 528.3ms | 462.5ms | **473.8MB** | 48.5MB |
+
+\* peak-RSS readout was broken on Windows in the first run (fixed since:
+proper `GetProcessMemoryInfo` prototypes).
+
+Recall correctness on both runs: 3/3 exact hits, 3/3 fuzzy hits, 0 false
+positives — unchanged by the optimization, as expected (write path only).
+
+Readings:
+
+- **Build: 17.5x faster** (1,671s → 95.3s), i.e. ~1,050 entries/sec vs the
+  ~160/sec that motivated the 10.4-min prediction. The bundle was the
+  dominant cost of `add()`.
+- **RSS matches the scaling law**: measured 473.8MB vs the 471MB prediction
+  (18.3 + 4,529 bytes/entry fit).
+- **Queries unchanged** (~0.5s at 100K on this box, SIMD-scan bound — the
+  optimization touched only the write path). Higher than the cloud VM's
+  108ms prediction; the dev box is slower hardware and the scan constant
+  differs by machine.
+- **Load stays flat**: 1.8s for 100K entries (~0.018 ms/entry).
+
 ## Scaling Laws (linear fit, R² > 0.999)
 
 | Metric | Formula | At 100K | At 250K | At 1M |
@@ -43,10 +74,10 @@ Fuzzy Miss = distinctive no-match query (O(n) worst case, full scan).
 - Build: 2.6 min (one-time cost for init)
 
 **Practical ceiling: 100K entries (4.5M tokens)**
-- Search: 108ms (still interactive)
-- RSS: 471MB (fine for servers, tight for laptops)
+- Search: 108ms (cloud VM) / ~0.5s (dev box, SIMD-scan bound) — still interactive
+- RSS: 471MB predicted, 474MB measured (validated)
 - File: 48MB
-- Build: 10.4 min
+- Build: measured 1.6 min post-optimization (was predicted 10.4 min)
 
 **Hard limit: 250K+ entries (11M+ tokens)**
 - Search: 270ms+ (noticeable latency)

@@ -2,8 +2,7 @@
 """Tests for prompt injection detection and trust scoring."""
 import unittest
 from sqac.injection import (
-    analyze_content, RiskLevel, InjectionResult,
-    wrap_untrusted, sanitize_for_injection,
+    analyze_content, RiskLevel, wrap_untrusted, sanitize_for_injection,
     UNTRUSTED_OPEN, UNTRUSTED_CLOSE, INJECTION_WARNING,
 )
 

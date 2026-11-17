@@ -35,9 +35,14 @@
 
 ### Portability Contract
 
-- Keychain-mode vaults are **local to the machine**. R2 sync warns and refuses to upload them unless `--allow-local-only-vault` is passed.
-- Cross-machine use requires `vault init --portable` or `vault rotate --portable` before syncing.
-- No key export endpoint exists in v1.
+- Vault cartridges default to `sync_policy: never`; R2 sync excludes them by
+  default. Cross-machine use requires `vault init --portable` plus an explicit
+  `sqac vault set-policy write_through` on the cartridge.
+- Keychain-mode vaults are **local to the machine**; their key never leaves
+  the OS keychain, and R2 sync cannot upload them.
+- Encrypted agent cartridges can never have their policy verified remotely;
+  they pull as `never` regardless of header claims.
+- No key export endpoint exists in v1.2.
 
 ### MCP Boundary
 
