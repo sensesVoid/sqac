@@ -293,6 +293,9 @@ class CartridgeRack:
         # including the active store's path.
         self._shards: dict[str, list[Path]] = {}
         self._load_errors: list[tuple[str, str]] = []
+        # Name of the cartridge last written via write()/write_routed()
+        # (after shard splitting). Lets callers persist only what changed.
+        self.last_written: Optional[str] = None
         if self.directory is not None and auto_load:
             self._auto_load_directory()
 
@@ -398,7 +401,6 @@ class CartridgeRack:
             return self
         p.parent.mkdir(parents=True, exist_ok=True)
         store = SqacStore(semantic=self.semantic, fuzzy_threshold=self.min_confidence)
-        store.format_version = 3
         store.save(p, name=name, description=description)
         self._stores[name] = store
         self._paths[name] = p
@@ -476,7 +478,6 @@ class CartridgeRack:
         new_store = SqacStore(
             semantic=self.semantic, fuzzy_threshold=self.min_confidence
         )
-        new_store.format_version = 3
         self._stores[name] = new_store
         # paths[name] stays the same (original path)
         # 4. Register the shard store so search can find it
@@ -521,6 +522,7 @@ class CartridgeRack:
         if active != name:
             name = active
         self._require(name).add(content, key=key, meta=meta, source=source, kind=kind)
+        self.last_written = name
         return self
 
     def write_routed(
@@ -767,7 +769,6 @@ class CartridgeRack:
         compacted = SqacStore(
             semantic=self.semantic, fuzzy_threshold=self.min_confidence
         )
-        compacted.format_version = 3
         # Replay entries into the fresh store (rebuilds indices)
         for e in merged:
             meta = dict(e.get("meta", {}))

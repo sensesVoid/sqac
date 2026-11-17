@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Full benchmark: skill store retrieval + application across 50+ problems.
 
-    python tests/bench_skill_store.py              # retrieval only (fast)
-    python tests/bench_skill_store.py --llm        # full application test
+    python experiments/bench_skill_store.py              # retrieval only (fast)
+    python experiments/bench_skill_store.py --llm        # full application test
 
 Design notes:
   - Application pass is batched (left-padded generate) for speed.

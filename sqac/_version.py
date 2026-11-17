@@ -1,3 +1,1 @@
-"""Single source of truth for the sqac distribution version."""
-
-__version__ = "0.3.0"
+﻿__version__ = "1.2.2"

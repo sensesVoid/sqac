@@ -26,11 +26,11 @@ Honest expectations (this repo's design, README-disclosed):
 The script CLASSIFIES each op from the measured growth ratio and FAILS
 (exit 1) if any correctness gate breaks at scale.
 
-    python tests/bench_rack.py              # default sweep (semantic if model)
-    python tests/bench_rack.py --no-semantic
-    python tests/bench_rack.py --big        # push toward 100K entries (lexical)
-    python tests/bench_rack.py --quick
-    python tests/bench_rack.py --scales 1000,5000,10000,25000,50000
+    python experiments/bench_rack.py              # default sweep (semantic if model)
+    python experiments/bench_rack.py --no-semantic
+    python experiments/bench_rack.py --big        # push toward 100K entries (lexical)
+    python experiments/bench_rack.py --quick
+    python experiments/bench_rack.py --scales 1000,5000,10000,25000,50000
 
 Run from the project root so `sqac.models` resolves.
 """

@@ -122,7 +122,6 @@ def main(argv: list[str] | None = None) -> int:
 
     # resolve fields per item
     prepared: list[dict] = []
-    field_stats = {"content": args.text_field, "key": args.key_field}
     for obj in items:
         if not isinstance(obj, dict):
             obj = {"content": str(obj)}

@@ -14,8 +14,7 @@ knowledge content.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 
 class CredentialError(ValueError):
@@ -62,6 +61,12 @@ _PATTERNS: list[tuple[str, re.Pattern, str, str]] = [
     (
         "OpenAI API Key",
         re.compile(r'\b(sk-[A-Za-z0-9]{48,})\b'),
+        "critical",
+        "Use OPENAI_API_KEY environment variable.",
+    ),
+    (
+        "OpenAI Project Key",
+        re.compile(r'\b(sk-proj-[A-Za-z0-9\-_]{20,})\b'),
         "critical",
         "Use OPENAI_API_KEY environment variable.",
     ),

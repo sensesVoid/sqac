@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqac.dms import DMS, UtilityWeights, utility, rank_store
 from sqac.offloader import ContextOffloader
-from sqac.store import KIND_FACT, KIND_TURN
 
 
 def _salient_exchange():

@@ -1,0 +1,190 @@
+# MCP server — SQAC memory for coding agents
+
+`sqac-mcp` (from the `sqac[mcp]` extra) exposes SQAC as native MCP tools so
+Claude Desktop, Claude Code, opencode, Codex, Cursor, Zed, and any MCP client
+share one memory store and one continuity sidecar.
+
+## Running
+
+```bash
+sqac-mcp                     # stdio transport
+sqac-mcp --dir ~/.sqacm      # memory directory (default: $SQAC_MEM_DIR or ~/.sqacm)
+sqac-mcp --no-semantic       # disable the semantic tier (lexical+exact only)
+```
+
+Environment variables:
+
+- `SQAC_MEM_DIR` — directory that holds cartridge files (default `~/.sqacm`)
+- `SQAC_SEMANTIC` — `1` (default) enables the static-embedding semantic tier;
+  `0` for faster lexical+exact-only operation
+- `SQAC_PROJECT` — default project key used by continuity tools
+- `SQAC_AGENT` — `0` disables prepending the agent packet to `mem_bootstrap`
+- `SQAC_VAULT_PASSPHRASE` — portable-vault unlock for headless servers (never
+  prompts)
+
+The server auto-injects the memory protocol into the client's system prompt
+(`instructions`), teaching the model to bootstrap/checkpoint its own state.
+A `memory://context` resource serves the same continuity packet for clients
+that auto-read resources.
+
+## Memory / continuity tools
+
+| Tool | Purpose |
+|------|---------|
+| `mem_bootstrap` | Load cross-CLI working context at session start (project, goal, last summary, last host/model, recent checkpoints, recent exchanges); prepends the active agent packet when set |
+| `mem_checkpoint` | Persist task handoff (goal + summary) at task boundaries |
+| `mem_observe` | Record a meaningful conversation turn |
+| `mem_search` | Search the long-term rack (fuzzy/semantic recall with confidence) |
+| `mem_write` | Teach a fact/skill/doc entry (auto-routes by kind) |
+| `mem_recall` / `mem_recall_detailed` | Recent working-memory context |
+| `mem_graduate` | Promote stable session memories into durable facts |
+| `mem_sparsify` | Run DMS eviction on session memory |
+| `mem_stats` | Cartridge + session statistics |
+| `mem_swap` | Hot-swap the active cartridge |
+| `mem_cartridge_create` / `mem_cartridge_list` | Manage cartridges in the rack |
+| `mem_save` | Persist all cartridges + the working session to disk |
+
+### Session saves (debounced)
+
+`mem_observe` does not rewrite `session.sqac` on every turn (the session bucket is a full-rewrite format, so a per-turn save is O(cartridge size) per turn). Session saves are debounced: at most every **10 turns** or **60 seconds**, whichever comes first, and forced immediately on explicit persist points (`mem_save`, `mem_checkpoint`, `mem_graduate`, `mem_swap`). A crash therefore loses at most the unsaved tail of the conversation (≤ 10 turns); the cross-CLI continuity packet (`continuity.json`, written by `mem_checkpoint`/`mem_observe` via `touch()`) is unaffected.
+
+Tune or restore the old behavior with environment variables:
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `SQAC_SESSION_FLUSH_TURNS` | `10` | Save once per N observed turns. `1` restores per-turn atomic saves (v1.2.1 behavior). |
+| `SQAC_SESSION_FLUSH_SECS` | `60` | Save at most this many seconds after the last flush. `0` forces a save on every observe. |
+| `SQAC_SEMANTIC` | — | `0` disables embeddings (lexical-only mode). |
+
+## Agent tools
+
+| Tool | Purpose |
+|------|---------|
+| `agent_list` | List agents + active agent |
+| `agent_use` | Set the active agent |
+| `agent_show` / `agent_bootstrap` | Bootstrap packet (persona + working state) |
+| `agent_update` | Set a section (`identity`/`instruction`/`preference`/`goal`/`decision`/`note`) |
+| `agent_done` | Mark a goal/decision done |
+| `agent_search` | Search agent memory (explicit path; agent entries stay out of `mem_search`) |
+
+## Vault tools (reference-only)
+
+| Tool | Purpose |
+|------|---------|
+| `vault_list` | Vault entries, metadata only |
+| `vault_meta` | Entry metadata (label/type/policy/updated) — no value |
+| `vault_http` | Allowlisted HTTPS proxy using a stored credential |
+| `vault_audit` | Read the audit log (no values, ever) |
+
+Deliberately absent: `vault_get`, `vault_resolve`, `vault_put`, `vault_exec`.
+See [VAULT.md](VAULT.md) for the full boundary.
+
+## Secret Domain tools (reference-only)
+
+| Tool | Purpose |
+|------|---------|
+| `secret_list` | List secret references in a domain (names, kinds, tags) |
+| `secret_meta` | One ref's metadata (label/kind/scopes/timestamps) — no value |
+
+Deliberately absent: `secret_resolve`, `secret_get`, `secret_put` — plaintext
+secret resolution is backend-only via `sqac.secret_resolver.SecretResolver`.
+See [SECRET.md](SECRET.md).
+
+## Cloud tools
+
+| Tool | Purpose |
+|------|---------|
+| `cloud_status` | Provider/bucket, per-object sync status |
+| `cloud_sync` | Trigger push/pull/both |
+
+## Code-structure (AST) tools
+
+| Tool | Purpose |
+|------|---------|
+| `ast_init` | Build the structural index (symbols + call/import/inheritance edges) |
+| `ast_explore` | Symbol definition + callers + callees |
+| `ast_blast` | Blast radius: everything affected by changing a symbol |
+| `ast_callers` / `ast_callees` | Upstream/downstream call queries |
+| `ast_search` | Fuzzy symbol search |
+| `ast_stats` | Symbol/edge/language counts |
+
+## Cross-CLI continuity
+
+Every CLI registers the **same** `sqac-mcp --dir <MEM_DIR>` command, so all
+harnesses share one memory dir and one `continuity.json`:
+
+```bash
+sqac mcp setup --host opencode       # opencode config snippet
+sqac mcp setup --host claude-code    # claude mcp add … command
+sqac mcp setup --host all            # every host's snippet
+sqac mcp setup --host opencode --dir /shared --hook-project .
+                                     # also appends the memory protocol to ./AGENTS.md
+```
+
+`detect_host()` walks the parent process chain to name the calling CLI
+(override with the `host=` tool argument), so a Claude Code bootstrap after
+opencode work reports the prior host, the preserved goal, and recent
+checkpoints/exchanges.
+
+## Wire-up snippets (as generated by `sqac mcp setup`)
+
+**opencode** (`opencode.json` at project root or `~/.config/opencode/opencode.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "sqac": {
+      "type": "local",
+      "command": "sqac-mcp --dir ~/.sqacm",
+      "enabled": true
+    }
+  }
+}
+```
+
+**Claude Code** (run in the project, or `--global`):
+
+```bash
+claude mcp add sqac --stdio -- sqac-mcp --dir ~/.sqacm
+```
+
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`
+or `%APPDATA%\Claude\claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "sqac": { "command": "sqac-mcp", "args": ["--dir", "~/.sqacm"] }
+  }
+}
+```
+
+**Codex** (`~/.codex/config.toml`, append):
+
+```toml
+[mcp_servers.sqac]
+command = "sqac-mcp"
+args = ["--dir", "~/.sqacm"]
+```
+
+**Cursor** (`.cursor/mcp.json` at project root):
+
+```json
+{
+  "mcpServers": {
+    "sqac": { "command": "sqac-mcp", "args": ["--dir", "~/.sqacm"] }
+  }
+}
+```
+
+**Zed** (`~/.config/zed/settings.json`, `"mcp"` key) — same shape as Cursor.
+
+## Memory protocol (what the server instructs the model to do)
+
+1. Call `mem_bootstrap` once at session start.
+2. Record meaningful turns with `mem_observe`.
+3. Call `mem_checkpoint` at task boundaries (goal reached, blocker, context
+   switch).
+4. Use `mem_search` for durable knowledge and `mem_recall` for recent context.
+5. Never fabricate: if memory has nothing on a topic, say so.

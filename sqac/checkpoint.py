@@ -21,30 +21,32 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import pwd
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Optional
+
+try:
+    import pwd  # Unix-only; used for the real home dir
+except ImportError:  # Windows: pwd does not exist
+    pwd = None
 
 
 def _get_user_home() -> Path:
     """Get the actual user home directory, not the HOME env var."""
-    try:
-        return Path(pwd.getpwuid(os.getuid()).pw_dir)
-    except Exception:
-        # Fallback: try common locations
-        for candidate in [Path("/home/zeus"), Path("/home/user"), Path("/root")]:
-            if candidate.exists():
-                return candidate
-        return Path(os.path.expanduser("~"))
+    if pwd is not None:
+        try:
+            return Path(pwd.getpwuid(os.getuid()).pw_dir)
+        except Exception:
+            pass
+    return Path(os.path.expanduser("~"))
 
 
 USER_HOME = _get_user_home()
 
 from .store import SqacStore, KIND_TURN, KIND_FACT
-from .offloader import ContextOffloader, Exchange, Turn
-from .dms import DMS, UtilityWeights
+from .offloader import ContextOffloader
+from .dms import DMS
 
 
 @dataclass

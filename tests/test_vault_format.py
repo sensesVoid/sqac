@@ -1,6 +1,5 @@
 """Tests for v5 vault format support."""
 
-import json
 import tempfile
 import unittest
 from pathlib import Path

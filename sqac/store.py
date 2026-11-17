@@ -15,6 +15,7 @@ from __future__ import annotations
 import collections
 import functools
 import hashlib
+import heapq
 import re
 import time
 import warnings
@@ -32,7 +33,6 @@ from .simd import backend as _simd
 from .format import (
     _HAS_LZ4,
 
-    VERSION,
     CartridgeHeader,
     Entry,
     FormatError,
@@ -180,7 +180,6 @@ class SqacStore:
         self.semantic = False
         self._sem_encoder = None
         self.cartridge_type = "memory"
-        self.format_version = VERSION  # v2 writes raw binary vectors; 1 = legacy hex
         # Query cache: maps (query_hash, tier) -> (packed_bits, write_version)
         self._cache_size = cache_size
         self._query_cache: collections.OrderedDict[tuple[str, str], tuple[bytes, int]] = (
@@ -222,6 +221,9 @@ class SqacStore:
         self._sem_keys: list[bytes] = []  # packed semantic key vectors
         self._sem_ckeys: list[bytes] = []  # packed semantic content vectors
         self._matrices: dict[str, tuple] = {}  # lazily unpacked (n, D) bit matrices
+        self._stats_cache: tuple[int, dict] | None = None
+        self._alive = 0
+        self._kind_counts: dict[str, int] = {}
 
     def _invalidate_cache(self) -> None:
         """Increment write version to invalidate stale cache entries.
@@ -231,6 +233,7 @@ class SqacStore:
         entries from before the write are retained.
         """
         self._write_version += 1
+        self._stats_cache = None
         self._matrices.clear()  # bit matrices are stale on any write
 
     # ── write path ───────────────────────────────────────────────────────
@@ -292,6 +295,7 @@ class SqacStore:
         norm = normalize(key_text)
         self._invalidate_cache()
 
+        kind_resolved = resolve_kind(kind)
         idx = len(self._entries)
         self._entries.append(
             {
@@ -299,10 +303,13 @@ class SqacStore:
                 "key_norm": norm,
                 "meta": dict(meta or {}),
                 "source": source,
-                "kind": resolve_kind(kind),
+                "kind": kind_resolved,
                 "trust": inj.to_dict(),
             }
         )
+        kname = KIND_NAMES.get(kind_resolved, "generic")
+        self._kind_counts[kname] = self._kind_counts.get(kname, 0) + 1
+        self._alive += 1
         self._keys.append(self.encoder.encode_bits(key_text))
         self._ckeys.append(self.encoder.encode_bits(content))
         if self.semantic:
@@ -316,7 +323,15 @@ class SqacStore:
         if not (0 <= idx < len(self._entries)):
             return False
         norm = self._entries[idx]["key_norm"]
+        already = bool(self._entries[idx].get("deleted"))
         self._entries[idx]["deleted"] = True
+        if not already:
+            kname = KIND_NAMES.get(self._entries[idx].get("kind", KIND_GENERIC), "generic")
+            if self._kind_counts.get(kname):
+                self._kind_counts[kname] -= 1
+            self._alive -= 1
+            if self._alive < 0:
+                self._alive = 0
         # Only drop the exact mapping if it still points at this entry: a
         # later add with the same key may have claimed it, and that sibling
         # must keep its O(1) exact tier.
@@ -350,7 +365,6 @@ class SqacStore:
             self._entries.append(e)
             norm = e["key_norm"]
             idx = len(self._entries) - 1
-            key_text = norm  # reconstruct from normalized key
             self._keys.append(self.encoder.encode_bits(norm))
             self._ckeys.append(self.encoder.encode_bits(e["content"]))
             if self.semantic and self._sem_encoder:
@@ -358,10 +372,16 @@ class SqacStore:
                 self._sem_ckeys.append(self._sem_encoder.encode_bits(e["content"]))
             if norm:
                 self._exact[norm] = idx
+        self._alive = len(self._entries)
+        counts: dict[str, int] = {}
+        for e in self._entries:
+            kname = KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic")
+            counts[kname] = counts.get(kname, 0) + 1
+        self._kind_counts = counts
         return {"before": before, "after": len(alive), "removed": removed}
 
     def __len__(self) -> int:
-        return sum(1 for e in self._entries if not e.get("deleted"))
+        return self._alive
 
     # ── read path ────────────────────────────────────────────────────────
 
@@ -374,14 +394,15 @@ class SqacStore:
         """
         t0 = time.perf_counter()
         norm = normalize(query)
+        entries = self._entries
         want_kind: Optional[int] = None
         if kind is not None:
             want_kind = kind if isinstance(kind, int) else resolve_kind(kind)
 
         def eligible(i: int) -> bool:
-            if self._entries[i].get("deleted"):
+            if entries[i].get("deleted"):
                 return False
-            if want_kind is not None and self._entries[i].get("kind", KIND_GENERIC) != want_kind:
+            if want_kind is not None and entries[i].get("kind", KIND_GENERIC) != want_kind:
                 return False
             return True
 
@@ -415,7 +436,11 @@ class SqacStore:
             seen_idx.add(idx)
 
         # 2-3) Fuzzy + Semantic tiers
-        live = [i for i in range(len(self._entries)) if eligible(i)]
+        if want_kind is None:
+            live = [i for i, e in enumerate(entries) if not e.get("deleted")]
+        else:
+            live = [i for i, e in enumerate(entries)
+                    if not e.get("deleted") and e.get("kind", KIND_GENERIC) == want_kind]
         if len(out) < top_k:
             tier_results = self._search_tiers(query, live, use_cache, eligible, seen_idx, top_k - len(out))
             for sim, i, mode in tier_results:
@@ -452,10 +477,9 @@ class SqacStore:
                 if sim >= self.semantic_threshold:
                     results.append((sim, i, "semantic"))
         
-        results.sort(reverse=True)
-        # Filter out already-seen indices (from exact tier)
-        filtered = [(sim, i, mode) for sim, i, mode in results if i not in seen_idx]
-        return filtered[:top_k]
+        if seen_idx:
+            return heapq.nlargest(top_k, ((sim, i, mode) for sim, i, mode in results if i not in seen_idx))
+        return heapq.nlargest(top_k, results)
 
     def search_or_none(self, query: str, min_confidence: float = 0.75) -> Optional[Hit]:
         """Convenience: best hit above threshold, else None."""
@@ -507,14 +531,12 @@ class SqacStore:
     # ── persistence ──────────────────────────────────────────────────────
 
     def save(self, path: str | Path, name: str = "", description: str = "") -> None:
-        """Write the store as a .sqac cartridge (atomic replace).
+        """Persist to a .sqac file.
 
-        v2 layout: auxiliary packed vectors (content, semantic key/content)
-        go into a per-entry raw binary block — ~2x smaller than the v1
-        hex-in-JSON encoding. Use format_version=1 to emit the legacy
-        layout (readable by pre-v2 runtimes).
+        Writes the current v2 binary layout: auxiliary packed vectors
+        (content, semantic key/content) are stored in a per-entry raw
+        binary block.
         """
-        key_len = self.dims // 8
         entries = []
         for idx, (e, kbits, ckbits) in enumerate(zip(self._entries, self._keys, self._ckeys)):
             payload = {
@@ -524,16 +546,10 @@ class SqacStore:
                 "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
                 **({"meta": e["meta"]} if e["meta"] else {}),
             }
-            if self.format_version >= 2:
-                binvec = bytes(ckbits)
-                if self.semantic:
-                    binvec += bytes(self._sem_keys[idx]) + bytes(self._sem_ckeys[idx])
-            else:
-                binvec = b""
-                payload["content_key"] = ckbits.hex()
-                if self.semantic:
-                    payload["sem_key"] = self._sem_keys[idx].hex()
-                    payload["sem_content_key"] = self._sem_ckeys[idx].hex()
+            # v2+: always write raw binary vectors (no hex fallback)
+            binvec = bytes(ckbits)
+            if self.semantic:
+                binvec += bytes(self._sem_keys[idx]) + bytes(self._sem_ckeys[idx])
             entries.append(
                 Entry(
                     key_bits=bytearray(kbits),
@@ -624,6 +640,12 @@ class SqacStore:
                     store._sem_ckeys.append(bytes.fromhex(sck) if sck else None)
             if norm and not e.deleted:
                 store._exact[norm] = idx
+        for e in store._entries:
+            if e.get("deleted"):
+                continue
+            kname = KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic")
+            store._kind_counts[kname] = store._kind_counts.get(kname, 0) + 1
+            store._alive += 1
         if store.semantic:
             store._backfill_semantic()
         return store
@@ -714,14 +736,12 @@ class SqacStore:
         return [max(sk, sc) for sk, sc in zip(sims_k, sims_c)]
 
     def stats(self) -> dict:
-        kinds: dict[str, int] = {}
-        for e in self._entries:
-            if e.get("deleted"):
-                continue
-            k = KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic")
-            kinds[k] = kinds.get(k, 0) + 1
-        return {
-            "entries": len(self),
+        wv = self._write_version
+        if self._stats_cache is not None and self._stats_cache[0] == wv:
+            cached = self._stats_cache[1]
+            return {**cached, "kinds": dict(cached["kinds"])}
+        out = {
+            "entries": self._alive,
             "dims": self.dims,
             "encoder": f"{self.encoder.seed}:ngram={self.encoder.ngram}",
             "fuzzy_threshold": self.fuzzy_threshold,
@@ -729,8 +749,10 @@ class SqacStore:
             "semantic_threshold": getattr(self, "semantic_threshold", None),
             "simd": _HAS_SIMD,
             "lz4": _HAS_LZ4,
-            "kinds": kinds,
+            "kinds": dict(self._kind_counts),
         }
+        self._stats_cache = (wv, out)
+        return {**out, "kinds": dict(out["kinds"])}
 
 
 def _ms(seconds: float) -> float:

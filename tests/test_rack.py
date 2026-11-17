@@ -26,7 +26,7 @@ from sqac.rack import (
     default_grader,
     graduation_pass,
 )
-from sqac.store import KIND_FACT, KIND_TURN
+from sqac.store import KIND_FACT
 
 # Salient session: bug diagnosis + a decision should graduate;
 # chitchat and a bare "switching topics" should not.

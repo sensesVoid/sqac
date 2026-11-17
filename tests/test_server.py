@@ -255,7 +255,7 @@ class TestServerGraph(unittest.TestCase):
         })
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        self.assertEqual(len(data["nodes"]), 4)
+        self.assertEqual(len(data["nodes"]), 5)  # 4 entries + 1 cartridge center
         self.assertIn("edges", data)
         self.assertEqual(data["dims"], 1024)
         self.assertEqual(data["alive_entries"], 4)

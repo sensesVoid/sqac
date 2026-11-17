@@ -91,8 +91,28 @@ class BSCEncoder:
         return n.to_bytes(nbytes, "big")
 
     def _bundle(self, vecs: list[bytes]) -> bytes:
-        """Majority vote via per-byte bit accumulation (8x fewer ops than bit-loop)."""
+        """Majority vote across packed vectors (ties -> bit unset).
+
+        NumPy fast path (unpackbits + column sum) when numpy is importable;
+        the per-byte accumulation loop below is the zero-dependency fallback.
+        Both paths are bit-exact.
+        """
+        n = len(vecs)
         nbytes = self.dims // 8
+        if n == 0:
+            return bytes(nbytes)
+        if n == 1:
+            return bytes(vecs[0])
+        try:
+            import numpy as np
+        except ImportError:
+            pass
+        else:
+            mat = np.frombuffer(b"".join(vecs), dtype=np.uint8).reshape(n, -1)[:, :nbytes]
+            bits = np.unpackbits(mat, axis=1, bitorder="big")  # (n, D), MSB-first
+            majority = bits.sum(axis=0) > n / 2
+            return np.packbits(majority, bitorder="big").tobytes()
+
         # counts[i][b] = how many vectors have bit b set in byte i
         masks = (0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01)
         counts = [[0] * 8 for _ in range(nbytes)]

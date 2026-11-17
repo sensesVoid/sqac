@@ -41,12 +41,19 @@ from sqac.rack import CartridgeRack
 from sqac.offloader import ContextOffloader
 from sqac.graph_mcp import register_graph_tools
 from sqac.vault_mcp import register_vault_tools
+from sqac.agent_mcp import register_agent_tools
+from sqac.secret_mcp import register_secret_tools
+from sqac.cloud_mcp import register_cloud_tools
 
 SERVER_NAME = "sqac_mcp"
 DEFAULT_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
 DEFAULT_CARTRIDGES = ("facts", "docs", "skills")
 VALID_KINDS = ("generic", "fact", "skill", "doc", "turn")
 SESSION_BUDGET = 25_000  # DMS budget: capacity sweep sweet spot
+# Debounce session-bucket rewrites: save at most every N observes or M seconds.
+# Set 1 / 0 to restore per-turn atomic saves (v1.2.1 behavior).
+SESSION_FLUSH_TURNS = int(os.environ.get("SQAC_SESSION_FLUSH_TURNS", "10"))
+SESSION_FLUSH_SECS = float(os.environ.get("SQAC_SESSION_FLUSH_SECS", "60"))
 
 mcp = MCPServer(
     name=SERVER_NAME,
@@ -70,6 +77,15 @@ register_graph_tools(mcp)
 
 # Register vault tools (reference-only, no plaintext exfiltration)
 register_vault_tools(mcp)
+
+# Register secret-domain tools (reference-only, no plaintext exfiltration)
+register_secret_tools(mcp)
+
+# Register agent tools (persona + working state)
+register_agent_tools(mcp)
+
+# Register cloud tools (sync status and trigger)
+register_cloud_tools(mcp)
 
 
 @dataclass
@@ -506,7 +522,8 @@ def mem_observe(
     try:
         st = _state()
         evicted = st.session.observe(role, text)
-        st.session.save()
+        if st.session.should_flush(SESSION_FLUSH_TURNS, SESSION_FLUSH_SECS):
+            st.session.save()
         st.continuity.touch(_project_name(None), host=detect_host(), summary=text[:400])
         st.continuity.save()
         return _ok(
@@ -556,7 +573,11 @@ def mem_write(
             st.rack.write(cartridge, content, key=key, meta=meta, source="mcp", kind=kind)
         else:
             st.rack.write_routed(content, key=key, meta=meta, source="mcp", kind=kind)
-        st.rack.save()
+        written = st.rack.last_written
+        if written:
+            st.rack.save([written])
+        else:
+            st.rack.save()
         return _ok(
             {
                 "written": True,
