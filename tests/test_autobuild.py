@@ -4,9 +4,7 @@ Run: python -m pytest tests/test_autobuild.py -q
 """
 
 import json
-import os
 import tempfile
-import time
 import unittest
 from pathlib import Path
 
@@ -468,7 +466,6 @@ class TestTrackOnceLogging(unittest.TestCase):
 class TestAuditLog(unittest.TestCase):
     def test_log_file_appended(self):
         """track() with --log appends JSONL entries to the file."""
-        import threading
         with tempfile.TemporaryDirectory() as td:
             root = Path(td, "project")
             root.mkdir()

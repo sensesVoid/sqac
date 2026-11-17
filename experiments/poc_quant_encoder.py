@@ -13,7 +13,7 @@ Validation targets (from our earlier calibration):
   - x86 -> ARM64 rule          >= 0.60  (the semantic catch)
   - discriminative miss        < 0.60   (no leakage between unrelated keys)
 
-Run: python tests/poc_quant_encoder.py
+Run: python experiments/poc_quant_encoder.py
 """
 
 from __future__ import annotations

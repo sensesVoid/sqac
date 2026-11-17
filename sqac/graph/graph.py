@@ -21,7 +21,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Optional
 
-from .models import Edge, EdgeKind, FileInfo, Symbol, SymbolKind
+from .models import Edge, EdgeKind, FileInfo, Symbol
 from .parser import CodeParser, detect_language, should_skip
 
 logger = logging.getLogger(__name__)

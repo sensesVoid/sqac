@@ -3,7 +3,6 @@
 Run: python -m pytest tests/test_production.py -q
 """
 
-import os
 import tempfile
 import threading
 import time
@@ -11,20 +10,17 @@ import unittest
 from pathlib import Path
 
 from sqac.format import (
-    CartridgeLockError,
     compact_cartridge,
     locked_cartridge,
     read_cartridge,
     write_cartridge,
     CartridgeHeader,
     Entry,
-    FLAG_DELETED,
 )
 from sqac.store import (
     SqacStore,
     sanitize_content,
     sanitize_key,
-    resolve_kind,
 )
 
 

@@ -3,9 +3,6 @@
 import os
 import tempfile
 import unittest
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import threading
-import ssl
 
 from sqac.vault import Vault
 

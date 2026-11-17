@@ -94,7 +94,6 @@ class TestVaultMcpTools(unittest.TestCase):
 
     def test_locked_vault_returns_structured_error(self):
         # Open vault without passphrase in an env without SQAC_VAULT_PASSPHRASE
-        import sqac.vault as vm
         os.environ.pop("SQAC_VAULT_PASSPHRASE", None)
         # Force keychain unavailable
         with patch("sqac.vault_crypto.keychain_get", side_effect=Exception("no keyring")):

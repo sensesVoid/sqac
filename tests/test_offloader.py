@@ -27,7 +27,6 @@ from sqac.offloader import (
     _salience,
     heuristic_distill,
 )
-from sqac.store import KIND_TURN
 
 TRANSCRIPT = [
     ("user", "Our CI is failing with a 504 on the deploy step."),

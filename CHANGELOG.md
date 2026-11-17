@@ -1,6 +1,115 @@
 # Changelog
 
-## [0.3.0] — 2026-11-15 (in progress)
+## [1.2.2] — 2026-11-17
+
+### Performance
+- **Session-bucket save debounce**: `mem_observe` no longer rewrites `session.sqac` on every turn. Saves are now debounced to at most every **10 turns** or **60 seconds** (env `SQAC_SESSION_FLUSH_TURNS` / `SQAC_SESSION_FLUSH_SECS`), whichever comes first, and forced immediately on explicit persist points (`mem_save`, `mem_checkpoint`, `mem_graduate`, `mem_swap`). At 18K entries a per-turn full-session rewrite is O(cartridge size); this removes it from the per-turn hot path entirely. Set `SQAC_SESSION_FLUSH_TURNS=1` / `SQAC_SESSION_FLUSH_SECS=0` to restore v1.2.1 per-turn atomic saves.
+- `ContextOffloader` now tracks `_since_flush`/`_last_flush` and exposes `should_flush(turns, secs)`; `save()` resets both counters.
+
+### Behavior change
+- A crash of the MCP host now loses at most the unsaved tail of the conversation (≤ 10 turns of recallable exchanges). The cross-CLI continuity packet (`continuity.json`) is unaffected (it is written on every `mem_observe`/`mem_checkpoint`); explicit persist points still flush synchronously. `mem_sparsify` and friends are unchanged.
+
+### Fixed
+- MCP stdio tests now spawn the server with an explicit isolated `SQAC_MEM_DIR` (the MCP SDK's default child environment does not inherit it). Previously `tests/test_mcp_continuity.py` and the new debounce test silently used the developer's real `~/.sqacm`; the `recent ≥ 1` assertion previously passed only against accumulated real-home state. It now fills the offload window hermetically (8 alternating turns) before asserting.
+
+## [1.2.1] — 2026-11-17
+
+### Performance
+- `SqacStore.stats()` and `__len__` are now **O(1)**: incremental per-kind alive counters maintained at add/delete/compact/load. `rack.stats()`/`session.stats()` cost (~11/7 ms at 18K entries) is gone, including after writes.
+- `mem_bootstrap` warm path no longer pays the full kinds-loop; measured ~112–124 ms → ~100 ms on a 18K-entry memory (remaining cost is the Rust similarity scan; SIMD-bound).
+- `mem_observe` no longer recomputes a full `stats()` for the save description (~50–80 ms saved per turn at 18K entries).
+- `search()` hot loop: inline eligible-entries filter (no per-entry `eligible()` calls), and `heapq.nlargest` instead of full `sort()` for tier results.
+- `mem_write` persists **only the written cartridge** (crash-safe, shard-aware) instead of the entire rack — ~2/3 less disk I/O per taught fact at scale.
+- Format writer: one joined buffer write (single syscall pass) instead of per-entry `write()` calls; JSON payloads serialized with compact separators (~10 % faster).
+
+### Fixed
+- Cartridge serialization of `session` save path no longer forces an all-entries stats recomputation per turn.
+
+## [1.2.0] — 2026-11-16
+
+### Added
+- **Secret Domain cartridge** (`cartridge_type: secret`, `sqac secret init/list/put-ref/get-meta/rm/rename/list-domains`): encrypted (SQSE envelope, keychain or Argon2id portable mode) registry of secret *references and metadata only*. Credential-like material is rejected in every field; `secret:` indirection chains are rejected. Backends live under `~/.sqacm/secrets/<name>.sqac`.
+- **SecretResolver** (`sqac.secret_resolver.SecretResolver`): backend-only resolution of `vault:NAME`, `vault:VAULT/NAME`, `secret:DOMAIN/NAME`, `provider:1password:*`, `provider:bitwarden:*`, `op://`, `bw://` refs. Fail-closed agent allowlist enforcement (`agent_context.secret_refs`), cycle guard, hash-chained audit events without values.
+- **Secret Domain MCP tools** (reference-only): `secret_list`, `secret_meta`. No plaintext tools, ever.
+- **Agent schema v2** (additive): `model_profile_id`, `secret_ref`, `secret_refs`, `allowed_tools` header binding + `sync_policy`. Schema 1 cartridges remain readable and upgrade on save. `AgentCartridge.set_binding(...)`, `sqac agent bind`, `sqac agent init --model-profile/--secret-ref/--secret-refs/--allowed-tools`.
+- **Per-cartridge sync policy** enforced by the sync engine (authoritative): `extra.sync_policy` = `write_through | never | local_only`, fail-closed on unreadable/encrypted headers; `agent`/`vault`/`secret` default to `never`; `secrets/` is hard-denied; pull refuses to overwrite or create policy-denied cartridges; `sqac cloud status --show-denied` surfaces policy-denied local cartridges; `sqac vault set-policy` for opting in; `sqac agent bind --sync-policy` likewise.
+- `sqac cloud sync --allow-local-only-vault` removed (it was never wired up).
+
+### Security
+- **Behavior change:** agent/vault/secret cartridges no longer sync by default, even under `--force-remote`/`--force-local`. Operators must set `sync_policy: write_through` explicitly per cartridge. No data loss — denial skips sync; nothing is deleted.
+- Encrypted (SQAE/SQSE) cartridges can never have their policy verified remotely; they are treated as `never` on pull.
+- Vault create/save always writes `sync_policy: never` (opt-in only via `sqac vault set-policy`).
+- OpenAI project key (`sk-proj-*`) detection added to the credential scanner; high-entropy token heuristic added to Secret Domain field validation.
+
+### Changed
+- Cloud `SyncState` load/save now honor a module-level path override (testability; no behavior change).
+
+## [1.1.0] — 2026-11-16
+
+### Added
+- Multi-vault support: named vaults under `~/.sqacm/vaults/`, `--vault` global flag, `vault init/list-vaults/use` subcommands, `vault:VAULT/NAME` reference syntax (backward compatible with `vault:NAME`).
+- External secret providers: 1Password (`op`) and Bitwarden (`bw`) CLI wrappers for vault master keys. Zero new Python dependencies. Provider KDF mode stored in vault header.
+- Agent-cartridge encryption: opt-in AES-256-GCM encryption at rest via `--encrypt` flag. `sqac agent encrypt/decrypt/key rotate` commands. Plaintext agents remain first-class.
+- Blocking performance gate: `experiments/perf_gate.py` compares against `experiments/PERF_BASELINE.json` (5K-entry baseline), fails CI on >20% regression. Median-of-3 to reduce runner noise.
+- Docs site: MkDocs Material on GitHub Pages (`mkdocs.yml`), deployed on release tags.
+- Package hygiene: relocated `sqac/RESEARCH.md` → `docs/RESEARCH-unlimited-context.md`, moved benchmark scripts to `experiments/`.
+
+### Security
+- Cross-vault AAD isolation: ciphertext copied between vaults fails decryption.
+- Provider CLI errors surface install hints and locked-state guidance.
+
+## [1.0.0] — 2026-11-16
+
+### Added
+- Format hardening: caps on pb_len (64MB), decompressed payload (64MB), dims (8192), vocab (1M), entries (10M), token length (1024).
+- Format fuzz tests (truncation, corruption, version mismatch, huge counts).
+- Removed obsolete `format_version` attribute; always writes raw binary vectors (v2+).
+- Deleted duplicated `sqac/graph/graph/` package.
+- Adversarial credential detection tests (15 tests).
+- Adversarial prompt injection detection tests (23 tests).
+- Windows lock audit tests (5 tests).
+- Cross-CLI integration tests (4 tests).
+- `CONTRIBUTING.md` with development setup, testing, code style, PR process.
+- `sqac report` CLI command for filing GitHub issues with diagnostics.
+- Dedicated docs: `docs/VAULT.md`, `docs/AGENT.md`, `docs/CLOUD.md`, `docs/FORMAT.md`, `docs/MCP.md`, `docs/RELEASE.md`, root `SECURITY.md`.
+- README reframed around "SQAC replaces agent-facing `.md` files" with a source-aligned CLI reference.
+- Cross-platform capacity benchmark (`experiments/capacity_bench.py` runs on Windows; 100K-entry measurement).
+
+### Security
+- Hardened `read_cartridge`: rejects huge counts, caps payload sizes, handles decompression errors.
+- Credential detector: adversarial tests for base64, split tokens, homoglyphs, zero-width chars.
+- Prompt injection: adversarial tests for RTL overrides, tag chars, HTML comments, code blocks.
+
+### Changed
+- `cryptography>=42` is now a core dependency (vault is core feature).
+
+---
+
+## [0.5.0] — 2026-11-16
+
+### Added
+- Cloud sync: provider-agnostic S3 storage backend (R2, S3, Supabase, MinIO, B2, Spaces).
+- Sync engine: push/pull/status/conflict detection with force flags.
+- Cloud CLI: `init`, `status`, `sync` with provider/bucket options and dry-run/force flags.
+- MCP tools: `cloud_status`, `cloud_sync`.
+
+---
+
+## [0.4.0] — 2026-11-16
+
+### Added
+- Agent cartridge: persona + working state (identity, instruction, preference, goal, decision, note).
+- `agent` CLI: init, list, use, show, set, note, done, bootstrap, search.
+- MCP tools: agent_bootstrap, agent_update, agent_done, agent_search, agent_list, agent_use, agent_show.
+- `mem_bootstrap` prepends active agent packet (SQAC_AGENT=0 to disable).
+- Type-based rack isolation: agent/vault cartridges excluded from default search.
+
+### Privacy
+- Agent state is plaintext in v1; docs flag it. Encryption can reuse vault crypto later.
+
+---
+
+## [0.3.0] — 2026-11-15
 
 ### Added
 - Vault cartridge (v5 format): encrypted secret/PII storage with AES-256-GCM.
