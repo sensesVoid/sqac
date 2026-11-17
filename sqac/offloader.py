@@ -429,7 +429,7 @@ class ContextOffloader:
             p,
             name="session-bucket",
             description=(
-                f"{self._store.stats()['entries']} turn entries, "
+                f"{len(self._store)} turn entries, "
                 f"{self._xid} exchanges, xid={self._xid} "
                 f"turns={self._turn_count} window={self.window}"
             ),
