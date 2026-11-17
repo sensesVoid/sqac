@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.1] — 2026-11-17
+
+### Performance
+- `SqacStore.stats()` and `__len__` are now **O(1)**: incremental per-kind alive counters maintained at add/delete/compact/load. `rack.stats()`/`session.stats()` cost (~11/7 ms at 18K entries) is gone, including after writes.
+- `mem_bootstrap` warm path no longer pays the full kinds-loop; measured ~112–124 ms → ~100 ms on a 18K-entry memory (remaining cost is the Rust similarity scan; SIMD-bound).
+- `mem_observe` no longer recomputes a full `stats()` for the save description (~50–80 ms saved per turn at 18K entries).
+- `search()` hot loop: inline eligible-entries filter (no per-entry `eligible()` calls), and `heapq.nlargest` instead of full `sort()` for tier results.
+- `mem_write` persists **only the written cartridge** (crash-safe, shard-aware) instead of the entire rack — ~2/3 less disk I/O per taught fact at scale.
+- Format writer: one joined buffer write (single syscall pass) instead of per-entry `write()` calls; JSON payloads serialized with compact separators (~10 % faster).
+
+### Fixed
+- Cartridge serialization of `session` save path no longer forces an all-entries stats recomputation per turn.
+
 ## [1.2.0] — 2026-11-16
 
 ### Added
