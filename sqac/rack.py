@@ -293,6 +293,9 @@ class CartridgeRack:
         # including the active store's path.
         self._shards: dict[str, list[Path]] = {}
         self._load_errors: list[tuple[str, str]] = []
+        # Name of the cartridge last written via write()/write_routed()
+        # (after shard splitting). Lets callers persist only what changed.
+        self.last_written: Optional[str] = None
         if self.directory is not None and auto_load:
             self._auto_load_directory()
 
@@ -519,6 +522,7 @@ class CartridgeRack:
         if active != name:
             name = active
         self._require(name).add(content, key=key, meta=meta, source=source, kind=kind)
+        self.last_written = name
         return self
 
     def write_routed(

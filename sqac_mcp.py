@@ -568,7 +568,11 @@ def mem_write(
             st.rack.write(cartridge, content, key=key, meta=meta, source="mcp", kind=kind)
         else:
             st.rack.write_routed(content, key=key, meta=meta, source="mcp", kind=kind)
-        st.rack.save()
+        written = st.rack.last_written
+        if written:
+            st.rack.save([written])
+        else:
+            st.rack.save()
         return _ok(
             {
                 "written": True,

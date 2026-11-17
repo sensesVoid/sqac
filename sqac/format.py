@@ -389,7 +389,7 @@ def write_cartridge(
         if e.encrypted:
             flags |= FLAG_ENCRYPTED
         flags |= (e.kind & 0xFF) << FLAG_KIND_SHIFT
-        pb = json.dumps(e.payload, ensure_ascii=False).encode("utf-8")
+        pb = json.dumps(e.payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         # Compress the payload JSON with lz4 block (no frame overhead)
         compressed_pb = pb
         if _HAS_LZ4 and len(pb) >= 128:
@@ -448,10 +448,9 @@ def _atomic_replace(tmp: Path, target: Path) -> None:
 
 
 def _write_parts(tmp: Path, parts: list[bytes]) -> None:
-    """Write serialized parts to a temp file."""
+    """Write serialized parts to a temp file (one buffer, one write)."""
     with open(tmp, "wb") as f:
-        for chunk in parts:
-            f.write(chunk)
+        f.write(b"".join(parts))
 
 
 @dataclass
