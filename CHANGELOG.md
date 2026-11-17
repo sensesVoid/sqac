@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.2] — 2026-11-17
+
+### Performance
+- **Session-bucket save debounce**: `mem_observe` no longer rewrites `session.sqac` on every turn. Saves are now debounced to at most every **10 turns** or **60 seconds** (env `SQAC_SESSION_FLUSH_TURNS` / `SQAC_SESSION_FLUSH_SECS`), whichever comes first, and forced immediately on explicit persist points (`mem_save`, `mem_checkpoint`, `mem_graduate`, `mem_swap`). At 18K entries a per-turn full-session rewrite is O(cartridge size); this removes it from the per-turn hot path entirely. Set `SQAC_SESSION_FLUSH_TURNS=1` / `SQAC_SESSION_FLUSH_SECS=0` to restore v1.2.1 per-turn atomic saves.
+- `ContextOffloader` now tracks `_since_flush`/`_last_flush` and exposes `should_flush(turns, secs)`; `save()` resets both counters.
+
+### Behavior change
+- A crash of the MCP host now loses at most the unsaved tail of the conversation (≤ 10 turns of recallable exchanges). The cross-CLI continuity packet (`continuity.json`) is unaffected (it is written on every `mem_observe`/`mem_checkpoint`); explicit persist points still flush synchronously. `mem_sparsify` and friends are unchanged.
+
+### Fixed
+- MCP stdio tests now spawn the server with an explicit isolated `SQAC_MEM_DIR` (the MCP SDK's default child environment does not inherit it). Previously `tests/test_mcp_continuity.py` and the new debounce test silently used the developer's real `~/.sqacm`; the `recent ≥ 1` assertion previously passed only against accumulated real-home state. It now fills the offload window hermetically (8 alternating turns) before asserting.
+
 ## [1.2.1] — 2026-11-17
 
 ### Performance

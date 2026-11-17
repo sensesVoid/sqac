@@ -50,6 +50,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -213,6 +214,8 @@ class ContextOffloader:
         self.dms = dms  # optional Dynamic Memory Sparsification policy
         self._turn_count = 0
         self._xid = 0
+        self._since_flush = 0
+        self._last_flush = time.time()
         self._buffer: list[Turn] = []       # live turns inside the window
         self._evicted: list[int] = []       # xids flushed to the store
         if self.path and self.path.exists():
@@ -246,6 +249,7 @@ class ContextOffloader:
         if not text:
             return None
         self._turn_count += 1
+        self._since_flush += 1
         self._buffer.append(Turn(role=role, text=text))
         if len(self._buffer) >= self.window:
             return self._flush_one()
@@ -415,6 +419,18 @@ class ContextOffloader:
 
     # ── persistence ─────────────────────────────────────────────────────
 
+    def should_flush(self, turns: int, secs: float) -> bool:
+        """Return True when enough turns or time have accumulated since the
+        last full save to justify rewriting the cartridge.
+
+        ``turns <= 1`` or ``secs <= 0`` restore the pre-debounce behavior of
+        saving on every observe."""
+        if self._since_flush <= 0:
+            return False
+        return self._since_flush >= max(1, int(turns)) or (
+            secs <= 0 or (time.time() - self._last_flush) >= secs
+        )
+
     def save(self, path: str | Path | None = None) -> Path:
         """Persist the bucket. In-memory buffer is flushed first: nothing
         stays volatile across save(). An explicit path is adopted as the
@@ -434,6 +450,8 @@ class ContextOffloader:
                 f"turns={self._turn_count} window={self.window}"
             ),
         )
+        self._since_flush = 0
+        self._last_flush = time.time()
         return p
 
     def stats(self) -> dict[str, Any]:

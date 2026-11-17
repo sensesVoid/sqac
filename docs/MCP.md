@@ -44,6 +44,18 @@ that auto-read resources.
 | `mem_cartridge_create` / `mem_cartridge_list` | Manage cartridges in the rack |
 | `mem_save` | Persist all cartridges + the working session to disk |
 
+### Session saves (debounced)
+
+`mem_observe` does not rewrite `session.sqac` on every turn (the session bucket is a full-rewrite format, so a per-turn save is O(cartridge size) per turn). Session saves are debounced: at most every **10 turns** or **60 seconds**, whichever comes first, and forced immediately on explicit persist points (`mem_save`, `mem_checkpoint`, `mem_graduate`, `mem_swap`). A crash therefore loses at most the unsaved tail of the conversation (≤ 10 turns); the cross-CLI continuity packet (`continuity.json`, written by `mem_checkpoint`/`mem_observe` via `touch()`) is unaffected.
+
+Tune or restore the old behavior with environment variables:
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `SQAC_SESSION_FLUSH_TURNS` | `10` | Save once per N observed turns. `1` restores per-turn atomic saves (v1.2.1 behavior). |
+| `SQAC_SESSION_FLUSH_SECS` | `60` | Save at most this many seconds after the last flush. `0` forces a save on every observe. |
+| `SQAC_SEMANTIC` | — | `0` disables embeddings (lexical-only mode). |
+
 ## Agent tools
 
 | Tool | Purpose |
