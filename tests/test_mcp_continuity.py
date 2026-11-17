@@ -45,7 +45,14 @@ class McpServerContinuityTest(unittest.TestCase):
         from mcp import Client, StdioServerParameters
 
         async def scenario():
-            params = StdioServerParameters(command=sys.executable, args=["sqac_mcp.py"])
+            params = StdioServerParameters(
+                command=sys.executable, args=["sqac_mcp.py"],
+                env={
+                    "SQAC_MEM_DIR": self._td.name,
+                    "SQAC_SEMANTIC": "0",
+                    "PATH": os.environ.get("PATH", ""),
+                },
+            )
             async with Client(params) as c:
                 names = _tool_names(await c.list_tools())
                 for want in ("mem_bootstrap", "mem_checkpoint", "mem_sparsify",
@@ -57,10 +64,20 @@ class McpServerContinuityTest(unittest.TestCase):
                 self.assertEqual(pkt["project"], "acme")
                 self.assertIn("no prior state", pkt["summary"])
 
-                await c.call_tool("mem_observe", {"role": "user", "text": "migrate acme auth to OIDC"})
+                for role, text in [
+                    ("user", "migrate acme auth to OIDC"),
+                    ("assistant", "Sure — PKCE flow it is."),
+                    ("user", "start with the callback route"),
+                    ("assistant", "Added /auth/callback for acme"),
+                    ("user", "scopes: openid profile email"),
+                    ("assistant", "Wired PKCE challenge for acme"),
+                    ("user", "next: token refresh rotation"),
+                    ("assistant", "Rotation done for acme"),
+                ]:
+                    await c.call_tool("mem_observe", {"role": role, "text": text})
                 await c.call_tool("mem_checkpoint", {
                     "project": "acme", "host": "opencode",
-                    "goal": "migrate auth to OIDC",
+                    "goal": "migrate acme auth to OIDC",
                     "summary": "scope agreed, PKCE flow chosen",
                 })
 
@@ -69,7 +86,7 @@ class McpServerContinuityTest(unittest.TestCase):
                 # packet reflects the state BEFORE this session engaged:
                 # the prior worker (opencode) is what the resuming model must see
                 self.assertEqual(pkt2["last_state"]["last_host"], "opencode")
-                self.assertEqual(pkt2["last_state"]["goal"], "migrate auth to OIDC")
+                self.assertEqual(pkt2["last_state"]["goal"], "migrate acme auth to OIDC")
                 self.assertEqual(len(pkt2["checkpoints"]), 1)
                 self.assertGreaterEqual(len(pkt2["recent"]), 1)
 
@@ -89,13 +106,18 @@ class McpServerContinuityTest(unittest.TestCase):
         from mcp import Client, StdioServerParameters
 
         async def scenario():
-            p1 = StdioServerParameters(command=sys.executable, args=["sqac_mcp.py"])
+            shared_env = {
+                "SQAC_MEM_DIR": self._td.name,
+                "SQAC_SEMANTIC": "0",
+                "PATH": os.environ.get("PATH", ""),
+            }
+            p1 = StdioServerParameters(command=sys.executable, args=["sqac_mcp.py"], env=shared_env)
             async with Client(p1) as c1:
                 await c1.call_tool("mem_write", {
                     "content": "The deploy key lives in vault, path secret/deploy",
                     "key": "deploy-key-loc", "kind": "fact",
                 })
-            p2 = StdioServerParameters(command=sys.executable, args=["sqac_mcp.py"])
+            p2 = StdioServerParameters(command=sys.executable, args=["sqac_mcp.py"], env=shared_env)
             async with Client(p2) as c2:
                 r = await c2.call_tool("mem_search", {"query": "where is the deploy key"})
                 hits = json.loads(_text(r))["hits"]

@@ -50,6 +50,10 @@ DEFAULT_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
 DEFAULT_CARTRIDGES = ("facts", "docs", "skills")
 VALID_KINDS = ("generic", "fact", "skill", "doc", "turn")
 SESSION_BUDGET = 25_000  # DMS budget: capacity sweep sweet spot
+# Debounce session-bucket rewrites: save at most every N observes or M seconds.
+# Set 1 / 0 to restore per-turn atomic saves (v1.2.1 behavior).
+SESSION_FLUSH_TURNS = int(os.environ.get("SQAC_SESSION_FLUSH_TURNS", "10"))
+SESSION_FLUSH_SECS = float(os.environ.get("SQAC_SESSION_FLUSH_SECS", "60"))
 
 mcp = MCPServer(
     name=SERVER_NAME,
@@ -518,7 +522,8 @@ def mem_observe(
     try:
         st = _state()
         evicted = st.session.observe(role, text)
-        st.session.save()
+        if st.session.should_flush(SESSION_FLUSH_TURNS, SESSION_FLUSH_SECS):
+            st.session.save()
         st.continuity.touch(_project_name(None), host=detect_host(), summary=text[:400])
         st.continuity.save()
         return _ok(

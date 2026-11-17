@@ -145,7 +145,7 @@ sqac mcp setup --host <cli>         # wire memory into your agent
 
 ## Status
 
-- **Version:** 1.2.1 — 478 tests passing, 21 skipped
+- **Version:** 1.2.2 - 485 tests passing
 - **Repository:** https://github.com/sensesVoid/sqac
 - **Issues:** https://github.com/sensesVoid/sqac/issues
 
