@@ -112,6 +112,75 @@ Conflict-aware, explicit allowlist, never silently overwrites. → [docs/CLOUD.m
 
 Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fuzzy** matching (SIMD-accelerated), and optional **semantic** matching for paraphrases. No hit → no answer, never a confident guess.
 
+## Features
+
+### Memory core
+- **Portable `.sqac` cartridges** — one self-contained binary file per memory (magic header + vocab + entries), versioned and forward-compatible. `pip install sqac`, no database.
+- **Three-tier retrieval** — exact key lookup (O(1)); lexical/fuzzy recall over 1024-bit keys (Rust SIMD popcount, numpy fallback); optional static-embedding semantic tier (numpy — no torch required)
+- **Fail-safe confidence gate** — below threshold, SQAC says "not in memory" instead of guessing
+- **Flat-cost stats at scale** — incremental per-kind counters keep `sqac stats` O(1) regardless of cartridge size; `nlargest` selection instead of full sorts
+- **Atomic, crash-safe saves** — single joined-buffer writer; cartridges only rewrite on explicit saves (or the debounced session flush)
+- **PII & credential guard** — regex + Luhn PII detection and credential-pattern rejection run at write time; every entry carries an injection-risk `trust` score
+- **Kind taxonomy** — `generic | fact | skill | doc | turn`, with auto-routing into typed cartridges
+
+### CartridgeRack — many cartridges, one hot-swappable set
+- Named cartridges with **auto-routing by kind** (`fact`→`facts`, `skill`→`skills`, `doc`→`docs`) and **auto-create on first write**
+- **Folder routing** — shard your memory under subfolders (`facts/team-a.sqac`)
+- **Capacity sharding** — cartridges split automatically at 25K entries
+- **Hot swap** — `mem_swap` / rack swap in-process, no restart
+- `sqac compact` (tombstone GC + full rewrite), `sqac stats` per-cartridge and rack-wide
+
+### Session memory (working memory)
+- **ContextOffloader** — rolling 8-turn window; exchanges are distilled and offloaded into the `session.sqac` bucket
+- **DMS (Dynamic Memory Sparsification)** — utility scoring (salience, frequency, recency); `mem_sparsify` demotes low-utility exchanges to durable tier instead of deleting them
+- **Session-save debounce (v1.2.2)** — `session.sqac` rewrites at most every 10 turns / 60 s; `mem_save`, `mem_checkpoint`, `mem_graduate`, `mem_swap` always flush synchronously; tune with `SQAC_SESSION_FLUSH_TURNS`/`SECS`
+- **`mem_graduate`** — promote stable session findings into durable cartridges (default `facts`)
+
+### MCP server (`sqac-mcp`) — one memory dir shared by every CLI
+36 tools across six groups (see [docs/MCP.md](docs/MCP.md)):
+- **Memory** — `mem_bootstrap` (cross-CLI handoff packet), `mem_checkpoint`, `mem_observe`, `mem_search`, `mem_write`, `mem_recall`/`mem_recall_detailed`, `mem_graduate`, `mem_sparsify`, `mem_swap`, `mem_save`, `mem_stats`, `mem_cartridge_create`/`mem_cartridge_list`
+- **Agent** — `agent_list`, `agent_use`, `agent_show`, `agent_bootstrap`, `agent_update`, `agent_done`, `agent_search`
+- **Vault (reference-only)** — `vault_list`, `vault_meta`, `vault_http`, `vault_audit` — use secrets without ever exposing them
+- **Secret Domain (reference-only)** — `secret_list`, `secret_meta` — references and metadata, never values
+- **Code graph** — `ast_init`, `ast_explore`, `ast_blast`, `ast_callers`, `ast_callees`, `ast_search`, `ast_stats`
+- **Cloud** — `cloud_status`, `cloud_sync`
+- Plus the `memory://context` resource and **cross-CLI continuity** (`continuity.json`): project goal, last host/model, checkpoint trail — pick up mid-task in any client
+
+### Agent cartridges
+- Persona + working state in one file: identity, preferences, instructions, goals, decisions, notes
+- **Agent schema v2** — model-profile binding (`model_profile_id`), `secret_ref`/`secret_refs` fail-closed allowlist, `allowed_tools`, per-cartridge `sync_policy`; schema-1 cartridges upgrade automatically on save
+- `sqac agent bootstrap` — compact "get to work" packet for fresh sessions; agent memory is deliberately kept out of default `mem_search` (use `agent_search`)
+
+### Vault — encrypted secrets
+- **AES-256-GCM**; Argon2id-wrapped master key or OS keychain; portable passphrase mode for machines without a secure store
+- `sqac vault exec --env KEY=vault:NAME -- <cmd>` — the secret exists only in the child process environment
+- `sqac vault http` / `vault_http` MCP tool — secret-injected HTTP calls; the value never enters the model's context
+- Hash-chained **audit log** (`sqac vault audit`); PII scan (`sqac vault scan`); vaults default to `sync_policy: never`
+- Multi-vault registry — named vaults under one directory; per-vault default policies
+
+### Secret Domain — secret *references*, never values
+- Encrypted (SQSE) registry: `vault:NAME`, `vault:VAULT/NAME`, `secret:DOMAIN/NAME`, `provider:1password:*`, `provider:bitwarden:*`, `op://`, `bw://`
+- **Fail-closed allowlist** in the trusted backend, cycle guard, hash-chained audit events without values
+- Resolution lives in `SecretResolver` (backend only); MCP/CLI tools return metadata only
+- `sqac secret` — init/list/put-ref/get-meta/rm/rename/list-domains
+
+### Cloud sync (S3-compatible)
+- Providers: Cloudflare R2 (default), AWS S3, Supabase Storage, MinIO, Backblaze B2, DigitalOcean Spaces
+- Explicit allowlist, conflict-aware — **never silently overwrites**; `sqac cloud sync` (push/pull/both)
+- Per-cartridge `sync_policy` (`write_through | never | local_only`); `agent`/`vault`/`secret` default to `never`; `secrets/` is hard-denied; encrypted cartridges are treated as `never` on pull
+- `sqac cloud status --show-denied` shows which local cartridges are policy-denied
+
+### Code-graph intelligence (tree-sitter)
+- `sqac graph init` — index a codebase into `graph.sqac` (Python, TS/JS, Go, Rust, and the full tree-sitter-language-pack set)
+- `sqac graph explore / blast / callers / callees / search / stats` — blast radius, who-calls-what, symbol search
+- `sqac graph watch` — reindex on change; also auto-builds with `sqac init .` and keeps fresh with `sqac track .`
+
+### Ops & observability
+- `sqac dashboard` — local web dashboard (port 8420, optional API key, rack mount) and `sqac viz` — 3D hyperdimensional memory graph
+- `sqac report "title" -d "..."` — file a GitHub issue with diagnostics attached
+- HTTP API server (`sqac-server`, FastAPI) for self-hosting memory behind your own endpoints
+- 485 tests, CI across numpy fallback + Ubuntu/Windows × Python 3.10–3.13, pip-audit-clean runtime deps, full docs set ([FORMAT](docs/FORMAT.md) · [MCP](docs/MCP.md) · [VAULT](docs/VAULT.md) · [SECRET](docs/SECRET.md) · [CLOUD](docs/CLOUD.md) · [DMS](docs/DMS.md) · [SECURITY](docs/SECURITY.md) · [THESIS](docs/THESIS.md))
+
 ## The CLI in one glance
 
 ```bash
@@ -123,11 +192,15 @@ sqac agent ...                      # agent personas + working state
 sqac vault ...                      # encrypted secrets/PII
 sqac secret ...                     # secret refs/metadata (never values)
 sqac cloud ...                      # S3-compatible sync
+sqac graph ...                      # AST code-graph intelligence (init/explore/blast/...)
+sqac dashboard / sqac viz           # web dashboard / 3D hyperdimensional graph
+sqac compact                        # tombstone garbage collection for a cartridge
+sqac stats                          # memory statistics
 sqac report "bug title" -d "..."    # file a GitHub issue with diagnostics
 sqac mcp setup --host <cli>         # wire memory into your agent
 ```
 
-→ Full reference in the [CLI section](#the-cli-in-one-glance) above; MCP tool list in [docs/MCP.md](docs/MCP.md); HTTP endpoints in the server module.
+→ Full feature inventory above; MCP tool tables in [docs/MCP.md](docs/MCP.md); HTTP endpoints in [`sqac-server`](sqac/server.py) (FastAPI).
 
 ## FAQ
 
