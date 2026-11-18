@@ -123,6 +123,7 @@ Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fu
 - **PII & credential guard** — regex + Luhn PII detection and credential-pattern rejection run at write time; every entry carries an injection-risk `trust` score
 - **Kind taxonomy** - `generic | fact | skill | doc | turn`, with auto-routing into typed cartridges
 - **Multilingual normalization (opt-in)** — `SQAC_NORMALIZE="unicode_fold,stopwords:en,affix:en"` pipeline in the key tokenizer (accent folding, language stopwords, rule-based affix stripping); see [docs/NORMALIZE.md](docs/NORMALIZE.md)
+- **OpenAI-compatible client middleware (opt-in)** — `from sqac.integrations import wrap` around Ollama/vLLM/LiteLLM/OpenAI clients: memories are auto-hydrated into the system prompt (confidence-gated), turns auto-recorded to the offloader; see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
 
 ### CartridgeRack — many cartridges, one hot-swappable set
 - Named cartridges with **auto-routing by kind** (`fact`→`facts`, `skill`→`skills`, `doc`→`docs`) and **auto-create on first write**
