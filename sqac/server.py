@@ -5,7 +5,7 @@
     python -m sqac.cli serve --dir ./memory --port 8420 --api-key sk-xxx
 """
 from __future__ import annotations
-import argparse, hmac, html, os, threading, time
+import argparse, hmac, html, os, re, threading, time
 from collections import Counter, deque
 from pathlib import Path
 from typing import Optional
@@ -13,17 +13,31 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Security
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
-from .format import compact_cartridge, _HAS_LZ4
+from .format import compact_cartridge, read_cartridge, _HAS_LZ4
 from .store import SqacStore, _HAS_SIMD
 from ._version import __version__
 from .rack import CartridgeRack
 from .offloader import ContextOffloader
+import sqac.agent as _agent_mod
 
 # Load the graph visualization HTML at import time
 _GRAPH_HTML_PATH = Path(__file__).parent / "graph_view.html"
 _GRAPH_HTML = _GRAPH_HTML_PATH.read_text(encoding="utf-8") if _GRAPH_HTML_PATH.exists() else "<h1>graph_view.html not found</h1>"
 
 _api_key = os.environ.get("SQAC_API_KEY", "")
+SESSION_FLUSH_TURNS = int(os.environ.get("SQAC_SESSION_FLUSH_TURNS", "10"))
+SESSION_FLUSH_SECS = float(os.environ.get("SQAC_SESSION_FLUSH_SECS", "60"))
+AGENT_ENCRYPTED_MAGIC = b"SQAE"
+# Mirror sqac_mcp.DEFAULT_ROUTES (kept local so the HTTP server never imports the MCP layer)
+_RACK_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
+
+
+def _make_rack(d):
+    return CartridgeRack(
+        directory=d, routes=dict(_RACK_ROUTES), default="facts",
+        semantic=True, min_confidence=0.60, auto_load=True,
+        max_entries=25_000, folder_routing=True,
+    )
 _security = APIKeyHeader(name="X-API-Key", auto_error=False)
 _start_time = time.time()
 
@@ -60,6 +74,60 @@ def _cartridge_path(name: str) -> Path:
         raise HTTPException(400, f"invalid cartridge name: {name!r}")
     return path
 
+# ── agent cartridge helpers (HTTP parity, v1.3) ─────────────────────────
+
+_AGENT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
+
+
+def _agent_dir() -> Path:
+    # resolved lazily so tests can point the agent dir elsewhere
+    return Path(getattr(_agent_mod, "AGENT_DIR", Path.home() / ".sqacm" / "agents"))
+
+
+def _agent_path(name: str) -> Path:
+    """Resolve an agent cartridge path, refusing traversal."""
+    if not name or not _AGENT_NAME_RE.match(name) or ".." in name:
+        raise HTTPException(400, f"invalid agent name: {name!r}")
+    base = _agent_dir().resolve()
+    p = (base / f"{name}.sqac").resolve()
+    if p.parent != base:
+        raise HTTPException(400, f"invalid agent name: {name!r}")
+    return p
+
+
+def _agent_meta(path: Path) -> dict:
+    """Header-only agent metadata; encrypted (SQAE) agents expose nothing."""
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        raw = b""
+    base = {"name": path.stem, "role": "", "encrypted": True,
+            "model_profile_id": None, "secret_ref": None, "secret_refs": [],
+            "allowed_tools": [], "sync_policy": "never", "created": None}
+    if raw.startswith(AGENT_ENCRYPTED_MAGIC):
+        return dict(base)
+    try:
+        cart = read_cartridge(str(path))
+        info = (cart.header.extra.get("agent") or {}) if isinstance(cart.header.extra, dict) else {}
+        base.update({
+            "encrypted": bool(cart.header.extra.get("encrypted")),
+            "name": info.get("name") or path.stem,
+            "role": info.get("role") or "",
+            "model_profile_id": info.get("model_profile_id"),
+            "secret_ref": info.get("secret_ref"),
+            "secret_refs": list(info.get("secret_refs") or []),
+            "allowed_tools": list(info.get("allowed_tools") or []),
+            "sync_policy": (cart.header.extra.get("sync_policy") or "never"),
+            "created": info.get("created"),
+            "updated": info.get("updated"),
+        })
+        return base
+    except Exception:
+        return dict(base)
+
+
+VALID_SYNC_POLICIES = {"write_through", "never", "local_only"}
+
 # Module-level state: lazily initialized on first request from env vars
 _state: dict = {}
 
@@ -79,7 +147,7 @@ def _ensure_state():
         if not dp.exists():
             _state["default_store"].save(dp)
         if os.environ.get("SQAC_RACK"):
-            _state["rack"] = CartridgeRack(directory=d, semantic=True)
+            _state["rack"] = _make_rack(d)
         sp = os.environ.get("SQAC_SESSION")
         if sp:
             sp_path = Path(sp)
@@ -94,7 +162,7 @@ def _get_store(name: Optional[str] = None) -> SqacStore:
     if _state.get("rack") and name:
         return _state["rack"][name]
     s = _state.get("default_store")
-    if s:
+    if s is not None:          # stores are __len__-able: an EMPTY store is falsy
         return s
     raise HTTPException(404, "no cartridge loaded")
 
@@ -120,6 +188,27 @@ class GraphRequest(BaseModel):
     cartridge: Optional[str] = None
 class HitResponse(BaseModel):
     content: str; confidence: float; source: str; mode: str; meta: dict = {}
+class AgentCreateRequest(BaseModel):
+    name: str
+    role: str = ""
+    model_profile_id: Optional[str] = None
+    secret_ref: Optional[str] = None
+    secret_refs: Optional[list[str]] = None
+    allowed_tools: Optional[list[str]] = None
+    sync_policy: str = "never"
+class AgentUpdateRequest(BaseModel):
+    role: Optional[str] = None
+    model_profile_id: Optional[str] = None
+    secret_ref: Optional[str] = None
+    secret_refs: Optional[list[str]] = None
+    allowed_tools: Optional[list[str]] = None
+    sync_policy: Optional[str] = None
+class SessionForgetRequest(BaseModel):
+    n: Optional[int] = Field(None, ge=1)
+    all_turns: bool = False
+class SessionGraduateRequest(BaseModel):
+    target_cartridge: Optional[str] = None
+    threshold: float = Field(0.40, ge=0.0, le=1.0)
 
 @app.middleware("http")
 async def _track_metrics(request: Request, call_next):
@@ -166,9 +255,21 @@ def search_endpoint(req: SearchRequest, _=Depends(_verify_key)):
 def teach(req: TeachRequest, _=Depends(_verify_key)):
     global _teach_count
     _ensure_state()
-    store = _get_store(req.cartridge)
     name = req.cartridge or "memory"
     path = _cartridge_path(name)
+    r = _state.get("rack")
+    if r and req.cartridge is None and req.kind:
+        # kind-aware teach: route into the rack (fact->facts, skill->skills, doc->docs)
+        with _teach_lock_for("__rack__"):
+            target = r._target_for(req.kind)
+            r.write_routed(req.content, key=req.key, source=req.source, kind=req.kind)
+            r.save()
+        with _metrics_lock:
+            _teach_count += 1
+        entries = len(r._require(target)) if target in r else 0
+        return {"ok": True, "written": target, "cartridge": target,
+                "entries": entries, "path": str(_cartridge_path(target))}
+    store = _get_store(req.cartridge)
     with _teach_lock_for(name):
         store.add(req.content, key=req.key, source=req.source, kind=req.kind)
         store.save(path)
@@ -193,13 +294,37 @@ def list_cartridges(_=Depends(_verify_key)):
     r = _state.get("rack"); d = _state["dir"]
     return {"cartridges": r.names() if r else sorted(p.stem for p in d.glob("*.sqac")), "rack": str(d) if r else None}
 
+def _enriched_hit(h):
+    """HitResponse fields plus the v1.3 HTTP-parity surface:
+    cartridge/key/kind at top level, tier preserved in meta."""
+    meta = dict(h.meta)
+    return {
+        "content": h.content,
+        "confidence": round(h.confidence, 4),
+        "source": h.source,
+        "mode": h.mode,
+        "tier": h.mode,  # exact | fuzzy | semantic
+        "cartridge": meta.get("cartridge"),
+        "key": meta.get("key_norm"),
+        "kind": meta.get("kind"),
+        "meta": meta,
+    }
+
+
+def _searched(r, cartridges=None):
+    """The stems a rack search will actually touch (incl. shards)."""
+    targets = r._collect_search_targets(cartridges)
+    return [t for t in targets if t in r._stores]
+
+
 @app.post("/rack/search")
 def rack_search(req: SearchRequest, _=Depends(_verify_key)):
     _ensure_state()
     r = _state.get("rack")
     if not r: raise HTTPException(400, "no rack mounted")
     hits = r.search(req.query, top_k=req.top_k, kind=req.kind)
-    return {"hits": [HitResponse(content=h.content, confidence=round(h.confidence,4), source=h.source, mode=h.mode, meta=h.meta).model_dump() for h in hits], "count": len(hits)}
+    out = [_enriched_hit(h) for h in hits]
+    return {"hits": out, "count": len(out), "searched": _searched(r, None)}
 
 @app.post("/rack/write")
 def rack_write(req: RackWriteRequest, _=Depends(_verify_key)):
@@ -214,7 +339,9 @@ def session_observe(req: SessionObserveRequest, _=Depends(_verify_key)):
     _ensure_state()
     o = _state.get("offloader")
     if not o: raise HTTPException(400, "no session offloader")
-    xid = o.observe(req.role, req.text); o.save()
+    xid = o.observe(req.role, req.text)
+    if o.should_flush(SESSION_FLUSH_TURNS, SESSION_FLUSH_SECS):
+        o.save()
     return {"ok": True, "exchange_offloaded": xid, "buffer_size": len(o._buffer)}
 
 @app.post("/session/recall")
@@ -606,6 +733,248 @@ def main(argv: list[str] | None = None) -> int:
     print(f"SQAC server on {args.host}:{args.port} | dir={d} | SIMD={_HAS_SIMD} | LZ4={_HAS_LZ4}")
     import uvicorn; uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     return 0
+
+# ── agents (HTTP parity, Tier 1A) ───────────────────────────────────
+
+def _agent_list():
+    d = _agent_dir()
+    out = []
+    if d.exists():
+        for p in sorted(d.glob("*.sqac")):
+            if p.name.startswith("."):
+                continue
+            out.append(_agent_meta(p))
+    return out
+
+
+@app.get("/agents")
+def agents_list(_=Depends(_verify_key)):
+    return {"agents": _agent_list()}
+
+
+@app.get("/agents/{name}")
+def agents_get(name: str, _=Depends(_verify_key)):
+    p = _agent_path(name)
+    if not p.exists():
+        raise HTTPException(404, f"agent not found: {name}")
+    return _agent_meta(p)
+
+
+@app.post("/agents")
+def agents_create(req: AgentCreateRequest, _=Depends(_verify_key)):
+    name = req.name.strip()
+    p = _agent_path(name)
+    if p.exists():
+        raise HTTPException(409, f"agent already exists: {name}")
+    if req.sync_policy not in VALID_SYNC_POLICIES:
+        raise HTTPException(400, f"invalid sync_policy: {req.sync_policy!r}")
+    try:
+        _agent_mod.create_agent(
+            name, req.role, semantic=False,
+            model_profile_id=req.model_profile_id,
+            secret_ref=req.secret_ref, secret_refs=req.secret_refs,
+            allowed_tools=req.allowed_tools, sync_policy=req.sync_policy)
+    except Exception as exc:
+        raise HTTPException(400, f"create failed: {exc}")
+    return {"ok": True, **_agent_meta(p)}
+
+
+@app.put("/agents/{name}")
+def agents_update(name: str, req: AgentUpdateRequest, _=Depends(_verify_key)):
+    p = _agent_path(name)
+    if not p.exists():
+        raise HTTPException(404, f"agent not found: {name}")
+    if req.sync_policy is not None and req.sync_policy not in VALID_SYNC_POLICIES:
+        raise HTTPException(400, f"invalid sync_policy: {req.sync_policy!r}")
+    is_enc = p.read_bytes().startswith(AGENT_ENCRYPTED_MAGIC)
+    try:
+        ag = _agent_mod.load_agent(name, semantic=False)
+    except Exception as exc:
+        if is_enc:
+            raise HTTPException(422, f"agent is encrypted; it cannot be opened here: {exc}")
+        raise HTTPException(400, f"load failed: {exc}")
+    if req.role is not None:
+        ag.role = req.role
+    binding = {}
+    if req.model_profile_id is not None:
+        binding["model_profile_id"] = req.model_profile_id
+    if req.secret_ref is not None:
+        binding["secret_ref"] = req.secret_ref
+    if req.secret_refs is not None:
+        binding["secret_refs"] = req.secret_refs
+    if req.allowed_tools is not None:
+        binding["allowed_tools"] = req.allowed_tools
+    if req.sync_policy is not None:
+        binding["sync_policy"] = req.sync_policy
+    if binding:
+        ag.set_binding(**binding)   # persists internally
+    else:
+        ag.save()
+    return {"ok": True, **_agent_meta(p)}
+
+
+@app.delete("/agents/{name}")
+def agents_delete(name: str, hard: bool = False, _=Depends(_verify_key)):
+    p = _agent_path(name)
+    if not p.exists():
+        raise HTTPException(404, f"agent not found: {name}")
+    if hard:
+        p.unlink()
+        return {"ok": True, "deleted": name}
+    trash = p.parent / ".trash"
+    trash.mkdir(parents=True, exist_ok=True)
+    dest = trash / f"{name}-{int(time.time())}.sqac"
+    p.rename(dest)
+    try:
+        active_ptr = Path(getattr(_agent_mod, "ACTIVE_AGENT_PATH", ""))
+        if active_ptr.exists() and active_ptr.read_text(encoding="utf-8").strip() == name:
+            active_ptr.unlink()
+    except OSError:
+        pass
+    return {"ok": True, "tombstoned": name, "trash": str(dest)}
+
+
+# ── rack introspection + reload (Tier 1B) ──────────────────────────
+
+@app.get("/rack")
+def rack_state(_=Depends(_verify_key)):
+    _ensure_state()
+    r = _state.get("rack")
+    if not r:
+        raise HTTPException(400, "no rack mounted")
+    mounted = []
+    for n in r.names():
+        s = r.stats(n)
+        entries = s.get("entries", 0)
+        mounted.append({
+            "name": n,
+            "entries": entries,
+            "kinds": s.get("kinds", {}),
+            "percent_full": round(100.0 * entries / max(1, r.max_entries), 1),
+        })
+    return {"mounted": mounted, "count": len(mounted),
+            "max_entries": r.max_entries, "default": r.default}
+
+
+@app.get("/rack/capabilities")
+def rack_capabilities(_=Depends(_verify_key)):
+    _ensure_state()
+    r = _state.get("rack")
+    if not r:
+        raise HTTPException(400, "no rack mounted")
+    routes = {str(k): v for k, v in (r.routes or {}).items()}
+    return {
+        "kinds": sorted(set(routes) | {"generic"}),
+        "routes": routes,
+        "default": r.default,
+        "max_entries": r.max_entries,
+        "shard_at": r.max_entries,
+    }
+
+
+@app.post("/reload")
+def reload_rack(_=Depends(_verify_key)):
+    _ensure_state()
+    old = _state.get("rack")
+    had_rack = old is not None or bool(os.environ.get("SQAC_RACK"))
+    if not had_rack:
+        return {"ok": True, "mounted": [], "note": "no rack to reload"}
+    if old is not None:
+        try:
+            old.save()
+        except Exception:
+            pass
+    d = _state["dir"]
+    _state["rack"] = _make_rack(d)
+    r = _state["rack"]
+    return {"ok": True, "mounted": r.names(), "directory": str(d)}
+
+
+# ── rack search trace (Tier 1D) ─────────────────────────────────────
+
+@app.post("/rack/trace")
+def rack_trace(req: SearchRequest, _=Depends(_verify_key)):
+    _ensure_state()
+    r = _state.get("rack")
+    if not r:
+        raise HTTPException(400, "no rack mounted")
+    hits = r.search(req.query, top_k=req.top_k, kind=req.kind)
+    out = []
+    for h in hits:
+        hit = _enriched_hit(h)
+        hit["tier"] = h.mode
+        hit["latency_ms"] = h.meta.get("latency_ms")
+        out.append(hit)
+    return {"hits": out, "count": len(out), "searched": _searched(r, None)}
+
+
+# ── session lifecycle (Tier 1E) ──────────────────────────────────────
+
+@app.get("/session/stats")
+def session_stats(_=Depends(_verify_key)):
+    _ensure_state()
+    o = _state.get("offloader")
+    if not o:
+        raise HTTPException(400, "no session offloader")
+    return {
+        "entries": len(o._store),
+        "offloaded_exchanges": o._xid,
+        "turns": o._turn_count,
+        "live_buffer": len(o._buffer),
+        "window": o.window,
+        "kinds": o._store.stats().get("kinds", {}),
+    }
+
+
+@app.post("/session/graduate")
+def session_graduate(req: SessionGraduateRequest, _=Depends(_verify_key)):
+    _ensure_state()
+    o = _state.get("offloader")
+    if not o:
+        raise HTTPException(400, "no session offloader")
+    r = _state.get("rack")
+    if not r:
+        raise HTTPException(400, "no rack mounted")
+    target = req.target_cartridge or r.default or "facts"
+    if target not in r:
+        r.create(target)
+    report = r.graduate(o, target_name=target, threshold=req.threshold)
+    r.save()
+    o.save()
+    target = req.target_cartridge or r.default or "facts"
+    return {"ok": True, "target": target, **(report if isinstance(report, dict) else {"report": report})}
+
+
+@app.post("/session/forget")
+def session_forget(req: SessionForgetRequest, _=Depends(_verify_key)):
+    _ensure_state()
+    o = _state.get("offloader")
+    if not o:
+        raise HTTPException(400, "no session offloader")
+    from .store import KIND_TURN
+    store = o._store
+    entries = store._entries
+    turn_idx = [i for i, e in enumerate(entries)
+                if not e.get("deleted") and e.get("kind") == KIND_TURN]
+    if req.all_turns:
+        drop = turn_idx
+    else:
+        n = req.n or len(turn_idx)
+        drop = turn_idx[:n]
+    for i in drop:
+        store.delete(i)
+    buffer_cleared = False
+    if req.all_turns:
+        o._buffer.clear()
+        buffer_cleared = True
+    removed = len(drop)
+    if removed:
+        o.save()
+    return {"ok": True, "removed": removed, "buffer_cleared": buffer_cleared,
+            "remaining_turns": sum(1 for e in store._entries
+                                    if not e.get("deleted") and e.get("kind") == KIND_TURN)}
+
+
 
 if __name__ == "__main__":
     import sys; sys.exit(main())
