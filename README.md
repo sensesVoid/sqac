@@ -121,7 +121,8 @@ Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fu
 - **Flat-cost stats at scale** — incremental per-kind counters keep `sqac stats` O(1) regardless of cartridge size; `nlargest` selection instead of full sorts
 - **Atomic, crash-safe saves** — single joined-buffer writer; cartridges only rewrite on explicit saves (or the debounced session flush)
 - **PII & credential guard** — regex + Luhn PII detection and credential-pattern rejection run at write time; every entry carries an injection-risk `trust` score
-- **Kind taxonomy** — `generic | fact | skill | doc | turn`, with auto-routing into typed cartridges
+- **Kind taxonomy** - `generic | fact | skill | doc | turn`, with auto-routing into typed cartridges
+- **Multilingual normalization (opt-in)** — `SQAC_NORMALIZE="unicode_fold,stopwords:en,affix:en"` pipeline in the key tokenizer (accent folding, language stopwords, rule-based affix stripping); see [docs/NORMALIZE.md](docs/NORMALIZE.md)
 
 ### CartridgeRack — many cartridges, one hot-swappable set
 - Named cartridges with **auto-routing by kind** (`fact`→`facts`, `skill`→`skills`, `doc`→`docs`) and **auto-create on first write**

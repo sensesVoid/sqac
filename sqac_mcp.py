@@ -39,7 +39,7 @@ from sqac.continuity import (
 from sqac.dms import DMS
 from sqac.rack import CartridgeRack
 from sqac.offloader import ContextOffloader
-from sqac import events
+from sqac import events, textnorm
 from sqac.graph_mcp import register_graph_tools
 from sqac.vault_mcp import register_vault_tools
 from sqac.agent_mcp import register_agent_tools
@@ -114,6 +114,7 @@ class _MemoryState:
             auto_load=True,  # mounts existing *.sqac (never the session bucket)
             max_entries=25_000,  # auto-split at capacity benchmark sweet spot
             folder_routing=True,  # facts/, skills/, docs/ subdirectories
+            normalizer=textnorm.from_env(),  # SQAC_NORMALIZE (off by default)
         )
         # Ensure the default cartridge set exists. create() is safe: existing
         # files are loaded, never wiped.
