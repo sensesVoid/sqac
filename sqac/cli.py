@@ -32,7 +32,13 @@ def _open(path: str) -> SqacStore:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="sqac", description="SQAC — Symbolic Query Addressable Cartridge")
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            # cartridge contents can hold arbitrary unicode; never crash on console encode
+            sys.stdout.reconfigure(errors="replace")
+        except Exception:
+            pass
+    ap = argparse.ArgumentParser(prog="sqac", description="SQAC - Symbolic Query Addressable Cartridge")
     ap.add_argument("--vault", default=None, help="vault name to use (default: active vault)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
@@ -119,6 +125,16 @@ def main(argv: list[str] | None = None) -> int:
                          help="only show changes, suppress 'no change' messages")
     p_track.add_argument("--watch", "-w", action="store_true",
                          help="use OS file events (watchdog) instead of polling")
+
+    p_export = sub.add_parser("export", help="serialize a plaintext cartridge to Markdown or JSON")
+    p_export.add_argument("cartridge", help="path to the .sqac cartridge")
+    p_export.add_argument("--format", choices=("md", "json"), default="md", help="output format (default: md)")
+    p_export.add_argument("--out", default=None, help="write to file instead of stdout")
+
+    p_diff = sub.add_parser("diff", help="diff two plaintext cartridges (added/removed/updated/reclassified)")
+    p_diff.add_argument("old", help="old .sqac cartridge")
+    p_diff.add_argument("new", help="new .sqac cartridge")
+    p_diff.add_argument("--format", choices=("md", "json"), default="md", help="output format (default: md)")
 
     p_checkpoint = sub.add_parser("checkpoint", help="rate-limit recovery checkpoints")
     cp_sub = p_checkpoint.add_subparsers(dest="cp_action", required=True)
@@ -885,6 +901,28 @@ def main(argv: list[str] | None = None) -> int:
                       rack_dir=rack_dir, rack_name=rack_name, quiet=args.quiet)
             except KeyboardInterrupt:
                 pass
+
+    elif args.cmd == "export":
+        from .export import export_cartridge, ExportError
+        try:
+            out = export_cartridge(args.cartridge, fmt=args.format)
+        except ExportError as exc:
+            print(f"export failed: {exc}")
+            return 1
+        if args.out:
+            Path(args.out).write_text(out, encoding="utf-8")
+            print(f"exported {args.cartridge} -> {args.out}")
+        else:
+            print(out)
+
+    elif args.cmd == "diff":
+        from .export import diff_cartridges, ExportError
+        try:
+            out = diff_cartridges(args.old, args.new, fmt=args.format)
+        except ExportError as exc:
+            print(f"diff failed: {exc}")
+            return 1
+        print(out)
 
     elif args.cmd == "checkpoint":
         from .checkpoint import CheckpointCartridge
