@@ -20,6 +20,9 @@
 ### Normalization
 - **`sqac.textnorm`** — pluggable pre-encoding normalization for the hybrid tokenizer (opt-in via `SQAC_NORMALIZE`, off by default, fingerprint-stable): `unicode_fold` (NFKD combining-mark strip), `stopwords:<lang>` (built-in `en`; `stopwords:file=...` for any language), `affix:<lang>` (light rule-based suffix stripping; `affix:file=...` for any language). Threaded through `SqacStore`/`SqacStore.load`/`CartridgeRack`/MCP + HTTP server (mounted cartridges included). User-supplied multilingual static embedding tables work today via `SQAC_STATIC_MODEL_DIR` (see [docs/NORMALIZE.md](docs/NORMALIZE.md)).
 
+### Integrations
+- **`sqac.integrations`** — drop-in `chat.completions.create` middleware for OpenAI-compatible clients (Ollama, vLLM, LiteLLM, OpenAI): hydrates the system prompt with confidence-gated memories (`threshold=0.60`, `top_k=5`), records both turns into the session offloader (debounced), and passes responses through untouched; anything unmodeled falls through to the wrapped client. `SQAC_MEM_DIR`/`memory_dir` resolution, `SQAC_NORMALIZE` honored.
+
 ### Fixed
 - **Pre-existing**: `GET /stats`/`POST /teach` (and any default-cartridge call) returned **404** when `memory.sqac` was empty — `SqacStore` implements `__len__`, so an empty store was falsy under `if s:`.
 - The HTTP server mounted the rack with **no routes**, so `rack/search` and kind-routed writes could never resolve kinds; it now mirrors sqac_mcp exactly (`routes`, `default="facts"`, `auto_load`, `folder_routing`, session bucket excluded by the rack itself).
