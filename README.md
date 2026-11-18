@@ -43,7 +43,7 @@ pip install "sqac[vault]"         # OS keychain for vault secrets
 pip install "sqac[all]"           # everything
 ```
 
-Python 3.10–3.13. Windows, Linux, macOS (x86_64 prebuilt wheels; aarch64/macOS wheels coming post-1.0).
+Python 3.10-3.13. Windows, Linux, macOS. Prebuilt wheels for Linux x86_64/aarch64 and Windows (Python 3.10); macOS installs from sdist (pure Python + optional Rust accel).
 
 ## Quick start (60 seconds)
 
@@ -244,7 +244,7 @@ sqac mcp setup --host <cli>         # wire memory into your agent
 
 ## Status
 
-- **Version:** 1.3.0 — 535 tests passing
+- **Version:** 1.3.1 - 535 tests passing
 - **Repository:** https://github.com/sensesVoid/sqac
 - **Issues:** https://github.com/sensesVoid/sqac/issues
 
