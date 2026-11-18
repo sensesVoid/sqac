@@ -5,12 +5,12 @@
     python -m sqac.cli serve --dir ./memory --port 8420 --api-key sk-xxx
 """
 from __future__ import annotations
-import argparse, base64, hmac, html, io, os, re, tarfile, threading, time
+import argparse, base64, hmac, html, io, json, os, re, tarfile, threading, time
 from collections import Counter, deque
 from pathlib import Path
 from typing import Optional
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from .format import compact_cartridge, read_cartridge, _HAS_LZ4
@@ -19,6 +19,7 @@ from ._version import __version__
 from .rack import CartridgeRack
 from .offloader import ContextOffloader
 import sqac.agent as _agent_mod
+from . import events as _events
 
 # Load the graph visualization HTML at import time
 _GRAPH_HTML_PATH = Path(__file__).parent / "graph_view.html"
@@ -300,6 +301,8 @@ def teach(req: TeachRequest, _=Depends(_verify_key)):
                 raise HTTPException(403, f"cartridge outside scope: {target!r}")
             r.write_routed(req.content, key=req.key, source=req.source, kind=req.kind)
             r.save()
+            _events.emit("mem_write", key=req.key, kind=req.kind,
+                         cartridge=target, source="http")
         with _metrics_lock:
             _teach_count += 1
         entries = len(r._require(target)) if target in r else 0
@@ -311,6 +314,8 @@ def teach(req: TeachRequest, _=Depends(_verify_key)):
     with _teach_lock_for(name):
         store.add(req.content, key=req.key, source=req.source, kind=req.kind)
         store.save(path)
+    _events.emit("mem_write", key=req.key, kind=req.kind,
+                 cartridge=name, source="http")
     with _metrics_lock:
         _teach_count += 1
     return {"ok": True, "entries": len(store), "path": str(path)}
@@ -382,6 +387,8 @@ def rack_write(req: RackWriteRequest, _=Depends(_verify_key)):
         if not _in_scope(target):
             raise HTTPException(403, f"cartridge outside scope: {target!r}")
     r.write_routed(req.content, key=req.key, source=req.source, kind=req.kind); r.save()
+    _events.emit("mem_write", key=req.key, kind=req.kind,
+                 cartridge=r.last_written, source="http")
     return {"ok": True, "cartridges": r.names()}
 
 @app.post("/session/observe")
@@ -873,6 +880,7 @@ def capabilities(_=Depends(_verify_key)):
     return {
         "writable": not _readonly,
         "agents": True,
+        "events": True,
         "rack": _state.get("rack") is not None,
         "session": _state.get("offloader") is not None,
         "readonly": _readonly,
@@ -889,6 +897,7 @@ def version():
         "features": [
             "rack", "agents", "session", "metrics", "dashboard",
             "cartridge-export-import", "readonly", "scope", "capabilities",
+            "events",
         ],
     }
 
@@ -917,10 +926,12 @@ def describe(_=Depends(_verify_key)):
                     "GET /session/stats", "POST /session/graduate",
                     "POST /session/forget"],
         "cartridges": ["POST /cartridges/{name}/export", "POST /cartridges/{name}/import"],
+        "events": ["GET /events"],
         "notes": [
             "vault never crosses HTTP; agent secrets stay refs",
             "scope (SQAC_SCOPE) applies to cartridges, not agents",
             "missing capability -> 501 with reason (never a bare 404)",
+            "events: SSE GET /events (metadata only, never content/secrets); SQAC_WEBHOOK_URL POSTs the same events",
         ],
     }
 
@@ -1136,6 +1147,8 @@ def session_graduate(req: SessionGraduateRequest, _=Depends(_verify_key)):
     report = r.graduate(o, target_name=target, threshold=req.threshold)
     r.save()
     o.save()
+    _events.emit("mem_graduate", target=target, promoted=report.get("promoted", 0),
+                 threshold=req.threshold, source="http")
     target = req.target_cartridge or r.default or "facts"
     return {"ok": True, "target": target, **(report if isinstance(report, dict) else {"report": report})}
 
@@ -1169,6 +1182,37 @@ def session_forget(req: SessionForgetRequest, _=Depends(_verify_key)):
             "remaining_turns": sum(1 for e in store._entries
                                     if not e.get("deleted") and e.get("kind") == KIND_TURN)}
 
+
+
+# ── events (SSE + webhook, deliverable proposal 3) ────────────────────
+
+@app.get("/events")
+def events_stream(once: bool = False, _=Depends(_verify_key)):
+    """Server-Sent Events stream of memory operations.
+
+    Emits mem_write / mem_graduate / mem_swap / mem_checkpoint and their HTTP
+    analogs, metadata only (no content, never secrets). ``once=true`` sends
+    the backlog and closes (useful for probes).
+    """
+    def _gen():
+        q = _events.subscribe()
+        try:
+            yield "retry: 3000\n\n"
+            for evt in _events.backlog():
+                yield f"event: {evt.get('event')}\ndata: {json.dumps(evt, default=str)}\n\n"
+            if once:
+                return
+            while True:
+                try:
+                    evt = q.get(timeout=15)
+                except Exception:
+                    yield ": keepalive\n\n"
+                    continue
+                yield f"event: {evt.get('event')}\ndata: {json.dumps(evt, default=str)}\n\n"
+        finally:
+            _events.unsubscribe(q)
+
+    return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
 if __name__ == "__main__":

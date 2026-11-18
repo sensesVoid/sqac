@@ -39,6 +39,7 @@ from sqac.continuity import (
 from sqac.dms import DMS
 from sqac.rack import CartridgeRack
 from sqac.offloader import ContextOffloader
+from sqac import events
 from sqac.graph_mcp import register_graph_tools
 from sqac.vault_mcp import register_vault_tools
 from sqac.agent_mcp import register_agent_tools
@@ -289,6 +290,8 @@ def mem_checkpoint(
         host_name = detect_host(host)
         rec = st.continuity.checkpoint(proj, host=host_name, goal=goal, summary=summary)
         st.continuity.save()
+        events.emit("mem_checkpoint", project=proj, goal=goal, host=host_name,
+                    source="mcp")
         return _ok(
             {
                 "project": proj,
@@ -578,6 +581,8 @@ def mem_write(
             st.rack.save([written])
         else:
             st.rack.save()
+        events.emit("mem_write", key=key, kind=kind,
+                    cartridge=cartridge or written, source="mcp")
         return _ok(
             {
                 "written": True,
@@ -625,6 +630,8 @@ def mem_graduate(
         )
         st.rack.save()
         st.session.save()
+        events.emit("mem_graduate", target=target, promoted=report.get("promoted", 0),
+                    threshold=threshold, source="mcp")
         return _ok(
             {
                 "target": target,
@@ -671,6 +678,8 @@ def mem_swap(
             st.cfg.dir / "session.sqac", window=8, semantic=st.cfg.semantic,
             dms=DMS(budget=SESSION_BUDGET),
         )
+        events.emit("mem_swap", archived=name, archive_file=str(archive_file),
+                    source="mcp")
         return _ok(
             {"archived": name, "archive_file": str(archive_file), "session_reset": True}
         )
