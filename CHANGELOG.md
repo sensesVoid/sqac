@@ -1,6 +1,14 @@
 # Changelog
 
-## [1.3.0] — Unreleased (tagged on release)
+## [1.3.1] — Unreleased (tagged on release)
+
+### Wheels
+- Expanded wheel matrix to include native **Linux aarch64** wheels (Ubuntu 24.04 ARM) alongside `x86_64` and Windows. macOS users install from the sdist (pure Python + optional Rust acceleration).
+
+### Changed
+- Bumped `actions/checkout` 4 → 7 across CI and wheel workflows (supersedes dependabot #4).
+
+## [1.3.0] — 2026-11-19
 
 ### HTTP parity (`sqac.server`)
 - **Agent cartridges over HTTP** (Tier 1A): `GET /agents`, `GET/POST/PUT/DELETE /agents/{name}`. Metadata is read header-only — encrypted (SQAE) agents expose name + `encrypted` flag only, never their contents. `POST /agents` runs `create_agent` (schema-v2 binding); `PUT` applies partial binding updates (`set_binding`); `DELETE` tombstones to `agents/.trash/` (default) or unlinks with `?hard=true`. Agent names are slug-validated and traversal-proof.
