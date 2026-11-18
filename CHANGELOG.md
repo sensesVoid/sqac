@@ -12,6 +12,11 @@
 - **Cartridge lifecycle** (Tier 2F): `POST /cartridges/{name}/export` → base64 tar.gz of the single `.sqac`; `POST /cartridges/{name}/import` → counterpart with traversal guard, 50 MB cap, and an `overwrite=true` guard; rack-aware paths (folder-routed cartridges export correctly).
 - **System endpoints** (Tier 2H): `GET /version` (semver + feature flags) and `GET /describe` (machine-readable route index).
 
+### Events (SSE + webhook)
+- New **`GET /events`** Server-Sent Events stream on the HTTP server: `mem_write` / `mem_graduate` / `mem_swap` / `mem_checkpoint` (and their HTTP analogs: `/teach`, `/rack/write`, `/session/graduate`) emit **metadata-only** events (never content, never secret values) with an `event:` name and monotonic `seq`. `?once=true` sends the bounded backlog (256 events) and closes — good for probes.
+- **Webhooks**: `SQAC_WEBHOOK_URL` (or `SQAC_WEBHOOK`) — every event is POSTed as JSON, best-effort with a 3 s timeout; failures never propagate into write paths.
+- Event bus lives in `sqac/events.py` so both the MCP layer (`mem_*`) and the HTTP server emit identically; sandboxed read-only agents can subscribe (`/events` is GET).
+
 ### Fixed
 - **Pre-existing**: `GET /stats`/`POST /teach` (and any default-cartridge call) returned **404** when `memory.sqac` was empty — `SqacStore` implements `__len__`, so an empty store was falsy under `if s:`.
 - The HTTP server mounted the rack with **no routes**, so `rack/search` and kind-routed writes could never resolve kinds; it now mirrors sqac_mcp exactly (`routes`, `default="facts"`, `auto_load`, `folder_routing`, session bucket excluded by the rack itself).
