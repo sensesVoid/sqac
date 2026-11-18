@@ -41,7 +41,8 @@ NGRAM = 3  # character n-gram size
 class BSCEncoder:
     """Deterministic text -> D-bit BSC hypervector encoder."""
 
-    def __init__(self, dims: int = DEFAULT_DIMS, seed: str = "sqac-v1", ngram: int = NGRAM):
+    def __init__(self, dims: int = DEFAULT_DIMS, seed: str = "sqac-v1", ngram: int = NGRAM,
+                 normalizer=None):
         if dims % 8 != 0:
             raise ValueError("dims must be a multiple of 8")
         if dims < 64:
@@ -49,6 +50,7 @@ class BSCEncoder:
         self.dims = dims
         self.seed = seed
         self.ngram = ngram
+        self.normalizer = normalizer
         self._atom_cache: dict[str, bytes] = {}
 
     # ── atom hypervectors ────────────────────────────────────────────────
@@ -160,6 +162,8 @@ class BSCEncoder:
         Order-free bundling is the FissFus Exp C "fusion only" variant and
         was the right operating point for retrieval at this scale.
         """
+        if self.normalizer is not None:
+            text = self.normalizer(text)
         text = f"  {text.strip().lower()}  "  # pad so word edges form grams
         if not text.strip():
             return bytes(self.dims // 8)
