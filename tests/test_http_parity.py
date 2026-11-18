@@ -224,5 +224,104 @@ class TestSessionLifecycle(_Base):
         self.assertEqual(r.json()["remaining_turns"], 0)
 
 
+class TestTier2(_Base):
+    def test_export_import_roundtrip(self):
+        d = _reset(self.tmpdir, rack=False)
+        self.client.post("/teach", headers=self._h(), json={
+            "content": "deploy ARM64 first", "key": "deploy-arch"})
+        r = self.client.post("/cartridges/memory/export", headers=self._h())
+        self.assertEqual(r.status_code, 200)
+        blob = r.json()["archive_b64"]
+        self.assertTrue(blob)
+        # wipe the flat cartridge, import, verify content is back
+        (d / "memory.sqac").unlink()
+        r = self.client.post("/cartridges/memory/import", headers=self._h(),
+                             json={"archive_b64": blob})
+        self.assertEqual(r.status_code, 200)
+        r = self.client.post("/search", headers=self._h(), json={
+            "query": "deploy arch", "top_k": 1})
+        self.assertIn("ARM64", r.json()["hits"][0]["content"])
+
+    def test_export_folder_routed_cartridge(self):
+        _reset(self.tmpdir)  # rack: folder routing on
+        self.client.post("/teach", headers=self._h(), json={
+            "content": "deploy ARM64 first", "key": "deploy-arch", "kind": "fact"})
+        r = self.client.post("/cartridges/facts/export", headers=self._h())
+        # facts lives at facts/facts.sqac; the resolver must find it
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["archive_b64"])
+
+    def test_import_requires_overwrite(self):
+        _reset(self.tmpdir, rack=False)
+        self.client.post("/teach", headers=self._h(), json={
+            "content": "x", "key": "k"})
+        r = self.client.post("/cartridges/memory/export", headers=self._h())
+        blob = r.json()["archive_b64"]
+        r = self.client.post("/cartridges/memory/import", headers=self._h(),
+                             json={"archive_b64": blob})
+        self.assertEqual(r.status_code, 409)
+        r = self.client.post("/cartridges/memory/import", headers=self._h(),
+                             json={"archive_b64": blob, "overwrite": True})
+        self.assertEqual(r.status_code, 200)
+
+    def test_readonly_blocks_mutations(self):
+        _reset(self.tmpdir, rack=False)
+        srv._readonly = True
+        try:
+            r = self.client.post("/teach", headers=self._h(), json={
+                "content": "x", "key": "k"})
+            self.assertEqual(r.status_code, 403)
+            r = self.client.get("/stats", headers=self._h())
+            self.assertEqual(r.status_code, 200)
+        finally:
+            srv._readonly = False
+
+    def test_scope_blocks_out_of_scope_cartridge(self):
+        d = _reset(self.tmpdir)
+        srv._scope = ["facts"]
+        try:
+            # facts-in-scope write is fine
+            r = self.client.post("/teach", headers=self._h(), json={
+                "content": "deploy ARM64 first", "key": "k", "kind": "fact"})
+            self.assertEqual(r.status_code, 200)
+            # default memory cartridge is out of scope -> 403
+            r = self.client.post("/teach", headers=self._h(), json={
+                "content": "x", "key": "k"})
+            self.assertEqual(r.status_code, 403)
+            # unscoped default /stats is also out of scope -> 403
+            r = self.client.get("/stats", headers=self._h())
+            self.assertEqual(r.status_code, 403)
+            # but the scoped cartridge reads fine
+            r = self.client.get("/stats?cartridge=facts", headers=self._h())
+            self.assertEqual(r.status_code, 200)
+        finally:
+            srv._scope = []
+
+    def test_capabilities_version_describe(self):
+        _reset(self.tmpdir, rack=False)
+        r = self.client.get("/capabilities", headers=self._h())
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["writable"])
+        self.assertEqual(r.json()["scope"], [])
+
+        srv._readonly = True
+        try:
+            r = self.client.get("/capabilities", headers=self._h())
+            self.assertFalse(r.json()["writable"])
+            self.assertTrue(r.json()["readonly"])
+        finally:
+            srv._readonly = False
+
+        from sqac._version import __version__
+        r = self.client.get("/version")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["version"], __version__)
+
+        r = self.client.get("/describe", headers=self._h())
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("/agents", r.json()["routes"].get("GET", []))
+        self.assertIn("/rack/search", r.json()["routes"].get("POST", []))
+
+
 if __name__ == "__main__":
     unittest.main()

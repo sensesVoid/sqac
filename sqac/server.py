@@ -5,12 +5,12 @@
     python -m sqac.cli serve --dir ./memory --port 8420 --api-key sk-xxx
 """
 from __future__ import annotations
-import argparse, hmac, html, os, re, threading, time
+import argparse, base64, hmac, html, io, os, re, tarfile, threading, time
 from collections import Counter, deque
 from pathlib import Path
 from typing import Optional
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from .format import compact_cartridge, read_cartridge, _HAS_LZ4
@@ -27,6 +27,10 @@ _GRAPH_HTML = _GRAPH_HTML_PATH.read_text(encoding="utf-8") if _GRAPH_HTML_PATH.e
 _api_key = os.environ.get("SQAC_API_KEY", "")
 SESSION_FLUSH_TURNS = int(os.environ.get("SQAC_SESSION_FLUSH_TURNS", "10"))
 SESSION_FLUSH_SECS = float(os.environ.get("SQAC_SESSION_FLUSH_SECS", "60"))
+# Tier 2 auth tiers: --readonly makes every route GET/HEAD/OPTIONS -> 403 otherwise;
+# SQAC_SCOPE (comma-separated stems) restricts cartridge-scoped calls to those stems.
+_readonly = os.environ.get("SQAC_READONLY", "").lower() in ("1", "true", "yes")
+_scope = [s.strip() for s in os.environ.get("SQAC_SCOPE", "").split(",") if s.strip()]
 AGENT_ENCRYPTED_MAGIC = b"SQAE"
 # Mirror sqac_mcp.DEFAULT_ROUTES (kept local so the HTTP server never imports the MCP layer)
 _RACK_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
@@ -72,6 +76,8 @@ def _cartridge_path(name: str) -> Path:
     path = (base / f"{name}.sqac").resolve()
     if base not in path.parents:
         raise HTTPException(400, f"invalid cartridge name: {name!r}")
+    if not _in_scope(name):
+        raise HTTPException(403, f"cartridge outside scope: {name!r}")
     return path
 
 # ── agent cartridge helpers (HTTP parity, v1.3) ─────────────────────────
@@ -128,6 +134,22 @@ def _agent_meta(path: Path) -> dict:
 
 VALID_SYNC_POLICIES = {"write_through", "never", "local_only"}
 
+
+def _in_scope(name: str) -> bool:
+    if not _scope:
+        return True
+    return name in _scope or any(
+        name.startswith(s + "__") or name.startswith(s + "-") for s in _scope)
+
+
+def _scope_cartridges(r):
+    """Mounted stems authorized by SQAC_SCOPE (incl. shard/folder artifacts)."""
+    if not _scope:
+        return None
+    return [n for n in r.names()
+            if any(n == s or n.startswith(s + "__") or n.startswith(s + "-")
+                   for s in _scope)]
+
 # Module-level state: lazily initialized on first request from env vars
 _state: dict = {}
 
@@ -159,7 +181,11 @@ def _get_store(name: Optional[str] = None) -> SqacStore:
     _ensure_state()
     if name == "session" and _state.get("offloader"):
         return _state["offloader"]._store
+    if _scope and name is None and not _in_scope("memory"):
+        raise HTTPException(403, "default cartridge outside scope")
     if _state.get("rack") and name:
+        if not _in_scope(name):
+            raise HTTPException(403, f"cartridge outside scope: {name!r}")
         return _state["rack"][name]
     s = _state.get("default_store")
     if s is not None:          # stores are __len__-able: an EMPTY store is falsy
@@ -206,9 +232,19 @@ class AgentUpdateRequest(BaseModel):
 class SessionForgetRequest(BaseModel):
     n: Optional[int] = Field(None, ge=1)
     all_turns: bool = False
+class CartridgeImportRequest(BaseModel):
+    archive_b64: str
+    overwrite: bool = False
 class SessionGraduateRequest(BaseModel):
     target_cartridge: Optional[str] = None
     threshold: float = Field(0.40, ge=0.0, le=1.0)
+
+@app.middleware("http")
+async def _readonly_guard(request: Request, call_next):
+    if _readonly and request.method not in ("GET", "HEAD", "OPTIONS"):
+        return JSONResponse({"detail": "server is read-only"}, status_code=403)
+    return await call_next(request)
+
 
 @app.middleware("http")
 async def _track_metrics(request: Request, call_next):
@@ -255,20 +291,22 @@ def search_endpoint(req: SearchRequest, _=Depends(_verify_key)):
 def teach(req: TeachRequest, _=Depends(_verify_key)):
     global _teach_count
     _ensure_state()
-    name = req.cartridge or "memory"
-    path = _cartridge_path(name)
     r = _state.get("rack")
     if r and req.cartridge is None and req.kind:
         # kind-aware teach: route into the rack (fact->facts, skill->skills, doc->docs)
         with _teach_lock_for("__rack__"):
             target = r._target_for(req.kind)
+            if not _in_scope(target):
+                raise HTTPException(403, f"cartridge outside scope: {target!r}")
             r.write_routed(req.content, key=req.key, source=req.source, kind=req.kind)
             r.save()
         with _metrics_lock:
             _teach_count += 1
         entries = len(r._require(target)) if target in r else 0
         return {"ok": True, "written": target, "cartridge": target,
-                "entries": entries, "path": str(_cartridge_path(target))}
+                "entries": entries, "path": str(_cartridge_resolve(target))}
+    name = req.cartridge or "memory"
+    path = _cartridge_path(name)
     store = _get_store(req.cartridge)
     with _teach_lock_for(name):
         store.add(req.content, key=req.key, source=req.source, kind=req.kind)
@@ -292,7 +330,14 @@ def compact_endpoint(req: CompactRequest, _=Depends(_verify_key)):
 def list_cartridges(_=Depends(_verify_key)):
     _ensure_state()
     r = _state.get("rack"); d = _state["dir"]
-    return {"cartridges": r.names() if r else sorted(p.stem for p in d.glob("*.sqac")), "rack": str(d) if r else None}
+    if r:
+        names = _scope_cartridges(r) if _scope else r.names()
+    else:
+        names = [p.stem for p in d.glob("*.sqac")]
+        if _scope:
+            names = [n for n in names if _in_scope(n)]
+        names = sorted(names)
+    return {"cartridges": names, "rack": str(d) if r else None}
 
 def _enriched_hit(h):
     """HitResponse fields plus the v1.3 HTTP-parity surface:
@@ -322,15 +367,20 @@ def rack_search(req: SearchRequest, _=Depends(_verify_key)):
     _ensure_state()
     r = _state.get("rack")
     if not r: raise HTTPException(400, "no rack mounted")
-    hits = r.search(req.query, top_k=req.top_k, kind=req.kind)
+    hits = r.search(req.query, top_k=req.top_k, kind=req.kind,
+                    cartridges=_scope_cartridges(r))
     out = [_enriched_hit(h) for h in hits]
-    return {"hits": out, "count": len(out), "searched": _searched(r, None)}
+    return {"hits": out, "count": len(out), "searched": _searched(r, _scope_cartridges(r))}
 
 @app.post("/rack/write")
 def rack_write(req: RackWriteRequest, _=Depends(_verify_key)):
     _ensure_state()
     r = _state.get("rack")
     if not r: raise HTTPException(400, "no rack mounted")
+    if _scope:
+        target = r._target_for(req.kind)
+        if not _in_scope(target):
+            raise HTTPException(403, f"cartridge outside scope: {target!r}")
     r.write_routed(req.content, key=req.key, source=req.source, kind=req.kind); r.save()
     return {"ok": True, "cartridges": r.names()}
 
@@ -709,7 +759,7 @@ footer{{margin-top:24px;padding-top:12px;border-top:1px solid #21263d;color:#484
 
 
 def main(argv: list[str] | None = None) -> int:
-    global _api_key
+    global _api_key, _readonly, _scope
     ap = argparse.ArgumentParser(prog="sqac.server")
     ap.add_argument("--dir", default=None, help="cartridge directory (default: env SQAC_DIR or .)")
     ap.add_argument("--port", type=int, default=8420)
@@ -717,6 +767,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--api-key", default=None)
     ap.add_argument("--rack", action="store_true")
     ap.add_argument("--session", default=None)
+    ap.add_argument("--readonly", action="store_true",
+                    help="read-only mode: every mutation returns 403")
+    ap.add_argument("--scope", default=None,
+                    help="comma-separated allowed cartridge stems (env SQAC_SCOPE)")
     args = ap.parse_args(argv)
     # Only override env vars when explicitly provided via CLI
     if args.dir is not None:
@@ -729,10 +783,149 @@ def main(argv: list[str] | None = None) -> int:
         _api_key = args.api_key
     elif not os.environ.get("SQAC_API_KEY"):
         _api_key = ""  # no key required if neither CLI nor env
+    if args.readonly:
+        os.environ["SQAC_READONLY"] = "1"
+        _readonly = True
+    if args.scope:
+        os.environ["SQAC_SCOPE"] = args.scope
+        _scope = [s.strip() for s in args.scope.split(",") if s.strip()]
     d = Path(os.environ.get("SQAC_DIR", ".")).resolve()
     print(f"SQAC server on {args.host}:{args.port} | dir={d} | SIMD={_HAS_SIMD} | LZ4={_HAS_LZ4}")
     import uvicorn; uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     return 0
+
+# ── cartridge export/import (Tier 2F) ────────────────────────────────
+
+_MAX_IMPORT_BYTES = 50 * 1024 * 1024  # 50 MB decoded cap
+
+
+def _cartridge_resolve(name: str) -> Path:
+    """Where a named cartridge actually lives: rack path when mounted,
+    else the flat directory path. Scope/traversal checks included."""
+    p = _cartridge_path(name)  # traversal + scope checks
+    r = _state.get("rack") if _state else None
+    if r is not None and name in r:
+        rp = r._paths.get(name)
+        if rp:
+            cand = Path(rp)
+            if cand.exists():
+                return cand
+    return p
+
+
+@app.post("/cartridges/{name}/export")
+def cartridge_export(name: str, _=Depends(_verify_key)):
+    p = _cartridge_resolve(name)
+    if not p.exists():
+        raise HTTPException(404, f"cartridge not found: {name}")
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+        tf.add(str(p), arcname=p.name)
+    return {"ok": True, "cartridge": name, "bytes": p.stat().st_size,
+            "archive_b64": base64.b64encode(buf.getvalue()).decode("ascii")}
+
+
+@app.post("/cartridges/{name}/import")
+def cartridge_import(name: str, req: CartridgeImportRequest, _=Depends(_verify_key)):
+    p = _cartridge_resolve(name)
+    if p.exists() and not req.overwrite:
+        raise HTTPException(409, f"cartridge exists: {name} (use overwrite=true)")
+    try:
+        data = base64.b64decode(req.archive_b64, validate=True)
+    except Exception:
+        raise HTTPException(400, "archive_b64 is not valid base64")
+    if len(data) > _MAX_IMPORT_BYTES:
+        raise HTTPException(413, f"archive exceeds {_MAX_IMPORT_BYTES} bytes")
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tf:
+            members = tf.getmembers()
+            for m in members:
+                if ".." in m.name or m.name.startswith("/") or m.name.startswith("\\"):
+                    raise HTTPException(400, f"path traversal in archive: {m.name!r}")
+            sqac = [m for m in members if m.name.endswith(".sqac") and m.isfile()]
+            if not sqac:
+                raise HTTPException(400, "archive contains no .sqac cartridge")
+            payload = tf.extractfile(sqac[0]).read()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(400, f"invalid archive: {exc}")
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(payload)
+    # Resync mounted views so the import is visible without a restart
+    if _state:
+        d = _state["dir"]
+        if name == "memory":
+            try:
+                _state["default_store"] = SqacStore.load(p)
+            except Exception:
+                pass
+        if _state.get("rack") is not None:
+            _state["rack"] = _make_rack(d)
+    return {"ok": True, "cartridge": name, "bytes": len(payload)}
+
+
+# ── capabilities / version / describe (Tier 2G + 2H) ───────────────────
+
+@app.get("/capabilities")
+def capabilities(_=Depends(_verify_key)):
+    _ensure_state()
+    return {
+        "writable": not _readonly,
+        "agents": True,
+        "rack": _state.get("rack") is not None,
+        "session": _state.get("offloader") is not None,
+        "readonly": _readonly,
+        "scope": list(_scope),
+    }
+
+
+@app.get("/version")
+def version():
+    import platform
+    return {
+        "version": __version__,
+        "python": platform.python_version(),
+        "features": [
+            "rack", "agents", "session", "metrics", "dashboard",
+            "cartridge-export-import", "readonly", "scope", "capabilities",
+        ],
+    }
+
+
+@app.get("/describe")
+def describe(_=Depends(_verify_key)):
+    routes: dict[str, set] = {}
+    for r in app.routes:
+        methods = getattr(r, "methods", None) or set()
+        for m in methods:
+            if m in ("HEAD", "OPTIONS"):
+                continue
+            routes.setdefault(m, set()).add(getattr(r, "path", ""))
+    return {
+        "name": "sqac-server",
+        "version": __version__,
+        "auth": "x-api-key header (enables with --api-key or SQAC_API_KEY)",
+        "readonly": _readonly,
+        "scope": list(_scope),
+        "routes": {m: sorted(p for p in paths if p) for m, paths in routes.items()},
+        "agent_crud": ["GET /agents", "POST /agents", "GET /agents/{name}",
+                       "PUT /agents/{name}", "DELETE /agents/{name}"],
+        "rack": ["GET /rack", "GET /rack/capabilities", "POST /reload",
+                 "POST /rack/search", "POST /rack/trace", "POST /rack/write"],
+        "session": ["POST /session/observe", "POST /session/recall",
+                    "GET /session/stats", "POST /session/graduate",
+                    "POST /session/forget"],
+        "cartridges": ["POST /cartridges/{name}/export", "POST /cartridges/{name}/import"],
+        "notes": [
+            "vault never crosses HTTP; agent secrets stay refs",
+            "scope (SQAC_SCOPE) applies to cartridges, not agents",
+            "missing capability -> 501 with reason (never a bare 404)",
+        ],
+    }
+
+
+
 
 # ── agents (HTTP parity, Tier 1A) ───────────────────────────────────
 
@@ -843,7 +1036,8 @@ def rack_state(_=Depends(_verify_key)):
     if not r:
         raise HTTPException(400, "no rack mounted")
     mounted = []
-    for n in r.names():
+    names = _scope_cartridges(r) if _scope else r.names()
+    for n in names:
         s = r.stats(n)
         entries = s.get("entries", 0)
         mounted.append({
@@ -898,14 +1092,15 @@ def rack_trace(req: SearchRequest, _=Depends(_verify_key)):
     r = _state.get("rack")
     if not r:
         raise HTTPException(400, "no rack mounted")
-    hits = r.search(req.query, top_k=req.top_k, kind=req.kind)
+    hits = r.search(req.query, top_k=req.top_k, kind=req.kind,
+                    cartridges=_scope_cartridges(r))
     out = []
     for h in hits:
         hit = _enriched_hit(h)
         hit["tier"] = h.mode
         hit["latency_ms"] = h.meta.get("latency_ms")
         out.append(hit)
-    return {"hits": out, "count": len(out), "searched": _searched(r, None)}
+    return {"hits": out, "count": len(out), "searched": _searched(r, _scope_cartridges(r))}
 
 
 # ── session lifecycle (Tier 1E) ──────────────────────────────────────

@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.3.0] — Unreleased (tagged on release)
+
+### HTTP parity (`sqac.server`)
+- **Agent cartridges over HTTP** (Tier 1A): `GET /agents`, `GET/POST/PUT/DELETE /agents/{name}`. Metadata is read header-only — encrypted (SQAE) agents expose name + `encrypted` flag only, never their contents. `POST /agents` runs `create_agent` (schema-v2 binding); `PUT` applies partial binding updates (`set_binding`); `DELETE` tombstones to `agents/.trash/` (default) or unlinks with `?hard=true`. Agent names are slug-validated and traversal-proof.
+- **Rack introspection + reload** (Tier 1B): `GET /rack` (mounted stems with entries/kinds/percent_full/max_entries), `GET /rack/capabilities`, `POST /reload` (re-reads the rack dir without restart).
+- **Kind-aware `/teach`** (Tier 1C): with a rack mounted and `kind` set, writes route by kind (`fact`→`facts`, `doc`→`docs`, `skill`→`skills`); otherwise default-memory behavior is preserved.
+- **Rack search parity** (Tier 1D): `POST /rack/search` hits now carry `cartridge`/`key`/`kind` at top level plus a top-level `searched` list; new `POST /rack/trace` adds explicit `tier` (`exact`|`fuzzy`|`semantic`) and `latency_ms`. `store._hit` meta gains `key_norm`.
+- **Session lifecycle** (Tier 1E): `GET /session/stats` (entries, offloaded exchanges, turns, live buffer, window, kinds), `POST /session/graduate` (auto-creates the target like `write_routed`), `POST /session/forget` (n oldest or all turns; tombstones only, never writes elsewhere; clears the live buffer on `all_turns`). `POST /session/observe` now debounces saves like the MCP layer (`SQAC_SESSION_FLUSH_TURNS`/`SECS`).
+- **Auth tiers** (Tier 2G): `--readonly`/`SQAC_READONLY=1` makes every non-GET/HEAD/OPTIONS route return 403; `--scope`/`SQAC_SCOPE=stems` restricts cartridge-scoped calls to the allowed stems (prefix match covers shards and folder artifacts) — search, stats, writes, listings, and exports/imports are all scoped, fail-closed. New `GET /capabilities` reports the active mode.
+- **Cartridge lifecycle** (Tier 2F): `POST /cartridges/{name}/export` → base64 tar.gz of the single `.sqac`; `POST /cartridges/{name}/import` → counterpart with traversal guard, 50 MB cap, and an `overwrite=true` guard; rack-aware paths (folder-routed cartridges export correctly).
+- **System endpoints** (Tier 2H): `GET /version` (semver + feature flags) and `GET /describe` (machine-readable route index).
+
+### Fixed
+- **Pre-existing**: `GET /stats`/`POST /teach` (and any default-cartridge call) returned **404** when `memory.sqac` was empty — `SqacStore` implements `__len__`, so an empty store was falsy under `if s:`.
+- The HTTP server mounted the rack with **no routes**, so `rack/search` and kind-routed writes could never resolve kinds; it now mirrors sqac_mcp exactly (`routes`, `default="facts"`, `auto_load`, `folder_routing`, session bucket excluded by the rack itself).
+
+### Notes
+- `POST /rack/search` and `/rack/trace` accept an optional `cartridges` scoping via `SQAC_SCOPE`; `/agents` is out of scope by design (documented in `/describe` as applying to cartridges, not agents).
+- Deliverable record stored in SQAC at key `proposal:http-parity` (kind `doc`, source `maintainer-proposal`).
+
 ## [1.2.2] — 2026-11-17
 
 ### Performance
