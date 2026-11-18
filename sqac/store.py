@@ -172,8 +172,11 @@ class SqacStore:
         semantic: bool = False,
         semantic_model: Optional[str] = None,
         cache_size: int = DEFAULT_CACHE_SIZE,
+        normalizer=None,
     ):
-        self.encoder = encoder or BSCEncoder(dims=dims)
+        self._normalizer = normalizer
+        self.encoder = encoder or BSCEncoder(dims=dims, normalizer=normalizer)
+        self._norm = normalizer if normalizer is not None else normalize
         self.dims = self.encoder.dims
         self.fuzzy_threshold = fuzzy_threshold
         self.semantic_threshold = semantic_threshold
@@ -292,7 +295,7 @@ class SqacStore:
             inj = InjectionResult(risk=RiskLevel.SAFE, score=0.0, patterns=[], recommendation="skipped")
 
         key_text = sanitize_key(key) if key is not None else content
-        norm = normalize(key_text)
+        norm = self._norm(key_text)
         self._invalidate_cache()
 
         kind_resolved = resolve_kind(kind)
@@ -393,7 +396,7 @@ class SqacStore:
         tiers run — the exact/lexical/semantic merge is unchanged.
         """
         t0 = time.perf_counter()
-        norm = normalize(query)
+        norm = self._norm(query)
         entries = self._entries
         want_kind: Optional[int] = None
         if kind is not None:
@@ -572,7 +575,8 @@ class SqacStore:
         write_cartridge(path, header, {}, entries)
 
     @classmethod
-    def load(cls, path: str | Path, fuzzy_threshold: float = DEFAULT_FUZZY_THRESHOLD) -> "SqacStore":
+    def load(cls, path: str | Path, fuzzy_threshold: float = DEFAULT_FUZZY_THRESHOLD,
+             normalizer=None) -> "SqacStore":
         """Load a cartridge. Refuses incompatible encoder/fingerprint.
 
         fuzzy_threshold defaults to the same value as the constructor
@@ -582,7 +586,7 @@ class SqacStore:
         cart = read_cartridge(path)
         h = cart.header
         seed, ngram = _parse_encoder_name(h.encoder_name)
-        enc = BSCEncoder(dims=h.dims, seed=seed, ngram=ngram)
+        enc = BSCEncoder(dims=h.dims, seed=seed, ngram=ngram, normalizer=normalizer)
         expected = h.compute_fingerprint({})  # seeded vocab is empty by design
         if h.vocab_fingerprint and h.vocab_fingerprint != expected:
             raise FormatError("vocab fingerprint mismatch: cartridge incompatible")
@@ -591,6 +595,7 @@ class SqacStore:
             dims=h.dims,
             fuzzy_threshold=fuzzy_threshold,
             semantic="|sem-v1:" in h.encoder_name,
+            normalizer=normalizer,
         )
         store._description = h.description
         store.cartridge_type = h.cartridge_type

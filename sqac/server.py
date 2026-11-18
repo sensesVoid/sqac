@@ -20,6 +20,7 @@ from .rack import CartridgeRack
 from .offloader import ContextOffloader
 import sqac.agent as _agent_mod
 from . import events as _events
+from . import textnorm as _textnorm
 
 # Load the graph visualization HTML at import time
 _GRAPH_HTML_PATH = Path(__file__).parent / "graph_view.html"
@@ -42,6 +43,7 @@ def _make_rack(d):
         directory=d, routes=dict(_RACK_ROUTES), default="facts",
         semantic=True, min_confidence=0.60, auto_load=True,
         max_entries=25_000, folder_routing=True,
+        normalizer=_textnorm.from_env(),
     )
 _security = APIKeyHeader(name="X-API-Key", auto_error=False)
 _start_time = time.time()

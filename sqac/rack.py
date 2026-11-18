@@ -278,6 +278,7 @@ class CartridgeRack:
         auto_load: bool = True,
         max_entries: int = DEFAULT_MAX_ENTRIES,
         folder_routing: bool = False,
+        normalizer: Optional[Callable[[str], str]] = None,
     ):
         self.directory = Path(directory) if directory else None
         self.routes: dict[str, str] = dict(routes or {})
@@ -286,6 +287,7 @@ class CartridgeRack:
         self.min_confidence = min_confidence
         self.max_entries = max_entries
         self.folder_routing = folder_routing
+        self._normalizer = normalizer
         self._stores: dict[str, SqacStore] = {}
         self._paths: dict[str, Path] = {}
         # Track all shard paths per base cartridge name for merge-search.
@@ -329,7 +331,7 @@ class CartridgeRack:
         p = self._resolve_path(name, path)
         if not p.exists():
             raise RackError(f"cartridge file not found: {p}")
-        self._stores[name] = SqacStore.load(p, fuzzy_threshold=self.min_confidence)
+        self._stores[name] = SqacStore.load(p, fuzzy_threshold=self.min_confidence, normalizer=self._normalizer)
         self._paths[name] = p
         self._track_shard(name, p)
         return self
@@ -357,7 +359,7 @@ class CartridgeRack:
             if rack_name in self._stores:
                 continue
             try:
-                store = SqacStore.load(p, fuzzy_threshold=self.min_confidence)
+                store = SqacStore.load(p, fuzzy_threshold=self.min_confidence, normalizer=self._normalizer)
                 if getattr(store, "cartridge_type", "memory") in ("vault", "agent"):
                     logging.info("rack: skipping %s (cartridge_type=%s)", p.name, store.cartridge_type)
                     continue
@@ -393,14 +395,15 @@ class CartridgeRack:
             else self._resolve_path(name, None)
         )
         if p.exists() and not overwrite:
-            store = SqacStore.load(p, fuzzy_threshold=self.min_confidence)
+            store = SqacStore.load(p, fuzzy_threshold=self.min_confidence, normalizer=self._normalizer)
             self._stores[name] = store
             self._paths[name] = p
             base = _base_name(p.stem) if _is_shard_name(p.stem) else name
             self._track_shard(base, p)
             return self
         p.parent.mkdir(parents=True, exist_ok=True)
-        store = SqacStore(semantic=self.semantic, fuzzy_threshold=self.min_confidence)
+        store = SqacStore(semantic=self.semantic, fuzzy_threshold=self.min_confidence,
+                          normalizer=self._normalizer)
         store.save(p, name=name, description=description)
         self._stores[name] = store
         self._paths[name] = p
@@ -476,8 +479,8 @@ class CartridgeRack:
         self._shards[name].append(shard_path)
         # 3. Create a fresh empty store for the original name
         new_store = SqacStore(
-            semantic=self.semantic, fuzzy_threshold=self.min_confidence
-        )
+            semantic=self.semantic, fuzzy_threshold=self.min_confidence,
+                normalizer=self._normalizer)
         self._stores[name] = new_store
         # paths[name] stays the same (original path)
         # 4. Register the shard store so search can find it
@@ -767,8 +770,8 @@ class CartridgeRack:
         if base_path is None:
             base_path = self._resolve_path(name, None)
         compacted = SqacStore(
-            semantic=self.semantic, fuzzy_threshold=self.min_confidence
-        )
+            semantic=self.semantic, fuzzy_threshold=self.min_confidence,
+                normalizer=self._normalizer)
         # Replay entries into the fresh store (rebuilds indices)
         for e in merged:
             meta = dict(e.get("meta", {}))
