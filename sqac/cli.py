@@ -73,6 +73,8 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--api-key", default=None, help="API key (or set SQAC_API_KEY)")
     p_serve.add_argument("--rack", action="store_true", help="mount all cartridges as a rack")
     p_serve.add_argument("--session", default=None, help="session bucket for offloader")
+    p_serve.add_argument("--readonly", action="store_true", help="mutations return 403")
+    p_serve.add_argument("--scope", default=None, help="comma-separated allowed cartridge stems")
 
     p_init = sub.add_parser("init", help="auto-build a project cartridge from a directory")
     p_init.add_argument("root", nargs="?", default=".", help="project root (default: .)")
@@ -973,6 +975,10 @@ def main(argv: list[str] | None = None) -> int:
             serve_args.append("--rack")
         if args.session:
             serve_args += ["--session", args.session]
+        if getattr(args, "readonly", False):
+            serve_args.append("--readonly")
+        if getattr(args, "scope", None):
+            serve_args += ["--scope", args.scope]
         return serve_main(serve_args)
 
     elif args.cmd == "dashboard":

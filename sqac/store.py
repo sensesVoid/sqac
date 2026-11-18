@@ -416,6 +416,7 @@ class SqacStore:
                 meta={
                     **e["meta"],
                     "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
+                    "key_norm": e.get("key_norm"),
                     "latency_ms": _ms(time.perf_counter() - t0),
                 },
                 trust=dict(e.get("trust") or {}),
