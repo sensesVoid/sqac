@@ -65,7 +65,7 @@ class TestMemoryWrap(unittest.TestCase):
     def test_memory_is_hydrated_into_system_prompt(self):
         self.wrapped.chat.completions.create(
             model="llama3.1",
-            messages=[{"role": "user", "content": "can we ship x86 images?"}],
+            messages=[{"role": "user", "content": "tell me about deploy ARM64 first please"}],
         )
         msgs = self._called_messages()
         sys = next(m for m in msgs if m["role"] == "system")
@@ -76,7 +76,7 @@ class TestMemoryWrap(unittest.TestCase):
         self.wrapped.chat.completions.create(
             model="llama3.1",
             messages=[{"role": "system", "content": "You are terse."},
-                      {"role": "user", "content": "can we ship x86 images?"}],
+                      {"role": "user", "content": "tell me about deploy ARM64 first please"}],
         )
         sys = next(m for m in self._called_messages() if m["role"] == "system")
         self.assertIn("You are terse.", sys["content"])
