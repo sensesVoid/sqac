@@ -1,6 +1,6 @@
 name: Wheels
 
-on:
+"on":
   workflow_call:
   workflow_dispatch:
   pull_request:
@@ -40,8 +40,15 @@ jobs:
         include:
           - os: ubuntu-latest
             archs: "x86_64"
+          - os: ubuntu-24.04-arm
+            archs: "aarch64"
           - os: windows-latest
             archs: "AMD64"
+          # macOS wheel jobs omitted: no hosted-macOS runner allocation in this
+          # repo (queued for days / cancelled at 0s) and release.yml needs:
+          # wheels would block releases. macOS users install from sdist (pure
+          # Python + optional Rust accel). Re-add macos-13 / macos-14 entries
+          # when runner allocation is confirmed.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v7
