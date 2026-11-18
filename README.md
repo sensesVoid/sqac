@@ -21,6 +21,17 @@ With SQAC:     "Team Atlas maintains the payments service."  (correct, from your
 
 That gap is the entire product: a frozen, never-trained model answered private questions correctly because we handed it a 2.5 KB memory file. Also, unlike your model's training data, you can actually update it.
 
+## What's new in 1.3.0
+
+**HTTP parity** — the MCP surface is now on the wire, plus real-time observability and cartridge portability:
+
+- **`sqac-server` HTTP parity** — agent cartridges (`/agents` CRUD), rack introspection + `/reload`, kind-aware `/teach`, session lifecycle, cartridge export/import, `/capabilities`, `/describe`, `/version`
+- **Auth tiers for sandboxed agents** — `--readonly` (GET-only sandbox), `--scope` cartridge allowlist
+- **Real-time events** — `GET /events` SSE stream + `SQAC_WEBHOOK_URL` webhooks; metadata only, never content or secrets
+- **`sqac export` / `sqac diff`** — serialize any plaintext cartridge to Markdown/JSON; diff two versions (added/removed/updated/reclassified) — review memory changes in git PRs
+- **Multilingual normalization (opt-in)** — `SQAC_NORMALIZE="unicode_fold,stopwords:en,affix:en"` key-tokenizer pipeline (accent folding, stopwords, affix stripping); see [docs/NORMALIZE.md](docs/NORMALIZE.md)
+- **`sqac.integrations`** — drop-in middleware for OpenAI-compatible clients (Ollama, vLLM, LiteLLM, OpenAI): confidence-gated memory hydration + automatic turn recording; see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
+
 ## Install
 
 ```bash
@@ -121,7 +132,7 @@ Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fu
 - **Flat-cost stats at scale** — incremental per-kind counters keep `sqac stats` O(1) regardless of cartridge size; `nlargest` selection instead of full sorts
 - **Atomic, crash-safe saves** — single joined-buffer writer; cartridges only rewrite on explicit saves (or the debounced session flush)
 - **PII & credential guard** — regex + Luhn PII detection and credential-pattern rejection run at write time; every entry carries an injection-risk `trust` score
-- **Kind taxonomy** - `generic | fact | skill | doc | turn`, with auto-routing into typed cartridges
+- **Kind taxonomy** — `generic | fact | skill | doc | turn`, with auto-routing into typed cartridges
 - **Multilingual normalization (opt-in)** — `SQAC_NORMALIZE="unicode_fold,stopwords:en,affix:en"` pipeline in the key tokenizer (accent folding, language stopwords, rule-based affix stripping); see [docs/NORMALIZE.md](docs/NORMALIZE.md)
 - **OpenAI-compatible client middleware (opt-in)** — `from sqac.integrations import wrap` around Ollama/vLLM/LiteLLM/OpenAI clients: memories are auto-hydrated into the system prompt (confidence-gated), turns auto-recorded to the offloader; see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
 
@@ -181,7 +192,17 @@ Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fu
 - `sqac dashboard` — local web dashboard (port 8420, optional API key, rack mount) and `sqac viz` — 3D hyperdimensional memory graph
 - `sqac report "title" -d "..."` — file a GitHub issue with diagnostics attached
 - HTTP API server (`sqac-server`, FastAPI) for self-hosting memory behind your own endpoints
-- 499 tests, CI across numpy fallback + Ubuntu/Windows × Python 3.10–3.13, pip-audit-clean runtime deps, full docs set ([FORMAT](docs/FORMAT.md) · [MCP](docs/MCP.md) · [VAULT](docs/VAULT.md) · [SECRET](docs/SECRET.md) · [CLOUD](docs/CLOUD.md) · [DMS](docs/DMS.md) · [SECURITY](docs/SECURITY.md) · [THESIS](docs/THESIS.md))
+- 535 tests, CI across numpy fallback + Ubuntu/Windows × Python 3.10–3.13, pip-audit-clean runtime deps, full docs set ([FORMAT](docs/FORMAT.md) · [MCP](docs/MCP.md) · [VAULT](docs/VAULT.md) · [SECRET](docs/SECRET.md) · [CLOUD](docs/CLOUD.md) · [DMS](docs/DMS.md) · [SECURITY](docs/SECURITY.md) · [THESIS](docs/THESIS.md))
+
+### HTTP API server (`sqac-server`)
+- **Agent cartridges over HTTP** — `GET /agents`, `GET/POST/PUT/DELETE /agents/{name}`; encrypted (SQAE) agents expose metadata + encrypted flag only, never contents
+- **Rack introspection + reload** — `GET /rack` (mounted stems, entries, kinds, percent full), `GET /rack/capabilities`, `POST /reload` without a restart
+- **Kind-aware `/teach`** — with a rack mounted, `fact`/`doc`/`skill` route to `facts`/`docs`/`skills` automatically
+- **Rack search parity** — hits carry `cartridge`/`key`/`kind`; `POST /rack/trace` adds `tier` (`exact`|`fuzzy`|`semantic`) and `latency_ms`
+- **Session lifecycle over HTTP** — `POST /session/observe`, `POST /session/recall`, `POST /session/graduate`, `GET /session/stats`, `POST /session/forget`
+- **Cartridge export/import** — `POST /cartridges/{name}/export` & `/import`; encrypted payloads refuse; scope/tier aware
+- **Auth tiers** — `--readonly` (GET-only sandbox), `--scope` cartridge allowlist; `/capabilities` self-description; `/describe` onboarding guide; `/version` build info
+- **SSE event stream** — `GET /events` (backlog + live stream; `?once=true` dumps the backlog and closes); `mem_write` / `mem_graduate` / `mem_swap` / `mem_checkpoint`, metadata only — never content, never secrets; `SQAC_WEBHOOK_URL` POSTs the same events; GET route → read-only sandboxes can subscribe
 
 ## The CLI in one glance
 
@@ -198,6 +219,8 @@ sqac graph ...                      # AST code-graph intelligence (init/explore/
 sqac dashboard / sqac viz           # web dashboard / 3D hyperdimensional graph
 sqac compact                        # tombstone garbage collection for a cartridge
 sqac stats                          # memory statistics
+sqac export facts.sqac --format md  # serialize a cartridge (Markdown/JSON; encrypted payloads refuse)
+sqac diff old.sqac new.sqac         # added/removed/updated/reclassified entries between cartridges
 sqac report "bug title" -d "..."    # file a GitHub issue with diagnostics
 sqac mcp setup --host <cli>         # wire memory into your agent
 ```
@@ -220,7 +243,7 @@ sqac mcp setup --host <cli>         # wire memory into your agent
 
 ## Status
 
-- **Version:** 1.3.0 - 499 tests passing
+- **Version:** 1.3.0 — 535 tests passing
 - **Repository:** https://github.com/sensesVoid/sqac
 - **Issues:** https://github.com/sensesVoid/sqac/issues
 

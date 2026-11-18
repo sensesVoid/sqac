@@ -27,6 +27,10 @@
 - **Pre-existing**: `GET /stats`/`POST /teach` (and any default-cartridge call) returned **404** when `memory.sqac` was empty — `SqacStore` implements `__len__`, so an empty store was falsy under `if s:`.
 - The HTTP server mounted the rack with **no routes**, so `rack/search` and kind-routed writes could never resolve kinds; it now mirrors sqac_mcp exactly (`routes`, `default="facts"`, `auto_load`, `folder_routing`, session bucket excluded by the rack itself).
 
+### CLI (`sqac export` / `sqac diff`)
+- **`sqac export <cartridge> [--format md|json] [--out FILE]`** — serialize a plaintext cartridge to human-readable Markdown or JSON (entries, kind, source, key, type, count). Encrypted cartridges (SQAE/SQSE — vault/secret/agent) refuse to export; payloads stay in-process by design. Console-safe output on legacy (cp1252) terminals.
+- **`sqac diff <old.sqac> <new.sqac> [--format md|json]`** — added / removed / updated / **reclassified** (kind-changed) entries between two cartridge versions, matched by `key_norm`. Review memory changes in git PRs; audit agent learning across sessions.
+
 ### Notes
 - `POST /rack/search` and `/rack/trace` accept an optional `cartridges` scoping via `SQAC_SCOPE`; `/agents` is out of scope by design (documented in `/describe` as applying to cartridges, not agents).
 - Deliverable record stored in SQAC at key `proposal:http-parity` (kind `doc`, source `maintainer-proposal`).
