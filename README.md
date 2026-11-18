@@ -177,7 +177,8 @@ Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fu
 
 ### Ops & observability
 - `sqac dashboard` — local web dashboard (port 8420, optional API key, rack mount) and `sqac viz` — 3D hyperdimensional memory graph
-- `sqac report "title" -d "..."` — file a GitHub issue with diagnostics attached
+- `sqac report "title" -d "..."` - file a GitHub issue with diagnostics attached
+- `sqac export <cartridge> [--format md|json]` - serialize a plaintext cartridge to human-readable Markdown/JSON (encrypted vault/secret payloads refuse to export); `sqac diff <old.sqac> <new.sqac> [--format md|json]` - added/removed/updated/reclassified entries between cartridge versions
 - HTTP API server (`sqac-server`, FastAPI) for self-hosting memory behind your own endpoints
 - 485 tests, CI across numpy fallback + Ubuntu/Windows × Python 3.10–3.13, pip-audit-clean runtime deps, full docs set ([FORMAT](docs/FORMAT.md) · [MCP](docs/MCP.md) · [VAULT](docs/VAULT.md) · [SECRET](docs/SECRET.md) · [CLOUD](docs/CLOUD.md) · [DMS](docs/DMS.md) · [SECURITY](docs/SECURITY.md) · [THESIS](docs/THESIS.md))
 
