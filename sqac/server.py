@@ -18,6 +18,7 @@ from .store import SqacStore, _HAS_SIMD
 from ._version import __version__
 from .rack import CartridgeRack
 from .offloader import ContextOffloader
+from .continuity import ContinuityStore
 import sqac.agent as _agent_mod
 from . import events as _events
 from . import textnorm as _textnorm
@@ -29,6 +30,7 @@ _GRAPH_HTML = _GRAPH_HTML_PATH.read_text(encoding="utf-8") if _GRAPH_HTML_PATH.e
 _api_key = os.environ.get("SQAC_API_KEY", "")
 SESSION_FLUSH_TURNS = int(os.environ.get("SQAC_SESSION_FLUSH_TURNS", "10"))
 SESSION_FLUSH_SECS = float(os.environ.get("SQAC_SESSION_FLUSH_SECS", "60"))
+ATTENTION_TURNS = int(os.environ.get("SQAC_ATTENTION_TURNS", "5"))
 # Tier 2 auth tiers: --readonly makes every route GET/HEAD/OPTIONS -> 403 otherwise;
 # SQAC_SCOPE (comma-separated stems) restricts cartridge-scoped calls to those stems.
 _readonly = os.environ.get("SQAC_READONLY", "").lower() in ("1", "true", "yes")
@@ -179,6 +181,9 @@ def _ensure_state():
             if not sp_path.is_absolute():
                 sp_path = d / sp
             _state["offloader"] = ContextOffloader(sp_path)
+        # D2 fix (v1.4.0): server gains the continuity store used by the
+        # attention-block derived fallback and mem_observe analogs.
+        _state["continuity"] = ContinuityStore.load(d / "continuity.json")
 
 def _get_store(name: Optional[str] = None) -> SqacStore:
     _ensure_state()
@@ -405,7 +410,15 @@ def session_observe(req: SessionObserveRequest, _=Depends(_verify_key)):
     xid = o.observe(req.role, req.text)
     if o.should_flush(SESSION_FLUSH_TURNS, SESSION_FLUSH_SECS):
         o.save()
-    return {"ok": True, "exchange_offloaded": xid, "buffer_size": len(o._buffer)}
+    out = {"ok": True, "exchange_offloaded": xid, "buffer_size": len(o._buffer)}
+    if o.attention_due(ATTENTION_TURNS):
+        from .attention import render_block
+        from .tasks import TaskManager
+        tm = TaskManager(_state.get("rack") or CartridgeRack(directory=_state["dir"]))
+        out["attention"] = render_block(o._turn_count,
+                                        [(t["content"], t["mem_id"]) for t in tm.list(status="current")],
+                                        [(t["content"], t["mem_id"]) for t in tm.list(status="pending")])
+    return out
 
 @app.post("/session/recall")
 def session_recall(req: SessionRecallRequest, _=Depends(_verify_key)):
@@ -837,6 +850,26 @@ def get_entry(mem_id: str, _=Depends(_verify_key)):
                     "kind": KIND_NAMES.get(e.get("kind", 0), "generic"),
                     "source": e.get("source", ""), "cartridge": "memory", "meta": dict(e.get("meta") or {})}
     return JSONResponse({"found": False, "mem_id": mem_id}, status_code=404)
+
+
+# ── attention block (v1.4.0) ──────────────────────────────────────────
+
+@app.get("/attention")
+def attention(_=Depends(_verify_key)):
+    """Current attention block: [SQAC attention | turn N] + Current/Pending.
+
+    Always returns the current block (no due-check); see GET /session/observe.
+    """
+    _ensure_state()
+    from .attention import render_block
+    from .tasks import TaskManager
+    off = _state.get("offloader")
+    turn = off._turn_count if off else 0
+    rack = _state.get("rack") or CartridgeRack(directory=_state["dir"])
+    tm = TaskManager(rack)
+    cur = [(t["content"], t["mem_id"]) for t in tm.list(status="current")]
+    pnd = [(t["content"], t["mem_id"]) for t in tm.list(status="pending")]
+    return {"turn": turn, "attention": render_block(turn, cur, pnd)}
 
 
 # ── cartridge export/import (Tier 2F) ────────────────────────────────

@@ -57,6 +57,7 @@ SESSION_BUDGET = 25_000  # DMS budget: capacity sweep sweet spot
 # Set 1 / 0 to restore per-turn atomic saves (v1.2.1 behavior).
 SESSION_FLUSH_TURNS = int(os.environ.get("SQAC_SESSION_FLUSH_TURNS", "10"))
 SESSION_FLUSH_SECS = float(os.environ.get("SQAC_SESSION_FLUSH_SECS", "60"))
+ATTENTION_TURNS = int(os.environ.get("SQAC_ATTENTION_TURNS", "5"))
 
 mcp = MCPServer(
     name=SERVER_NAME,
@@ -127,7 +128,7 @@ class _MemoryState:
             cfg.dir / "session.sqac", window=8, semantic=cfg.semantic,
             dms=DMS(budget=SESSION_BUDGET),
         )
-        self.continuity = ContinuityStore(cfg.dir / "continuity.json")
+        self.continuity = ContinuityStore.load(cfg.dir / "continuity.json")
 
     def save(self) -> None:
         self.rack.save()
@@ -210,6 +211,22 @@ def _recent_exchanges(st, project: str, n: int = 5) -> list[dict[str, Any]]:
         return []
 
 
+def _attention_block(st) -> str:
+    """Render the current attention block for the MCP surface (v1.4.0).
+
+    Empty when there are no current/pending tasks (header only).
+    """
+    from sqac.attention import render_block
+    from sqac.tasks import TaskManager
+    try:
+        tm = TaskManager(st.rack)
+        cur = [(t["content"], t["mem_id"]) for t in tm.list(status="current")]
+        pnd = [(t["content"], t["mem_id"]) for t in tm.list(status="pending")]
+    except Exception:
+        return ""
+    return render_block(st.session._turn_count, cur, pnd)
+
+
 # ── read tools ───────────────────────────────────────────────────────────────
 
 @mcp.tool(
@@ -258,6 +275,7 @@ def mem_bootstrap(
             rack_stats=st.rack.stats(),
             recent=_recent_exchanges(st, proj),
         )
+        packet["attention"] = _attention_block(st)
         st.continuity.touch(proj, host=host_name, model=model)
         st.continuity.save()
         return _ok(packet)
@@ -392,6 +410,10 @@ def _resource_context() -> str:
         lines.append("")
     lines.append(f"Memory: {packet['memory_entries']} long-term entries, "
                  f"{packet['session'].get('entries', 0)} session entries.")
+    attention = _attention_block(st)
+    if attention:
+        lines.append("")
+        lines.append(attention)
     return "\n".join(lines)
 
 @mcp.tool(
@@ -655,15 +677,16 @@ def mem_observe(
         evicted = st.session.observe(role, text)
         if st.session.should_flush(SESSION_FLUSH_TURNS, SESSION_FLUSH_SECS):
             st.session.save()
+        out = {"recorded": True}
+        if st.session.attention_due(ATTENTION_TURNS):
+            out["attention"] = _attention_block(st)
         st.continuity.touch(_project_name(None), host=detect_host(), summary=text[:400])
         st.continuity.save()
-        return _ok(
-            {
-                "recorded": True,
-                "session_entries": st.session.stats().get("entries", 0),
-                "evicted": evicted,
-            }
-        )
+        out.update({
+            "session_entries": st.session.stats().get("entries", 0),
+            "evicted": evicted,
+        })
+        return _ok(out)
     except Exception as e:
         return _err(e)
 

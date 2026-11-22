@@ -74,10 +74,29 @@ class _Completions:
         self._upstream = upstream
         self._rack = rack
         self._offloader = offloader
+        self._turns = 0
+
+    def _attention_due(self) -> bool:
+        self._turns += 1
+        off = self._offloader
+        return bool(self._turns % max(1, self._client.attention_turns) == 0
+                    or off.take_attention_dirty())
+
+    def _render_attention(self) -> str:
+        from .attention import render_block
+        from .tasks import TaskManager
+        tm = TaskManager(self._rack)
+        current = [(t["content"], t["mem_id"]) for t in tm.list(status="current")]
+        pending = [(t["content"], t["mem_id"]) for t in tm.list(status="pending")]
+        return render_block(self._turns, current, pending)
 
     def create(self, model: str, messages: list[dict], **kwargs: Any):
         rack = self._rack
         offloader = self._offloader
+
+        # v1.4.0: attention block refresh (every N turns or task change)
+        if self._attention_due():
+            messages = _augment(messages, self._render_attention())
 
         query = next((m.get("content") or "" for m in reversed(messages)
                       if m.get("role") == "user"), "")
@@ -121,6 +140,7 @@ class SqacClient:
         self.threshold = threshold
         self.top_k = top_k
         self.memory_dir = d
+        self.attention_turns = int(os.environ.get("SQAC_ATTENTION_TURNS", "5"))
         self.rack = _make_rack(d)
         self.offloader = ContextOffloader(
             d / "session.sqac", window=8, semantic=True,

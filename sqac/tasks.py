@@ -98,6 +98,7 @@ class TaskManager:
         idx = st.add_with_mem_id(content, mem_id=mem_id or "", source="tasks", kind="task",
                                  meta=m)
         e = st._entries[idx] if idx is not None and idx < len(st._entries) else st._entries[-1]
+        self._rack.save()
         return {"mem_id": e["meta"]["mem_id"], "content": e["content"],
                 "status": e["meta"]["status"], "project": e["meta"]["project"]}
 
