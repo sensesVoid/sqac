@@ -79,12 +79,14 @@ KIND_FACT = 1
 KIND_SKILL = 2
 KIND_DOC = 3
 KIND_TURN = 4  # conversation-turn offload (context bucket)
+KIND_TASK = 5  # v1.4.0 task-state cartridge entries (working memory)
 KIND_NAMES = {
     KIND_GENERIC: "generic",
     KIND_FACT: "fact",
     KIND_SKILL: "skill",
     KIND_DOC: "doc",
     KIND_TURN: "turn",
+    KIND_TASK: "task",
 }
 _NAME_TO_KIND = {v: k for k, v in KIND_NAMES.items()}
 
@@ -264,6 +266,26 @@ class SqacStore:
             self._query_cache.popitem(last=False)
         return bits
 
+    def add_with_mem_id(
+        self,
+        content: str,
+        mem_id: str = "",
+        **kwargs: Any,
+    ) -> int:
+        """add() with an externally-preserved mem_id (task graduation).
+
+        The mem_id is honored as-is (never minted); the id index points at
+        the new entry. meta: pass via kwargs (or it is {} for us to fill).
+        """
+        m = dict(kwargs.pop("meta", None) or {})
+        if mem_id:
+            m["mem_id"] = mem_id
+        kwargs.pop("mem_id", None)
+        idx = self.add(content, meta=m, **kwargs)
+        if mem_id:
+            self._id_index[mem_id] = idx
+        return idx
+
     def add(
         self,
         content: str,
@@ -439,6 +461,22 @@ class SqacStore:
             if mid is not None:
                 self._id_index[mid] = i
 
+    def delete_entry_by_mem_id(self, mem_id: str) -> Optional[int]:
+        """Tombstone the entry with the given mem_id. Returns idx or None."""
+        if not mem_id:
+            return None
+        idx = self._id_index.get(mem_id)
+        if idx is None:
+            for i, e in enumerate(self._entries):
+                m = e.get("meta")
+                if isinstance(m, dict) and m.get("mem_id") == mem_id:
+                    idx = i
+                    break
+        if idx is None or idx >= len(self._entries):
+            return None
+        ok = self.delete(idx)
+        return idx if ok else None
+
     def _backfill_mem_ids(self) -> None:
         for e in self._entries:
             meta = e.get("meta")
@@ -467,7 +505,13 @@ class SqacStore:
         def eligible(i: int) -> bool:
             if entries[i].get("deleted"):
                 return False
-            if want_kind is not None and entries[i].get("kind", KIND_GENERIC) != want_kind:
+            k = entries[i].get("kind", KIND_GENERIC)
+            if want_kind is not None:
+                if k != want_kind:
+                    return False
+            elif k == KIND_TASK:
+                # v1.4.0: tasks are working memory; excluded from ordinary
+                # search (task_list and the attention block are their surface)
                 return False
             return True
 
@@ -512,7 +556,8 @@ class SqacStore:
         if len(out) < top_k:
             tier_results = self._search_tiers(query, live, use_cache, eligible, seen_idx, top_k - len(out))
             for sim, i, mode in tier_results:
-                out.append(_hit(i, mode, sim))
+                if eligible(i):
+                    out.append(_hit(i, mode, sim))
         return out
 
     def _search_tiers(

@@ -30,6 +30,8 @@ from pydantic import Field
 from mcp.server.mcpserver import MCPServer
 
 from sqac._version import __version__
+from sqac.store import KIND_NAMES
+from sqac.tasks import TaskManager
 from sqac.continuity import (
     ContinuityStore,
     bootstrap_packet,
@@ -47,9 +49,9 @@ from sqac.secret_mcp import register_secret_tools
 from sqac.cloud_mcp import register_cloud_tools
 
 SERVER_NAME = "sqac_mcp"
-DEFAULT_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
-DEFAULT_CARTRIDGES = ("facts", "docs", "skills")
-VALID_KINDS = ("generic", "fact", "skill", "doc", "turn")
+DEFAULT_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills", "task": "tasks"}
+DEFAULT_CARTRIDGES = ("facts", "docs", "skills", "tasks")
+VALID_KINDS = ("generic", "fact", "skill", "doc", "turn", "task")
 SESSION_BUDGET = 25_000  # DMS budget: capacity sweep sweet spot
 # Debounce session-bucket rewrites: save at most every N observes or M seconds.
 # Set 1 / 0 to restore per-turn atomic saves (v1.2.1 behavior).
@@ -469,6 +471,95 @@ def mem_get(
         return _ok({"found": True, "mem_id": mem_id, "content": e.get("content", ""),
                     "kind": KIND_NAMES.get(e.get("kind", 0), "generic"),
                     "source": e.get("source", ""), "cartridge": name, "meta": dict(e.get("meta") or {})})
+    except Exception as e:
+        return _err(e)
+
+
+@mcp.tool(
+    name="task_add",
+    annotations={
+        "title": "Add a Task",
+        "read_only_hint": False,
+        "destructive_hint": False,
+        "idempotent_hint": False,
+        "open_world_hint": False,
+    },
+)
+@_serialized
+def task_add(
+    content: Annotated[str, Field(min_length=1, max_length=2000, description="Task text to track")],
+    status: Annotated[str, Field(description="pending (default) or current")] = "pending",
+    project: Annotated[Optional[str], Field(description="Project key (default: active project)")] = None,
+) -> str:
+    """Add a task to the per-project tasks cartridge (v1.4.0).
+
+    Tasks are current/pending working memory, EXCLUDED from ordinary search
+    (task_list and the attention block are their surface).
+
+    Returns:
+        JSON: {"ok": true, "mem_id", "content", "status", "project"}.
+    """
+    try:
+        tm = TaskManager(_state().rack)
+        r = tm.add(content, status=status, project=project)
+        return _ok({**r, "ok": True})
+    except Exception as e:
+        return _err(e)
+
+
+@mcp.tool(
+    name="task_done",
+    annotations={
+        "title": "Complete a Task",
+        "read_only_hint": False,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+)
+@_serialized
+def task_done(mem_id: Annotated[str, Field(min_length=1, max_length=64, description="mem_id of the task")]) -> str:
+    """Graduate a task to a durable kind=fact memory (preserves the mem_id),
+    removing it from current/pending. Emits mem_graduate (source=mcp).
+
+    Returns:
+        JSON: {"ok": true, "found", "graduated", "mem_id", "content"}.
+    """
+    try:
+        st = _state()
+        tm = TaskManager(st.rack)
+        r = tm.done(mem_id)
+        if r.get("graduated"):
+            events.emit("mem_graduate", target="facts",
+                        source_entry=r.get("mem_id", ""), source="mcp", task=True)
+        return _ok(r)
+    except Exception as e:
+        return _err(e)
+
+
+@mcp.tool(
+    name="task_list",
+    annotations={
+        "title": "List Tasks",
+        "read_only_hint": True,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+)
+@_serialized
+def task_list(
+    project: Annotated[Optional[str], Field(description="Project filter (default: all)")] = None,
+    status: Annotated[Optional[str], Field(description="current or pending (default: all)")] = None,
+) -> str:
+    """List task entries (v1.4.0). current first, then pending.
+
+    Returns:
+        JSON: {"tasks": [{mem_id, content, status, project, updated}]}.
+    """
+    try:
+        tm = TaskManager(_state().rack)
+        return _ok({"tasks": tm.list(status=status, project=project)})
     except Exception as e:
         return _err(e)
 
