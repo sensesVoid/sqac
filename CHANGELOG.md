@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.4.0] — Unreleased (tagged on release)
+
+### Canonical mem_id & mem_get
+- **`sqac/memid.py`**: 26-char Crockford base32 ULID (48-bit ms timestamp + 80 bits `os.urandom`, stdlib only).
+- `SqacStore`: assigns `meta["mem_id"]` on `add()`, backfills on `load()`, store-level `_id_index` (rebuilt in `load()`/`compact()`), `get(mem_id)` O(1), `add_with_mem_id()`, `delete_entry_by_mem_id()`. Ids are preserved across compact, shard split, save/load, and export.
+- **Surfaces**: MCP `mem_get`, CLI `sqac get <mem_id>`, HTTP `GET /entries/{mem_id}` (scope-aware).
+- **Every hit carries `mem_id`**: `mem_search`/`_hit_json`, `mem_recall_detailed` + `mem_bootstrap.recent` + `/session/recall` (`mem_ids` arrays), `/rack/search`, `_enriched_hit`, integrations-injected memory lines.
+
+### Tasks & attention block
+- **`sqac/tasks.py`** (new): per-project tasks cartridge (`kind=task`, new first-class kind) — `task_add` / `task_done` / `task_list`. `task_done` graduates the task into a durable `kind=fact` memory **preserving its mem_id**; finished tasks never appear in the attention block.
+- **Kind=task excluded from ordinary search** (tasks are working memory, not knowledge — Q1); `task_list` and the attention block are the surface.
+- **`sqac/attention.py`**: compact `[SQAC attention | turn N]` block with Current + Pending sections (caps 5/10, "+N more", ≤150-token budget).
+- **Attention injection (`SQAC_ATTENTION_TURNS`, default 5)** — middleware, MCP `mem_observe`, HTTP `/session/observe`; always available via `GET /attention`.
+- **Derived fallback**: with no explicit tasks, Current = continuity goal, Pending = `offloader.recent(5)` — the block never comes up empty.
+- **Continuity fixes (D2)**: `_MemoryState` and `server.py` now call `ContinuityStore.load()`; server gains a ContinuityStore.
+- Design docs: `docs/ATTENTION.md`, `docs/NORMALIZE.md`, `docs/INTEGRATIONS.md`, `docs/superpowers/specs/`, `docs/superpowers/plans/`.
+
 ## [1.3.1] — Unreleased (tagged on release)
 
 ### Wheels
