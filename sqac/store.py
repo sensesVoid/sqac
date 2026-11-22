@@ -25,7 +25,7 @@ from typing import Any, Optional
 
 from .encoder import BSCEncoder, MiniLMSimHashEncoder
 from .static_encoder import StaticSimHashEncoder
-
+from .memid import new_mem_id
 # Bundled Rust SIMD acceleration — 100-300x faster for fuzzy scan
 from .simd import HAS_SIMD as _HAS_SIMD
 from .simd import backend as _simd
@@ -227,7 +227,8 @@ class SqacStore:
         self._stats_cache: tuple[int, dict] | None = None
         self._alive = 0
         self._kind_counts: dict[str, int] = {}
-
+        self._id_index: dict[str, int] = {}
+        self._rebuild_id_index()
     def _invalidate_cache(self) -> None:
         """Increment write version to invalidate stale cache entries.
         
@@ -299,12 +300,15 @@ class SqacStore:
         self._invalidate_cache()
 
         kind_resolved = resolve_kind(kind)
+        meta = dict(meta or {})
+        if not meta.get("mem_id"):
+            meta["mem_id"] = new_mem_id()
         idx = len(self._entries)
         self._entries.append(
             {
                 "content": content,
                 "key_norm": norm,
-                "meta": dict(meta or {}),
+                "meta": meta,
                 "source": source,
                 "kind": kind_resolved,
                 "trust": inj.to_dict(),
@@ -319,6 +323,7 @@ class SqacStore:
             self._sem_keys.append(self._sem_encoder.encode_bits(key_text))
             self._sem_ckeys.append(self._sem_encoder.encode_bits(content))
         self._exact[norm] = idx
+        self._id_index[meta["mem_id"]] = idx
         return idx
 
     def delete(self, idx: int) -> bool:
@@ -365,6 +370,13 @@ class SqacStore:
         self._matrices.clear()
         self._query_cache.clear()
         for e in alive:
+            # ensure meta is a dict and backfill mem_id if missing
+            meta = e.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+                e["meta"] = meta
+            if not meta.get("mem_id"):
+                meta["mem_id"] = new_mem_id()
             self._entries.append(e)
             norm = e["key_norm"]
             idx = len(self._entries) - 1
@@ -381,10 +393,56 @@ class SqacStore:
             kname = KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic")
             counts[kname] = counts.get(kname, 0) + 1
         self._kind_counts = counts
+        self._rebuild_id_index()
         return {"before": before, "after": len(alive), "removed": removed}
 
     def __len__(self) -> int:
         return self._alive
+
+    def get(self, mem_id: Any) -> Optional[dict[str, Any]]:
+        """O(1) lookup of an entry by its canonical mem_id.
+
+        Returns the entry dict when found and not tombstoned, else None.
+        The index is not cleared on delete, so tombstoned entries are
+        filtered here.
+        """
+        if mem_id is None:
+            return None
+        idx = self._id_index.get(mem_id)
+        if idx is None:
+            # Fallback: linear scan in case the index is stale/missing,
+            # then repair the index.
+            for i, e in enumerate(self._entries):
+                meta = e.get("meta") if isinstance(e.get("meta"), dict) else {}
+                if meta.get("mem_id") == mem_id:
+                    idx = i
+                    self._id_index[mem_id] = i
+                    break
+            if idx is None:
+                return None
+        if not (0 <= idx < len(self._entries)):
+            return None
+        e = self._entries[idx]
+        if e.get("deleted"):
+            return None
+        return e
+
+    def _rebuild_id_index(self) -> None:
+        self._id_index = {}
+        for i, e in enumerate(self._entries):
+            meta = e.get("meta") if isinstance(e.get("meta"), dict) else {}
+            mid = meta.get("mem_id") if isinstance(meta, dict) else None
+            if mid is not None:
+                self._id_index[mid] = i
+
+    def _backfill_mem_ids(self) -> None:
+        for e in self._entries:
+            meta = e.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+                e["meta"] = meta
+            if not meta.get("mem_id"):
+                meta["mem_id"] = new_mem_id()
 
     # ── read path ────────────────────────────────────────────────────────
 
@@ -607,11 +665,14 @@ class SqacStore:
             norm = e.payload.get("key_norm", "")
             kind = e.kind if e.kind else resolve_kind(e.payload.get("kind"))
             idx = len(store._entries)
+            meta = e.payload.get("meta", {})
+            if not isinstance(meta, dict):
+                meta = {}
             store._entries.append(
                 {
                     "content": e.payload["content"],
                     "key_norm": norm,
-                    "meta": e.payload.get("meta", {}),
+                    "meta": meta,
                     "source": e.payload.get("source", "user"),
                     "kind": kind,
                     **({"deleted": True} if e.deleted else {}),
@@ -646,12 +707,15 @@ class SqacStore:
                     store._sem_ckeys.append(bytes.fromhex(sck) if sck else None)
             if norm and not e.deleted:
                 store._exact[norm] = idx
+        # Backfill mem_id for entries that predate it (old cartridges).
+        store._backfill_mem_ids()
         for e in store._entries:
             if e.get("deleted"):
                 continue
             kname = KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic")
             store._kind_counts[kname] = store._kind_counts.get(kname, 0) + 1
             store._alive += 1
+        store._rebuild_id_index()
         if store.semantic:
             store._backfill_semantic()
         return store
