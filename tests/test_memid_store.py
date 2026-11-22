@@ -65,5 +65,45 @@ class TestMemIdStore(unittest.TestCase):
         mids = [st._entries[i]["meta"]["mem_id"] for i in range(5)]
         self.assertEqual(len(set(mids)), 5)
 
+
+
+class TestMemIdRack(unittest.TestCase):
+    def test_rack_compact_preserves_ids(self):
+        from sqac.rack import CartridgeRack
+        d = tempfile.mkdtemp()
+        rack = CartridgeRack(directory=d, routes={"fact": "facts"}, default="facts", semantic=False, max_entries=10)
+        rack.create("facts")
+        ids = []
+        for i in range(5):
+            rack.write_routed(f"fact {i}", key=f"k{i}", kind="fact")
+            st = rack._stores["facts"]
+            ids.append(st._entries[-1]["meta"]["mem_id"])
+        rack.compact("facts")
+        st = rack._stores["facts"]
+        for mid in ids:
+            self.assertIsNotNone(st.get(mid))
+        mids = [e["meta"]["mem_id"] for e in st._entries if not e.get("deleted")]
+        self.assertEqual(len(mids), len(set(mids)))
+
+    def test_rack_shard_split_preserves_ids(self):
+        from sqac.rack import CartridgeRack
+        d = tempfile.mkdtemp()
+        rack = CartridgeRack(directory=d, routes={"fact": "facts"}, default="facts", semantic=False, max_entries=5)
+        rack.create("facts")
+        for i in range(7):
+            rack.write_routed(f"fact {i}", key=f"k{i}", kind="fact")
+        ids = []
+        for name, st in rack._stores.items():
+            for e in st._entries:
+                if not e.get("deleted"):
+                    ids.append(e["meta"]["mem_id"])
+        self.assertEqual(len(ids), 7)
+        self.assertEqual(len(set(ids)), 7)
+        for name, st in rack._stores.items():
+            for e in st._entries:
+                if not e.get("deleted"):
+                    self.assertIsNotNone(st.get(e["meta"]["mem_id"]))
+
+
 if __name__ == "__main__":
     unittest.main()
