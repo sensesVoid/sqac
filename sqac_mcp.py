@@ -30,6 +30,8 @@ from pydantic import Field
 from mcp.server.mcpserver import MCPServer
 
 from sqac._version import __version__
+from sqac.store import KIND_NAMES
+from sqac.tasks import TaskManager
 from sqac.continuity import (
     ContinuityStore,
     bootstrap_packet,
@@ -47,14 +49,15 @@ from sqac.secret_mcp import register_secret_tools
 from sqac.cloud_mcp import register_cloud_tools
 
 SERVER_NAME = "sqac_mcp"
-DEFAULT_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
-DEFAULT_CARTRIDGES = ("facts", "docs", "skills")
-VALID_KINDS = ("generic", "fact", "skill", "doc", "turn")
+DEFAULT_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills", "task": "tasks"}
+DEFAULT_CARTRIDGES = ("facts", "docs", "skills", "tasks")
+VALID_KINDS = ("generic", "fact", "skill", "doc", "turn", "task")
 SESSION_BUDGET = 25_000  # DMS budget: capacity sweep sweet spot
 # Debounce session-bucket rewrites: save at most every N observes or M seconds.
 # Set 1 / 0 to restore per-turn atomic saves (v1.2.1 behavior).
 SESSION_FLUSH_TURNS = int(os.environ.get("SQAC_SESSION_FLUSH_TURNS", "10"))
 SESSION_FLUSH_SECS = float(os.environ.get("SQAC_SESSION_FLUSH_SECS", "60"))
+ATTENTION_TURNS = int(os.environ.get("SQAC_ATTENTION_TURNS", "5"))
 
 mcp = MCPServer(
     name=SERVER_NAME,
@@ -125,7 +128,7 @@ class _MemoryState:
             cfg.dir / "session.sqac", window=8, semantic=cfg.semantic,
             dms=DMS(budget=SESSION_BUDGET),
         )
-        self.continuity = ContinuityStore(cfg.dir / "continuity.json")
+        self.continuity = ContinuityStore.load(cfg.dir / "continuity.json")
 
     def save(self) -> None:
         self.rack.save()
@@ -165,7 +168,7 @@ def _err(exc: Exception) -> str:
 
 
 def _hit_json(h) -> dict[str, Any]:
-    return {
+    d = {
         "content": h.content,
         "confidence": h.confidence,
         "source": h.source,
@@ -174,6 +177,10 @@ def _hit_json(h) -> dict[str, Any]:
         "latency_ms": h.meta.get("latency_ms"),
         "kind": h.meta.get("kind"),
     }
+    mid = getattr(h, "mem_id", "") or (h.meta.get("mem_id", "") if isinstance(getattr(h, "meta", None), dict) else "")
+    if mid:
+        d["mem_id"] = mid
+    return d
 
 
 def _project_name(project: Optional[str]) -> str:
@@ -202,6 +209,25 @@ def _recent_exchanges(st, project: str, n: int = 5) -> list[dict[str, Any]]:
         return st.session.recall_detailed(query, top_k=n)
     except Exception:
         return []
+
+
+def _attention_block(st) -> str:
+    """Render the current attention block for the MCP surface (v1.4.0).
+
+    Empty when there are no current/pending tasks (header only).
+    """
+    from sqac.attention import render_block_with_fallback
+    from sqac.tasks import TaskManager
+    try:
+        tm = TaskManager(st.rack)
+        cur = [(t["content"], t["mem_id"]) for t in tm.list(status="current")]
+        pnd = [(t["content"], t["mem_id"]) for t in tm.list(status="pending")]
+    except Exception:
+        return ""
+    return render_block_with_fallback(
+        st.session._turn_count, cur, pnd,
+        offloader=st.session, continuity=st.continuity,
+        project=_project_name(None))
 
 
 # ── read tools ───────────────────────────────────────────────────────────────
@@ -252,6 +278,7 @@ def mem_bootstrap(
             rack_stats=st.rack.stats(),
             recent=_recent_exchanges(st, proj),
         )
+        packet["attention"] = _attention_block(st)
         st.continuity.touch(proj, host=host_name, model=model)
         st.continuity.save()
         return _ok(packet)
@@ -386,6 +413,10 @@ def _resource_context() -> str:
         lines.append("")
     lines.append(f"Memory: {packet['memory_entries']} long-term entries, "
                  f"{packet['session'].get('entries', 0)} session entries.")
+    attention = _attention_block(st)
+    if attention:
+        lines.append("")
+        lines.append(attention)
     return "\n".join(lines)
 
 @mcp.tool(
@@ -433,6 +464,127 @@ def mem_search(
         else:
             hits = st.rack.search(query, top_k=top_k, kind=kind, cartridges=cartridges)
         return _ok({"query": query, "count": len(hits), "hits": [_hit_json(h) for h in hits]})
+    except Exception as e:
+        return _err(e)
+
+
+@mcp.tool(
+    name="mem_get",
+    annotations={
+        "title": "Get Memory by ID",
+        "read_only_hint": True,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+)
+@_serialized
+def mem_get(
+    mem_id: Annotated[str, Field(min_length=1, max_length=64, description="Stable mem_id of the entry")],
+) -> str:
+    """Fetch a single memory entry by its canonical mem_id (O(1) lookup).
+
+    Returns:
+        JSON: {"found", "mem_id", "content", "kind", "source", "cartridge", "meta"} or {"found": false, "mem_id"}.
+    """
+    try:
+        st = _state()
+        res = st.rack.get_by_mem_id(mem_id)
+        if res is None:
+            return _ok({"found": False, "mem_id": mem_id})
+        name, e = res
+        return _ok({"found": True, "mem_id": mem_id, "content": e.get("content", ""),
+                    "kind": KIND_NAMES.get(e.get("kind", 0), "generic"),
+                    "source": e.get("source", ""), "cartridge": name, "meta": dict(e.get("meta") or {})})
+    except Exception as e:
+        return _err(e)
+
+
+@mcp.tool(
+    name="task_add",
+    annotations={
+        "title": "Add a Task",
+        "read_only_hint": False,
+        "destructive_hint": False,
+        "idempotent_hint": False,
+        "open_world_hint": False,
+    },
+)
+@_serialized
+def task_add(
+    content: Annotated[str, Field(min_length=1, max_length=2000, description="Task text to track")],
+    status: Annotated[str, Field(description="pending (default) or current")] = "pending",
+    project: Annotated[Optional[str], Field(description="Project key (default: active project)")] = None,
+) -> str:
+    """Add a task to the per-project tasks cartridge (v1.4.0).
+
+    Tasks are current/pending working memory, EXCLUDED from ordinary search
+    (task_list and the attention block are their surface).
+
+    Returns:
+        JSON: {"ok": true, "mem_id", "content", "status", "project"}.
+    """
+    try:
+        tm = TaskManager(_state().rack)
+        r = tm.add(content, status=status, project=project)
+        return _ok({**r, "ok": True})
+    except Exception as e:
+        return _err(e)
+
+
+@mcp.tool(
+    name="task_done",
+    annotations={
+        "title": "Complete a Task",
+        "read_only_hint": False,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+)
+@_serialized
+def task_done(mem_id: Annotated[str, Field(min_length=1, max_length=64, description="mem_id of the task")]) -> str:
+    """Graduate a task to a durable kind=fact memory (preserves the mem_id),
+    removing it from current/pending. Emits mem_graduate (source=mcp).
+
+    Returns:
+        JSON: {"ok": true, "found", "graduated", "mem_id", "content"}.
+    """
+    try:
+        st = _state()
+        tm = TaskManager(st.rack)
+        r = tm.done(mem_id)
+        if r.get("graduated"):
+            events.emit("mem_graduate", target="facts",
+                        source_entry=r.get("mem_id", ""), source="mcp", task=True)
+        return _ok(r)
+    except Exception as e:
+        return _err(e)
+
+
+@mcp.tool(
+    name="task_list",
+    annotations={
+        "title": "List Tasks",
+        "read_only_hint": True,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+)
+@_serialized
+def task_list(
+    project: Annotated[Optional[str], Field(description="Project filter (default: all)")] = None,
+    status: Annotated[Optional[str], Field(description="current or pending (default: all)")] = None,
+) -> str:
+    """List task entries (v1.4.0). current first, then pending.
+
+    Returns:
+        JSON: {"tasks": [{mem_id, content, status, project, updated}]}.
+    """
+    try:
+        tm = TaskManager(_state().rack)
+        return _ok({"tasks": tm.list(status=status, project=project)})
     except Exception as e:
         return _err(e)
 
@@ -528,15 +680,16 @@ def mem_observe(
         evicted = st.session.observe(role, text)
         if st.session.should_flush(SESSION_FLUSH_TURNS, SESSION_FLUSH_SECS):
             st.session.save()
+        out = {"recorded": True}
+        if st.session.attention_due(ATTENTION_TURNS):
+            out["attention"] = _attention_block(st)
         st.continuity.touch(_project_name(None), host=detect_host(), summary=text[:400])
         st.continuity.save()
-        return _ok(
-            {
-                "recorded": True,
-                "session_entries": st.session.stats().get("entries", 0),
-                "evicted": evicted,
-            }
-        )
+        out.update({
+            "session_entries": st.session.stats().get("entries", 0),
+            "evicted": evicted,
+        })
+        return _ok(out)
     except Exception as e:
         return _err(e)
 

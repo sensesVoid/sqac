@@ -213,6 +213,7 @@ class ContextOffloader:
         self.semantic = semantic
         self.dms = dms  # optional Dynamic Memory Sparsification policy
         self._turn_count = 0
+        self._attention_dirty = False
         self._xid = 0
         self._since_flush = 0
         self._last_flush = time.time()
@@ -359,6 +360,10 @@ class ContextOffloader:
 
     # ── read path ───────────────────────────────────────────────────────
 
+    def recent(self, n: int = 5) -> list[str]:
+        """Last n live turn texts (for the attention-block fallback)."""
+        return [t.text or "" for t in list(self._buffer)[-max(1, n):]]
+
     def recall(self, query: str, top_k: int = 2) -> str:
         """Answer a back-reference with offloaded context, or "" (fail-safe).
 
@@ -403,6 +408,14 @@ class ContextOffloader:
             seen.add(xid)
             if self.dms is not None:
                 self.dms.touch(xid)
+            # collect mem_ids for all entries in this exchange (S2)
+            mem_ids = []
+            for _e in self._store._entries:
+                if _e.get("deleted"):
+                    continue
+                _m = _e.get("meta") or {}
+                if _m.get("exchange") == xid and _m.get("mem_id"):
+                    mem_ids.append(_m["mem_id"])
             out.append(
                 {
                     "content": h.content,
@@ -411,6 +424,8 @@ class ContextOffloader:
                     "turns": h.meta.get("turns"),
                     "salience": h.meta.get("salience"),
                     "mode": h.mode,
+                    "mem_id": h.mem_id or h.meta.get("mem_id", ""),
+                    "mem_ids": mem_ids,
                 }
             )
             if len(out) >= top_k:
@@ -418,6 +433,20 @@ class ContextOffloader:
         return out
 
     # ── persistence ─────────────────────────────────────────────────────
+
+    def attention_due(self, turns: int) -> bool:
+        """True when the attention block should be re-injected (every `turns`)."""
+        n = max(1, int(turns))
+        return self._turn_count > 0 and self._turn_count % n == 0
+
+    def mark_attention_dirty(self) -> None:
+        """Flag: task state changed, refresh the block on the next turn."""
+        self._attention_dirty = True
+
+    def take_attention_dirty(self) -> bool:
+        dirty = self._attention_dirty
+        self._attention_dirty = False
+        return dirty
 
     def should_flush(self, turns: int, secs: float) -> bool:
         """Return True when enough turns or time have accumulated since the

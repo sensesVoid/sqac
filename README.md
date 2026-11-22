@@ -21,16 +21,13 @@ With SQAC:     "Team Atlas maintains the payments service."  (correct, from your
 
 That gap is the entire product: a frozen, never-trained model answered private questions correctly because we handed it a 2.5 KB memory file. Also, unlike your model's training data, you can actually update it.
 
-## What's new in 1.3.0
+## What's new in 1.4.0
 
-**HTTP parity** — the MCP surface is now on the wire, plus real-time observability and cartridge portability:
+**SQAC attention, canonical mem_id, and retrieval guarantees** — the memory OS upgrade:
 
-- **`sqac-server` HTTP parity** — agent cartridges (`/agents` CRUD), rack introspection + `/reload`, kind-aware `/teach`, session lifecycle, cartridge export/import, `/capabilities`, `/describe`, `/version`
-- **Auth tiers for sandboxed agents** — `--readonly` (GET-only sandbox), `--scope` cartridge allowlist
-- **Real-time events** — `GET /events` SSE stream + `SQAC_WEBHOOK_URL` webhooks; metadata only, never content or secrets
-- **`sqac export` / `sqac diff`** — serialize any plaintext cartridge to Markdown/JSON; diff two versions (added/removed/updated/reclassified) — review memory changes in git PRs
-- **Multilingual normalization (opt-in)** — `SQAC_NORMALIZE="unicode_fold,stopwords:en,affix:en"` key-tokenizer pipeline (accent folding, stopwords, affix stripping); see [docs/NORMALIZE.md](docs/NORMALIZE.md)
-- **`sqac.integrations`** — drop-in middleware for OpenAI-compatible clients (Ollama, vLLM, LiteLLM, OpenAI): confidence-gated memory hydration + automatic turn recording; see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
+- **Canonical `mem_id` on every entry (O(1) `mem_get`)** — stable ULID (`sqac/memid.py`) stored in entry `meta`; store-level id index; `mem_get` on MCP/CLI/`GET /entries/{mem_id}`; every search/recall hit carries `mem_id`. Backward compatible: no format bump, old cartridges backfill on load, new cartridges parse in old readers.
+- **Attention block** — compact `[SQAC attention | turn N]` with Current + Pending tasks, injected every 5 turns (`SQAC_ATTENTION_TURNS`) on middleware, MCP, and HTTP; always available via `GET /attention`. Finished tasks graduate to `kind=fact` memories (mem_id preserved).
+- **Per-project task state** — `kind=task` cartridge, excluded from search: `task_add` / `task_done` / `task_list` (MCP). Continuity fixes riding PR 2: `_MemoryState` and `server.py` now call `ContinuityStore.load()`; server gains a ContinuityStore.
 
 ## Install
 
@@ -193,7 +190,7 @@ Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fu
 - `sqac report "title" -d "..."` - file a GitHub issue with diagnostics attached
 - `sqac export <cartridge> [--format md|json]` - serialize a plaintext cartridge to human-readable Markdown/JSON (encrypted vault/secret payloads refuse to export); `sqac diff <old.sqac> <new.sqac> [--format md|json]` - added/removed/updated/reclassified entries between cartridge versions
 - HTTP API server (`sqac-server`, FastAPI) for self-hosting memory behind your own endpoints
-- 535 tests, CI across numpy fallback + Ubuntu/Windows × Python 3.10–3.13, pip-audit-clean runtime deps, full docs set ([FORMAT](docs/FORMAT.md) · [MCP](docs/MCP.md) · [VAULT](docs/VAULT.md) · [SECRET](docs/SECRET.md) · [CLOUD](docs/CLOUD.md) · [DMS](docs/DMS.md) · [SECURITY](docs/SECURITY.md) · [THESIS](docs/THESIS.md))
+- 574 tests, CI across numpy fallback + Ubuntu/Windows × Python 3.10–3.13, pip-audit-clean runtime deps, full docs set ([FORMAT](docs/FORMAT.md) · [MCP](docs/MCP.md) · [VAULT](docs/VAULT.md) · [SECRET](docs/SECRET.md) · [CLOUD](docs/CLOUD.md) · [DMS](docs/DMS.md) · [SECURITY](docs/SECURITY.md) · [THESIS](docs/THESIS.md))
 
 ### HTTP API server (`sqac-server`)
 - **Agent cartridges over HTTP** — `GET /agents`, `GET/POST/PUT/DELETE /agents/{name}`; encrypted (SQAE) agents expose metadata + encrypted flag only, never contents
@@ -244,7 +241,7 @@ sqac mcp setup --host <cli>         # wire memory into your agent
 
 ## Status
 
-- **Version:** 1.3.1 - 535 tests passing
+- **Version:** 1.4.0 — 574 tests passing
 - **Repository:** https://github.com/sensesVoid/sqac
 - **Issues:** https://github.com/sensesVoid/sqac/issues
 

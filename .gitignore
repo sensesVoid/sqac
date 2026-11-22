@@ -58,3 +58,6 @@ standalone_graph.html
 
 # MkDocs build output
 site/
+
+# Worktrees
+.worktrees/

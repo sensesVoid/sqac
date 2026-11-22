@@ -54,6 +54,7 @@ def _entries(store: SqacStore) -> list[dict[str, Any]]:
             "kind": KIND_NAMES.get(e.get("kind", 0), "generic"),
             "source": e.get("source", ""),
             "key_norm": e.get("key_norm", ""),
+            "meta": dict(e.get("meta") or {}),
         })
     return out
 

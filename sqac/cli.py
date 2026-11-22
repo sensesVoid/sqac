@@ -59,6 +59,10 @@ def main(argv: list[str] | None = None) -> int:
     p_search.add_argument("--threshold", type=float, default=None)
     add_db(p_search)
 
+    p_get = sub.add_parser("get", help="lookup an entry by mem_id")
+    p_get.add_argument("mem_id")
+    add_db(p_get)
+
     p_pack = sub.add_parser("pack", help="build a cartridge from a text file (one fact per line)")
     p_pack.add_argument("input")
     p_pack.add_argument("-o", "--out", required=True)
@@ -792,6 +796,39 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[{tag} {h.confidence:.3f}] {h.content}")
             if h.source:
                 print(f"          source: {h.source}")
+
+    elif args.cmd == "get":
+        import json as _json
+        db = Path(args.db)
+        found = None
+        found_cart = None
+        # try the specified db
+        if db.exists():
+            st = _open(args.db)
+            e = st.get(args.mem_id)
+            if e is not None:
+                found, found_cart = e, db.stem
+        # fallback: scan sibling .sqac files in same dir
+        if found is None and db.parent.exists():
+            for p in sorted(db.parent.glob("*.sqac")):
+                if p.resolve() == db.resolve():
+                    continue
+                try:
+                    st = SqacStore.load(p)
+                except Exception:
+                    continue
+                e = st.get(args.mem_id)
+                if e is not None:
+                    found, found_cart = e, p.stem
+                    break
+        if found is None:
+            print(_json.dumps({"found": False, "mem_id": args.mem_id}))
+            return 1
+        kind_name = {0:"generic",1:"fact",2:"skill",3:"doc",4:"turn"}.get(found.get("kind", 0), "generic")
+        out = {"found": True, "mem_id": args.mem_id, "content": found.get("content", ""),
+               "kind": kind_name, "source": found.get("source", ""), "cartridge": found_cart,
+               "meta": dict(found.get("meta") or {})}
+        print(_json.dumps(out, ensure_ascii=False))
 
     elif args.cmd == "pack":
         lines = [

@@ -528,6 +528,27 @@ class CartridgeRack:
         self.last_written = name
         return self
 
+    def add_with_mem_id(
+        self, name: str, content: str, key: Optional[str] = None,
+        mem_id: str = "",
+        source: str = "rack", kind: int | str | None = None,
+        meta: Optional[dict[str, Any]] = None,
+    ) -> tuple[str, int]:
+        """Write, preserving a given mem_id (used by task graduation).
+
+        Returns (cartridge_name, entry_idx) in the target store.
+        """
+        if name not in self._stores:
+            self.create(name, kind=kind)
+        m = dict(meta or {})
+        if mem_id:
+            m["mem_id"] = mem_id
+        store = self._require(name)
+        idx = store.add_with_mem_id(content, mem_id=mem_id, key=key,
+                                    source=source, kind=kind, meta=m,
+                                    validate=False)
+        return name, idx
+
     def write_routed(
         self,
         content: str,
@@ -564,6 +585,17 @@ class CartridgeRack:
         )
 
     # ── read path ───────────────────────────────────────────────────────
+
+    def get_by_mem_id(self, mem_id: str, cartridges: Optional[list[str]] = None):
+        """Return (cartridge_name, entry_dict) for mem_id, or None."""
+        for name in self._collect_search_targets(cartridges):
+            store = self._stores.get(name)
+            if store is None:
+                continue
+            e = store.get(mem_id)
+            if e is not None:
+                return name, e
+        return None
 
     def _collect_search_targets(
         self, cartridges: Optional[list[str]] = None
