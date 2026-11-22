@@ -565,6 +565,17 @@ class CartridgeRack:
 
     # ── read path ───────────────────────────────────────────────────────
 
+    def get_by_mem_id(self, mem_id: str, cartridges: Optional[list[str]] = None):
+        """Return (cartridge_name, entry_dict) for mem_id, or None."""
+        for name in self._collect_search_targets(cartridges):
+            store = self._stores.get(name)
+            if store is None:
+                continue
+            e = store.get(mem_id)
+            if e is not None:
+                return name, e
+        return None
+
     def _collect_search_targets(
         self, cartridges: Optional[list[str]] = None
     ) -> list[str]:

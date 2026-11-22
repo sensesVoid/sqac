@@ -803,6 +803,34 @@ def main(argv: list[str] | None = None) -> int:
     import uvicorn; uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     return 0
 
+# ── entry lookup by mem_id (v1.4.0) ────────────────────────────────
+
+@app.get("/entries/{mem_id}")
+def get_entry(mem_id: str, _=Depends(_verify_key)):
+    _ensure_state()
+    from .store import KIND_NAMES
+    r = _state.get("rack")
+    if r is not None:
+        res = r.get_by_mem_id(mem_id)
+        if res is None:
+            return JSONResponse({"found": False, "mem_id": mem_id}, status_code=404)
+        name, e = res
+        if not _in_scope(name):
+            return JSONResponse({"found": False, "mem_id": mem_id}, status_code=404)
+        return {"found": True, "mem_id": mem_id, "content": e.get("content", ""),
+                "kind": KIND_NAMES.get(e.get("kind", 0), "generic"),
+                "source": e.get("source", ""), "cartridge": name, "meta": dict(e.get("meta") or {})}
+    # fallback: default store
+    s = _state.get("default_store")
+    if s is not None:
+        e = s.get(mem_id)
+        if e is not None and _in_scope("memory"):
+            return {"found": True, "mem_id": mem_id, "content": e.get("content", ""),
+                    "kind": KIND_NAMES.get(e.get("kind", 0), "generic"),
+                    "source": e.get("source", ""), "cartridge": "memory", "meta": dict(e.get("meta") or {})}
+    return JSONResponse({"found": False, "mem_id": mem_id}, status_code=404)
+
+
 # ── cartridge export/import (Tier 2F) ────────────────────────────────
 
 _MAX_IMPORT_BYTES = 50 * 1024 * 1024  # 50 MB decoded cap

@@ -438,6 +438,38 @@ def mem_search(
 
 
 @mcp.tool(
+    name="mem_get",
+    annotations={
+        "title": "Get Memory by ID",
+        "read_only_hint": True,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+)
+@_serialized
+def mem_get(
+    mem_id: Annotated[str, Field(min_length=1, max_length=64, description="Stable mem_id of the entry")],
+) -> str:
+    """Fetch a single memory entry by its canonical mem_id (O(1) lookup).
+
+    Returns:
+        JSON: {"found", "mem_id", "content", "kind", "source", "cartridge", "meta"} or {"found": false, "mem_id"}.
+    """
+    try:
+        st = _state()
+        res = st.rack.get_by_mem_id(mem_id)
+        if res is None:
+            return _ok({"found": False, "mem_id": mem_id})
+        name, e = res
+        return _ok({"found": True, "mem_id": mem_id, "content": e.get("content", ""),
+                    "kind": KIND_NAMES.get(e.get("kind", 0), "generic"),
+                    "source": e.get("source", ""), "cartridge": name, "meta": dict(e.get("meta") or {})})
+    except Exception as e:
+        return _err(e)
+
+
+@mcp.tool(
     name="mem_recall",
     annotations={
         "title": "Recall Working Memory (text)",
