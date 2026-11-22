@@ -3,11 +3,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqac.tasks import TaskManager, project_name
 from sqac.store import SqacStore
 
-def _isolated(t=None):
-    if t is None:
-        t = tempfile.mkdtemp()
-    os.environ["SQAC_MEM_DIR"] = t
-    return t
 
 class TestTasks(unittest.TestCase):
     def setUp(self):
