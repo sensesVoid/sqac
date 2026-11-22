@@ -213,6 +213,7 @@ class ContextOffloader:
         self.semantic = semantic
         self.dms = dms  # optional Dynamic Memory Sparsification policy
         self._turn_count = 0
+        self._attention_dirty = False
         self._xid = 0
         self._since_flush = 0
         self._last_flush = time.time()
@@ -428,6 +429,20 @@ class ContextOffloader:
         return out
 
     # ── persistence ─────────────────────────────────────────────────────
+
+    def attention_due(self, turns: int) -> bool:
+        """True when the attention block should be re-injected (every `turns`)."""
+        n = max(1, int(turns))
+        return self._turn_count > 0 and self._turn_count % n == 0
+
+    def mark_attention_dirty(self) -> None:
+        """Flag: task state changed, refresh the block on the next turn."""
+        self._attention_dirty = True
+
+    def take_attention_dirty(self) -> bool:
+        dirty = self._attention_dirty
+        self._attention_dirty = False
+        return dirty
 
     def should_flush(self, turns: int, secs: float) -> bool:
         """Return True when enough turns or time have accumulated since the
