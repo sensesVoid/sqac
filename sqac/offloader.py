@@ -403,6 +403,14 @@ class ContextOffloader:
             seen.add(xid)
             if self.dms is not None:
                 self.dms.touch(xid)
+            # collect mem_ids for all entries in this exchange (S2)
+            mem_ids = []
+            for _e in self._store._entries:
+                if _e.get("deleted"):
+                    continue
+                _m = _e.get("meta") or {}
+                if _m.get("exchange") == xid and _m.get("mem_id"):
+                    mem_ids.append(_m["mem_id"])
             out.append(
                 {
                     "content": h.content,
@@ -411,6 +419,8 @@ class ContextOffloader:
                     "turns": h.meta.get("turns"),
                     "salience": h.meta.get("salience"),
                     "mode": h.mode,
+                    "mem_id": h.mem_id or h.meta.get("mem_id", ""),
+                    "mem_ids": mem_ids,
                 }
             )
             if len(out) >= top_k:

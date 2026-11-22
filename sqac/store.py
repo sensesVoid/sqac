@@ -129,9 +129,10 @@ class Hit:
     mode: str  # "exact" | "fuzzy"
     meta: dict[str, Any] = field(default_factory=dict)
     trust: dict[str, Any] = field(default_factory=dict)  # injection analysis
+    mem_id: str = ""
 
     def as_dict(self) -> dict:
-        return {
+        d = {
             "content": self.content,
             "confidence": round(self.confidence, 4),
             "source": self.source,
@@ -139,6 +140,9 @@ class Hit:
             "meta": dict(self.meta),
             "trust": dict(self.trust),
         }
+        if self.mem_id:
+            d["mem_id"] = self.mem_id
+        return d
 
 
 class SqacStore:
@@ -469,13 +473,15 @@ class SqacStore:
 
         def _hit(idx: int, mode: str, confidence: float) -> Hit:
             e = self._entries[idx]
+            meta = dict(e.get("meta") or {})
             return Hit(
                 content=e["content"],
                 confidence=confidence,
                 source=e["source"],
                 mode=mode,
+                mem_id=str(meta.get("mem_id", "")),
                 meta={
-                    **e["meta"],
+                    **meta,
                     "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
                     "key_norm": e.get("key_norm"),
                     "latency_ms": _ms(time.perf_counter() - t0),

@@ -67,8 +67,9 @@ class TestMemGetHTTP(unittest.TestCase):
         self.assertEqual(sr.status_code, 200)
         hits = sr.json().get("hits", [])
         self.assertTrue(hits)
-        mid = hits[0].get("mem_id") or hits[0].get("meta", {}).get("mem_id")
-        self.assertTrue(mid)
+        # enriched hits carry mem_id at top level (S6)
+        self.assertTrue(hits[0].get("mem_id"))
+        mid = hits[0]["mem_id"]
         gr = self.client.get(f"/entries/{mid}", headers=self._h())
         self.assertEqual(gr.status_code, 200)
         body = gr.json()

@@ -53,7 +53,9 @@ def _make_rack(d: Path) -> CartridgeRack:
 def _format_memories(hits: list) -> str:
     lines = ["Relevant memories (SQAC, confidence-gated):"]
     for h in hits:
-        lines.append(f"- [{h.confidence:.2f}] {h.content}")
+        mid = getattr(h, "mem_id", "") or (h.meta.get("mem_id", "") if isinstance(getattr(h, "meta", None), dict) else "")
+        tag = f" mem_id={mid}" if mid else ""
+        lines.append(f"- [{h.confidence:.2f}]{tag} {h.content}")
     return "\n".join(lines)
 
 

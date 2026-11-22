@@ -165,7 +165,7 @@ def _err(exc: Exception) -> str:
 
 
 def _hit_json(h) -> dict[str, Any]:
-    return {
+    d = {
         "content": h.content,
         "confidence": h.confidence,
         "source": h.source,
@@ -174,6 +174,10 @@ def _hit_json(h) -> dict[str, Any]:
         "latency_ms": h.meta.get("latency_ms"),
         "kind": h.meta.get("kind"),
     }
+    mid = getattr(h, "mem_id", "") or (h.meta.get("mem_id", "") if isinstance(getattr(h, "meta", None), dict) else "")
+    if mid:
+        d["mem_id"] = mid
+    return d
 
 
 def _project_name(project: Optional[str]) -> str:

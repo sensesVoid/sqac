@@ -350,7 +350,7 @@ def _enriched_hit(h):
     """HitResponse fields plus the v1.3 HTTP-parity surface:
     cartridge/key/kind at top level, tier preserved in meta."""
     meta = dict(h.meta)
-    return {
+    d = {
         "content": h.content,
         "confidence": round(h.confidence, 4),
         "source": h.source,
@@ -361,6 +361,10 @@ def _enriched_hit(h):
         "kind": meta.get("kind"),
         "meta": meta,
     }
+    mid = getattr(h, "mem_id", "") or meta.get("mem_id", "")
+    if mid:
+        d["mem_id"] = mid
+    return d
 
 
 def _searched(r, cartridges=None):
@@ -409,7 +413,11 @@ def session_recall(req: SessionRecallRequest, _=Depends(_verify_key)):
     o = _state.get("offloader")
     if not o: raise HTTPException(400, "no session offloader")
     text = o.recall(req.query, top_k=req.top_k)
-    return {"text": text, "hit": bool(text)}
+    detailed = o.recall_detailed(req.query, top_k=req.top_k)
+    mem_ids = []
+    for d in detailed:
+        mem_ids.extend(d.get("mem_ids") or [])
+    return {"text": text, "hit": bool(text), "mem_ids": mem_ids}
 
 @app.post("/graph")
 def graph_endpoint(req: GraphRequest, _=Depends(_verify_key)):
