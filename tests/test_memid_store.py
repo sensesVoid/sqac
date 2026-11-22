@@ -105,5 +105,22 @@ class TestMemIdRack(unittest.TestCase):
                     self.assertIsNotNone(st.get(e["meta"]["mem_id"]))
 
 
+
+
+class TestMemIdExport(unittest.TestCase):
+    def test_export_includes_mem_id(self):
+        import json, os, tempfile
+        from sqac.store import SqacStore
+        from sqac.export import export_cartridge
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, "t.sqac")
+        st = SqacStore()
+        st.add("hello", key="k1")
+        mid = st._entries[0]["meta"]["mem_id"]
+        st.save(path, name="t")
+        out = json.loads(export_cartridge(path, fmt="json"))
+        self.assertEqual(out["entries"][0]["meta"]["mem_id"], mid)
+
+
 if __name__ == "__main__":
     unittest.main()
