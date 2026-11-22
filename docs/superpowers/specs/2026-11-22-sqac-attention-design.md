@@ -269,20 +269,18 @@ checkpoint/observe.
   parsed by the old reader path (payload JSON round-trip without the
   mem_id key).
 
-## Open questions for the maintainer (theirs pile)
+## Decided by maintainer (post builder-check)
 
-- **Q1 - Do `kind=task` entries participate in ordinary retrieval?**
-  Lean: NO - tasks are a new first-class kind, excluded from
-  `mem_search`/`rack.search`/integrations injection by default;
-  `task_list` and the attention block are their surface. Otherwise
-  every search returns task text and the block is duplicated inside
-  injected memory lines.
-- **Q2 - Are tasks project-scoped or global?** `~/.sqacm` is shared
-  across projects; a global tasks cartridge mixes projects. Lean:
-  per-project - `task_add` stamps `project` (same `_project_name`
-  derivation as mem_checkpoint), `task_list`/block filter by the active
-  project, `task_done` rejects cross-project ids; HTTP (no project
-  concept) shows all with an optional `?project=` filter.
+- **Q1 - Tasks are EXCLUDED from ordinary retrieval.** `kind=task`
+  becomes a new first-class kind (VALID_KINDS + kind-exclusion across
+  `mem_search`, `rack.search`, offloader, integrations injection,
+  dashboard); `task_list` and the attention block are their only
+  surface. Tasks do NOT get a rack route beyond their own cartridge.
+- **Q2 - Tasks are PER-PROJECT.** `task_add` stamps `project` (same
+  `_project_name` derivation as mem_checkpoint: cwd basename or
+  SQAC_PROJECT); `task_list` and the attention block filter by the
+  active project; `task_done` rejects cross-project ids; HTTP shows
+  all tasks with an optional `?project=` filter.
 
 ## Risks & mitigations
 
