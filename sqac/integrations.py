@@ -83,12 +83,13 @@ class _Completions:
                     or off.take_attention_dirty())
 
     def _render_attention(self) -> str:
-        from .attention import render_block
+        from .attention import render_block_with_fallback
         from .tasks import TaskManager
         tm = TaskManager(self._rack)
         current = [(t["content"], t["mem_id"]) for t in tm.list(status="current")]
         pending = [(t["content"], t["mem_id"]) for t in tm.list(status="pending")]
-        return render_block(self._turns, current, pending)
+        return render_block_with_fallback(self._turns, current, pending,
+                                          offloader=self._offloader)
 
     def create(self, model: str, messages: list[dict], **kwargs: Any):
         rack = self._rack

@@ -216,7 +216,7 @@ def _attention_block(st) -> str:
 
     Empty when there are no current/pending tasks (header only).
     """
-    from sqac.attention import render_block
+    from sqac.attention import render_block_with_fallback
     from sqac.tasks import TaskManager
     try:
         tm = TaskManager(st.rack)
@@ -224,7 +224,10 @@ def _attention_block(st) -> str:
         pnd = [(t["content"], t["mem_id"]) for t in tm.list(status="pending")]
     except Exception:
         return ""
-    return render_block(st.session._turn_count, cur, pnd)
+    return render_block_with_fallback(
+        st.session._turn_count, cur, pnd,
+        offloader=st.session, continuity=st.continuity,
+        project=_project_name(None))
 
 
 # ── read tools ───────────────────────────────────────────────────────────────

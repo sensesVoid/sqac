@@ -360,6 +360,10 @@ class ContextOffloader:
 
     # ── read path ───────────────────────────────────────────────────────
 
+    def recent(self, n: int = 5) -> list[str]:
+        """Last n live turn texts (for the attention-block fallback)."""
+        return [t.text or "" for t in list(self._buffer)[-max(1, n):]]
+
     def recall(self, query: str, top_k: int = 2) -> str:
         """Answer a back-reference with offloaded context, or "" (fail-safe).
 

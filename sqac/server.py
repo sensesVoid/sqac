@@ -412,12 +412,15 @@ def session_observe(req: SessionObserveRequest, _=Depends(_verify_key)):
         o.save()
     out = {"ok": True, "exchange_offloaded": xid, "buffer_size": len(o._buffer)}
     if o.attention_due(ATTENTION_TURNS):
-        from .attention import render_block
+        from .attention import render_block_with_fallback
         from .tasks import TaskManager
         tm = TaskManager(_state.get("rack") or CartridgeRack(directory=_state["dir"]))
-        out["attention"] = render_block(o._turn_count,
-                                        [(t["content"], t["mem_id"]) for t in tm.list(status="current")],
-                                        [(t["content"], t["mem_id"]) for t in tm.list(status="pending")])
+        out["attention"] = render_block_with_fallback(
+            o._turn_count,
+            [(t["content"], t["mem_id"]) for t in tm.list(status="current")],
+            [(t["content"], t["mem_id"]) for t in tm.list(status="pending")],
+            offloader=o, continuity=_state.get("continuity"),
+            project=Path(_state["dir"]).name)
     return out
 
 @app.post("/session/recall")
@@ -861,7 +864,7 @@ def attention(_=Depends(_verify_key)):
     Always returns the current block (no due-check); see GET /session/observe.
     """
     _ensure_state()
-    from .attention import render_block
+    from .attention import render_block_with_fallback
     from .tasks import TaskManager
     off = _state.get("offloader")
     turn = off._turn_count if off else 0
@@ -869,7 +872,12 @@ def attention(_=Depends(_verify_key)):
     tm = TaskManager(rack)
     cur = [(t["content"], t["mem_id"]) for t in tm.list(status="current")]
     pnd = [(t["content"], t["mem_id"]) for t in tm.list(status="pending")]
-    return {"turn": turn, "attention": render_block(turn, cur, pnd)}
+    project = Path(_state["dir"]).name
+    return {"turn": turn,
+            "attention": render_block_with_fallback(turn, cur, pnd,
+                                                    offloader=off,
+                                                    continuity=_state.get("continuity"),
+                                                    project=project)}
 
 
 # ── cartridge export/import (Tier 2F) ────────────────────────────────

@@ -220,7 +220,7 @@ Continuity fixes (D2): `_MemoryState.__init__` calls `ContinuityStore.load()`; `
 
 - [ ] **Step 5: Commit**
 
-### Task 11: Derived fallback
+### Task 11: Derived fallback  **[DONE]**
 
 **Files:**
 - Modify: `sqac/attention.py` (render with fallback: current = continuity goal; pending = turns after last checkpoint marker)
@@ -229,8 +229,7 @@ Continuity fixes (D2): `_MemoryState.__init__` calls `ContinuityStore.load()`; `
 
 - [ ] **Step 1-5: Implement + verify + commit**
 
-### Task 12: Phase 2 integration + tests
-
+### Task 12: Phase 2 integration + tests  **[DONE]**
 **Files:**
 - Test: `tests/test_tasks_integration.py`
 - Modify: `docs/ATTENTION.md` (new)
