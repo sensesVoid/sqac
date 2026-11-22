@@ -304,6 +304,8 @@ checkpoint/observe.
    on all surfaces, derived fallback, D2 continuity fixes. Tests: caps,
    cadence triggers, graduation identity, fallback, BC fixtures.
 3. **PR 3** - recall benchmark + triage report; fix PRs follow.
+   **Starts in parallel with PR 1** (maintainer decision) - findings may
+   reshape PR 1/2 details before they harden.
 
 Version 1.4.0. CHANGELOG + README + docs/ATTENTION.md at PR 2 merge.
 
