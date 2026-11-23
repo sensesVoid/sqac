@@ -27,7 +27,8 @@ That gap is the entire product: a frozen, never-trained model answered private q
 
 - **Canonical `mem_id` on every entry (O(1) `mem_get`)** — stable ULID (`sqac/memid.py`) stored in entry `meta`; store-level id index; `mem_get` on MCP/CLI/`GET /entries/{mem_id}`; every search/recall hit carries `mem_id`. Backward compatible: no format bump, old cartridges backfill on load, new cartridges parse in old readers.
 - **Attention block** — compact `[SQAC attention | turn N]` with Current + Pending tasks, injected every 5 turns (`SQAC_ATTENTION_TURNS`) on middleware, MCP, and HTTP; always available via `GET /attention`. Finished tasks graduate to `kind=fact` memories (mem_id preserved).
-- **Per-project task state** — `kind=task` cartridge, excluded from search: `task_add` / `task_done` / `task_list` (MCP). Continuity fixes riding PR 2: `_MemoryState` and `server.py` now call `ContinuityStore.load()`; server gains a ContinuityStore.
+- **Per-project task state** — `kind=task` cartridge, excluded from search: `task_add` / `task_done` / `task_list` (MCP). `task_done` rejects cross-project ids; the attention block and `task_list` filter by the active project.
+- **Spec-compliance follow-ups (1.4.1, unreleased)** — S5 upsert tombstoning (old `mem_id` = honest miss), persisted checkpoint turn marker (`recent()` fallback only shows post-checkpoint turns), server continuity lifecycle, and the 150-token budget now honestly enforced (100-char line cap).
 
 ## Install
 
@@ -114,6 +115,7 @@ Conflict-aware, explicit allowlist, never silently overwrites. → [docs/CLOUD.m
 | Cartridge | Holds | encrypted |
 |---|---|---|
 | `memory` (default) | facts, skills, docs, session turns | no (plaintext by design) |
+| `tasks` | per-project current/pending task state (`kind=task`, excluded from search) | no |
 | `agent` | persona + working state (identity, goals, decisions) | opt-in (SQAE) |
 | `vault` | secrets, PII | yes (AES-256-GCM) |
 | `secret` | secret *references* + metadata (never values) | yes (SQSE) |
@@ -129,7 +131,7 @@ Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fu
 - **Flat-cost stats at scale** — incremental per-kind counters keep `sqac stats` O(1) regardless of cartridge size; `nlargest` selection instead of full sorts
 - **Atomic, crash-safe saves** — single joined-buffer writer; cartridges only rewrite on explicit saves (or the debounced session flush)
 - **PII & credential guard** — regex + Luhn PII detection and credential-pattern rejection run at write time; every entry carries an injection-risk `trust` score
-- **Kind taxonomy** — `generic | fact | skill | doc | turn`, with auto-routing into typed cartridges
+- **Kind taxonomy** — `generic | fact | skill | doc | turn | task`, with auto-routing into typed cartridges
 - **Multilingual normalization (opt-in)** — `SQAC_NORMALIZE="unicode_fold,stopwords:en,affix:en"` pipeline in the key tokenizer (accent folding, language stopwords, rule-based affix stripping); see [docs/NORMALIZE.md](docs/NORMALIZE.md)
 - **OpenAI-compatible client middleware (opt-in)** — `from sqac.integrations import wrap` around Ollama/vLLM/LiteLLM/OpenAI clients: memories are auto-hydrated into the system prompt (confidence-gated), turns auto-recorded to the offloader; see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
 
@@ -147,14 +149,12 @@ Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fu
 - **`mem_graduate`** — promote stable session findings into durable cartridges (default `facts`)
 
 ### MCP server (`sqac-mcp`) — one memory dir shared by every CLI
-36 tools across six groups (see [docs/MCP.md](docs/MCP.md)):
-- **Memory** — `mem_bootstrap` (cross-CLI handoff packet), `mem_checkpoint`, `mem_observe`, `mem_search`, `mem_write`, `mem_recall`/`mem_recall_detailed`, `mem_graduate`, `mem_sparsify`, `mem_swap`, `mem_save`, `mem_stats`, `mem_cartridge_create`/`mem_cartridge_list`
-- **Agent** — `agent_list`, `agent_use`, `agent_show`, `agent_bootstrap`, `agent_update`, `agent_done`, `agent_search`
-- **Vault (reference-only)** — `vault_list`, `vault_meta`, `vault_http`, `vault_audit` — use secrets without ever exposing them
-- **Secret Domain (reference-only)** — `secret_list`, `secret_meta` — references and metadata, never values
-- **Code graph** — `ast_init`, `ast_explore`, `ast_blast`, `ast_callers`, `ast_callees`, `ast_search`, `ast_stats`
-- **Cloud** — `cloud_status`, `cloud_sync`
+18 memory/task tools across four groups (see [docs/MCP.md](docs/MCP.md)):
+- **Memory** — `mem_bootstrap` (cross-CLI handoff packet), `mem_checkpoint`, `mem_observe`, `mem_search`, `mem_write`, `mem_get` (O(1) mem_id lookup), `mem_recall`/`mem_recall_detailed`, `mem_graduate`, `mem_sparsify`, `mem_swap`, `mem_save`, `mem_stats`, `mem_cartridge_create`/`mem_cartridge_list`
+- **Tasks** — `task_add`, `task_done` (graduates to a fact, mem_id preserved), `task_list` — per-project, excluded from ordinary search
 - Plus the `memory://context` resource and **cross-CLI continuity** (`continuity.json`): project goal, last host/model, checkpoint trail — pick up mid-task in any client
+
+Agent, vault, secret, cloud, and code-graph tools live in their own MCP servers (`sqac/agent_mcp.py`, `sqac/vault_mcp.py`, `sqac/secret_mcp.py`, `sqac/cloud_mcp.py`, `sqac/graph_mcp.py`) — see [docs/MCP.md](docs/MCP.md) for the full tool inventory.
 
 ### Agent cartridges
 - Persona + working state in one file: identity, preferences, instructions, goals, decisions, notes
@@ -190,7 +190,7 @@ Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fu
 - `sqac report "title" -d "..."` - file a GitHub issue with diagnostics attached
 - `sqac export <cartridge> [--format md|json]` - serialize a plaintext cartridge to human-readable Markdown/JSON (encrypted vault/secret payloads refuse to export); `sqac diff <old.sqac> <new.sqac> [--format md|json]` - added/removed/updated/reclassified entries between cartridge versions
 - HTTP API server (`sqac-server`, FastAPI) for self-hosting memory behind your own endpoints
-- 574 tests, CI across numpy fallback + Ubuntu/Windows × Python 3.10–3.13, pip-audit-clean runtime deps, full docs set ([FORMAT](docs/FORMAT.md) · [MCP](docs/MCP.md) · [VAULT](docs/VAULT.md) · [SECRET](docs/SECRET.md) · [CLOUD](docs/CLOUD.md) · [DMS](docs/DMS.md) · [SECURITY](docs/SECURITY.md) · [THESIS](docs/THESIS.md))
+- 586 tests, CI across numpy fallback + Ubuntu/Windows × Python 3.10–3.13, pip-audit-clean runtime deps, full docs set ([FORMAT](docs/FORMAT.md) · [MCP](docs/MCP.md) · [VAULT](docs/VAULT.md) · [SECRET](docs/SECRET.md) · [CLOUD](docs/CLOUD.md) · [DMS](docs/DMS.md) · [ATTENTION](docs/ATTENTION.md) · [INTEGRATIONS](docs/INTEGRATIONS.md) · [SECURITY](docs/SECURITY.md) · [THESIS](docs/THESIS.md))
 
 ### HTTP API server (`sqac-server`)
 - **Agent cartridges over HTTP** — `GET /agents`, `GET/POST/PUT/DELETE /agents/{name}`; encrypted (SQAE) agents expose metadata + encrypted flag only, never contents
@@ -198,6 +198,7 @@ Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fu
 - **Kind-aware `/teach`** — with a rack mounted, `fact`/`doc`/`skill` route to `facts`/`docs`/`skills` automatically
 - **Rack search parity** — hits carry `cartridge`/`key`/`kind`; `POST /rack/trace` adds `tier` (`exact`|`fuzzy`|`semantic`) and `latency_ms`
 - **Session lifecycle over HTTP** — `POST /session/observe`, `POST /session/recall`, `POST /session/graduate`, `GET /session/stats`, `POST /session/forget`
+- **Memory addressing** — `GET /entries/{mem_id}` (O(1) exact lookup), `GET /attention` (current attention block)
 - **Cartridge export/import** — `POST /cartridges/{name}/export` & `/import`; encrypted payloads refuse; scope/tier aware
 - **Auth tiers** — `--readonly` (GET-only sandbox), `--scope` cartridge allowlist; `/capabilities` self-description; `/describe` onboarding guide; `/version` build info
 - **SSE event stream** — `GET /events` (backlog + live stream; `?once=true` dumps the backlog and closes); `mem_write` / `mem_graduate` / `mem_swap` / `mem_checkpoint`, metadata only — never content, never secrets; `SQAC_WEBHOOK_URL` POSTs the same events; GET route → read-only sandboxes can subscribe
@@ -207,8 +208,10 @@ Every entry is retrievable three ways: **exact** key lookup (O(1)), **lexical/fu
 ```bash
 sqac teach "..." --key k            # store one fact
 sqac search "query"                 # retrieve it back
+sqac get <mem_id>                   # O(1) exact lookup by mem_id
 sqac init .                         # auto-build memory from a codebase
 sqac track .                        # keep it in sync as the code changes
+sqac checkpoint create/recover      # rate-limit recovery checkpoints
 sqac agent ...                      # agent personas + working state
 sqac vault ...                      # encrypted secrets/PII
 sqac secret ...                     # secret refs/metadata (never values)
@@ -241,7 +244,7 @@ sqac mcp setup --host <cli>         # wire memory into your agent
 
 ## Status
 
-- **Version:** 1.4.0 — 574 tests passing
+- **Version:** 1.4.0 — 586 tests passing
 - **Repository:** https://github.com/sensesVoid/sqac
 - **Issues:** https://github.com/sensesVoid/sqac/issues
 

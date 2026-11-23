@@ -29,7 +29,7 @@ from .offloader import ContextOffloader
 from .dms import DMS
 from . import textnorm
 
-_RACK_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
+_RACK_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills", "task": "tasks"}
 _SESSION_BUDGET = 25_000
 _FLUSH_TURNS = int(os.environ.get("SQAC_SESSION_FLUSH_TURNS", "10"))
 _FLUSH_SECS = float(os.environ.get("SQAC_SESSION_FLUSH_SECS", "60"))
@@ -38,7 +38,8 @@ _FLUSH_SECS = float(os.environ.get("SQAC_SESSION_FLUSH_SECS", "60"))
 def _memory_dir(memory_dir: Optional[str | Path]) -> Path:
     if memory_dir is not None:
         return Path(memory_dir).expanduser()
-    return Path(os.environ.get("SQAC_MEM_DIR", Path.home() / ".sqacm")).expanduser()
+    from .tasks import tasks_dir
+    return tasks_dir()
 
 
 def _make_rack(d: Path) -> CartridgeRack:
@@ -53,7 +54,7 @@ def _make_rack(d: Path) -> CartridgeRack:
 def _format_memories(hits: list) -> str:
     lines = ["Relevant memories (SQAC, confidence-gated):"]
     for h in hits:
-        mid = getattr(h, "mem_id", "") or (h.meta.get("mem_id", "") if isinstance(getattr(h, "meta", None), dict) else "")
+        mid = h.mem_id
         tag = f" mem_id={mid}" if mid else ""
         lines.append(f"- [{h.confidence:.2f}]{tag} {h.content}")
     return "\n".join(lines)
@@ -69,11 +70,12 @@ def _augment(messages: list[dict], injection: str) -> list[dict]:
 
 
 class _Completions:
-    def __init__(self, client: "SqacClient", upstream, rack, offloader):
+    def __init__(self, client: "SqacClient", upstream, rack, offloader, continuity=None):
         self._client = client
         self._upstream = upstream
         self._rack = rack
         self._offloader = offloader
+        self._continuity = continuity
         self._turns = 0
 
     def _attention_due(self) -> bool:
@@ -86,10 +88,18 @@ class _Completions:
         from .attention import render_block_with_fallback
         from .tasks import TaskManager
         tm = TaskManager(self._rack)
-        current = [(t["content"], t["mem_id"]) for t in tm.list(status="current")]
-        pending = [(t["content"], t["mem_id"]) for t in tm.list(status="pending")]
+        proj = self._project_name(None)
+        current = [(t["content"], t["mem_id"]) for t in tm.list(status="current", project=proj)]
+        pending = [(t["content"], t["mem_id"]) for t in tm.list(status="pending", project=proj)]
         return render_block_with_fallback(self._turns, current, pending,
-                                          offloader=self._offloader)
+                                          offloader=self._offloader,
+                                          continuity=self._continuity,
+                                          project=proj)
+
+    @staticmethod
+    def _project_name(project: Optional[str]) -> str:
+        from .tasks import project_name
+        return project_name(project)
 
     def create(self, model: str, messages: list[dict], **kwargs: Any):
         rack = self._rack
@@ -126,8 +136,8 @@ class _Completions:
 
 
 class _Chat:
-    def __init__(self, client: "SqacClient", upstream, rack, offloader):
-        self.completions = _Completions(client, upstream, rack, offloader)
+    def __init__(self, client: "SqacClient", upstream, rack, offloader, continuity=None):
+        self.completions = _Completions(client, upstream, rack, offloader, continuity=continuity)
 
 
 class SqacClient:
@@ -147,7 +157,12 @@ class SqacClient:
             d / "session.sqac", window=8, semantic=True,
             dms=DMS(budget=_SESSION_BUDGET),
         )
-        self.chat = _Chat(self, self._upstream, self.rack, self.offloader)
+        # Continuity store so the middleware's attention fallback can show
+        # the active goal (spec: Current goal from continuity, like MCP).
+        from .continuity import ContinuityStore
+        self.continuity = ContinuityStore.load(d / "continuity.json")
+        self.chat = _Chat(self, self._upstream, self.rack, self.offloader,
+                          continuity=self.continuity)
 
     def __getattr__(self, name: str) -> Any:
         # fallthrough to the wrapped client for anything we don't model

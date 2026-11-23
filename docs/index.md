@@ -34,7 +34,11 @@ sqac cloud init --provider r2 --bucket my-memory
 
 - [Repository README](https://github.com/sensesVoid/sqac) — full tour, CLI in one glance
 - [AGENT.md](AGENT.md) — agent personas + working state
+- [ATTENTION.md](ATTENTION.md) — attention block (Current/Pending tasks, every N turns)
+- [INTEGRATIONS.md](INTEGRATIONS.md) — OpenAI-compatible client middleware
+- [DMS.md](DMS.md) — Dynamic Memory Sparsification
 - [VAULT.md](VAULT.md) — encrypted vault cartridges
+- [SECRET.md](SECRET.md) — secret references, never values
 - [CLOUD.md](CLOUD.md) — cloud sync with per-cartridge sync policy
 - [MCP.md](MCP.md) — MCP tools reference
 - [FORMAT.md](FORMAT.md) — the `.sqac` binary format

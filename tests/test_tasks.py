@@ -26,16 +26,25 @@ class TestTasks(unittest.TestCase):
         self.assertIn("ship v2", [t["content"] for t in cur])
         self.assertIn("plan v3", [t["content"] for t in pend])
 
-    def test_default_status_is_current(self):
+    def test_default_status_is_pending(self):
         tm = TaskManager()
         r = tm.add("something urgent")
-        self.assertEqual(r["status"], "current")
-        tasks = tm.list(status="current")
+        self.assertEqual(r["status"], "pending")
+        tasks = tm.list(status="pending")
         self.assertTrue(any(t["content"] == "something urgent" for t in tasks))
+
+    def test_done_cross_project_rejected(self):
+        tm = TaskManager()
+        r = tm.add("other project task", status="current", project="otherproj")
+        res = tm.done(r["mem_id"])
+        self.assertFalse(res["found"])
+        self.assertFalse(res["graduated"])
+        # task still alive in its project
+        self.assertIsNotNone(tm._rack.get_by_mem_id(r["mem_id"], cartridges=["tasks"]))
 
     def test_done_graduates_preserving_id(self):
         tm = TaskManager()
-        r = tm.add("finish q4 review", status="current")
+        r = tm.add("finish q4 review", status="current", project=project_name())
         mid = r["mem_id"]
         # find task entry index in tasks store
         st = tm._store()
@@ -58,6 +67,13 @@ class TestTasks(unittest.TestCase):
         res = tm.done("nonexistent-id")
         self.assertFalse(res["found"])
         self.assertFalse(res["graduated"])
+
+    def test_done_same_project_graduates(self):
+        tm = TaskManager()
+        r = tm.add("local task", status="current", project=project_name())
+        res = tm.done(r["mem_id"])
+        self.assertTrue(res["found"])
+        self.assertTrue(res["graduated"])
 
     def test_tasks_excluded_from_search(self):
         tm = TaskManager()

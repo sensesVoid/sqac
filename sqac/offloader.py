@@ -214,6 +214,7 @@ class ContextOffloader:
         self.dms = dms  # optional Dynamic Memory Sparsification policy
         self._turn_count = 0
         self._attention_dirty = False
+        self._checkpoint_turn = 0  # turn of the latest mem_checkpoint (C5)
         self._xid = 0
         self._since_flush = 0
         self._last_flush = time.time()
@@ -228,6 +229,7 @@ class ContextOffloader:
                 default=0,
             )
             self._turn_count = self._restore_turn_count()
+            self._checkpoint_turn = self._restore_checkpoint_turn()
         else:
             self._store = SqacStore(semantic=semantic, fuzzy_threshold=min_confidence)
 
@@ -240,6 +242,23 @@ class ContextOffloader:
         if m:
             return int(m.group(1))
         return 2 * self._xid
+
+    def _restore_checkpoint_turn(self) -> int:
+        """Restore the checkpoint turn marker (C5). Buckets saved before
+        checkpoints existed read as 0 (fallback = the whole session)."""
+        desc = getattr(self._store, "_description", "") or ""
+        m = re.search(r"\bcheckpoint_turn=(\d+)\b", desc)
+        return int(m.group(1)) if m else 0
+
+    @property
+    def turn_count(self) -> int:
+        """Total turns observed (public accessor; attention/server used to
+        reach into _turn_count directly)."""
+        return self._turn_count
+
+    def record_checkpoint(self) -> None:
+        """Record the current turn as the latest checkpoint marker (C5)."""
+        self._checkpoint_turn = self._turn_count
 
     # ── write path ──────────────────────────────────────────────────────
 
@@ -345,7 +364,10 @@ class ContextOffloader:
                 continue
             e = self._store._entries[idx]
             # rewrite in place: turn -> durable fact (exempt from the basket)
+            old_mid = e.get("meta", {}).get("mem_id")
             self._store.delete(idx)
+            if old_mid:
+                self._store.claim_mem_id(old_mid)  # demotion keeps the id
             self._store.add(
                 e["content"],
                 key=e.get("key_norm") or e["content"],
@@ -361,8 +383,17 @@ class ContextOffloader:
     # ── read path ───────────────────────────────────────────────────────
 
     def recent(self, n: int = 5) -> list[str]:
-        """Last n live turn texts (for the attention-block fallback)."""
-        return [t.text or "" for t in list(self._buffer)[-max(1, n):]]
+        """Last n live turn texts (for the attention-block fallback).
+
+        C5: when a checkpoint marker exists, only turns AFTER the latest
+        checkpoint are eligible (the marker records where the last handoff
+        happened; anything before it is already summarized)."""
+        buf = self._buffer
+        if self._checkpoint_turn > 0:
+            start = self._turn_count - len(buf)  # turn number of buffer[0] - 1
+            after = [t for i, t in enumerate(buf) if start + i + 1 >= self._checkpoint_turn]
+            buf = after if after else buf
+        return [t.text or "" for t in buf[-max(1, n):]]
 
     def recall(self, query: str, top_k: int = 2) -> str:
         """Answer a back-reference with offloaded context, or "" (fail-safe).
@@ -476,7 +507,8 @@ class ContextOffloader:
             description=(
                 f"{len(self._store)} turn entries, "
                 f"{self._xid} exchanges, xid={self._xid} "
-                f"turns={self._turn_count} window={self.window}"
+                f"turns={self._turn_count} checkpoint_turn={self._checkpoint_turn} "
+                f"window={self.window}"
             ),
         )
         self._since_flush = 0

@@ -99,12 +99,18 @@ class TestServerAttention(unittest.TestCase):
         return {"X-API-Key": "sk-test"}
 
     def test_attention_endpoint_returns_block(self):
-        tm = TaskManager(CartridgeRack(directory=self.tmpdir))
-        tm.add("ship v2", status="current")
-        r = self.client.get("/attention", headers=self._h())
-        self.assertEqual(r.status_code, 200)
-        self.assertIn("[SQAC attention | turn 0]", r.json()["attention"])
-        self.assertIn("ship v2", r.json()["attention"])
+        import os as _os
+        from pathlib import Path
+        _os.environ["SQAC_PROJECT"] = Path(self.tmpdir).name
+        try:
+            tm = TaskManager(CartridgeRack(directory=self.tmpdir))
+            tm.add("ship v2", status="current")
+            r = self.client.get("/attention", headers=self._h())
+            self.assertEqual(r.status_code, 200)
+            self.assertIn("[SQAC attention | turn 0]", r.json()["attention"])
+            self.assertIn("ship v2", r.json()["attention"])
+        finally:
+            _os.environ.pop("SQAC_PROJECT", None)
 
     def test_observe_returns_attention_when_due(self):
         srv.ATTENTION_TURNS = 1
