@@ -82,13 +82,13 @@ class TaskManager:
             self._rack.create("tasks")
         return self._rack._require("tasks")
 
-    def add(self, content: str, status: str = "current", project: Optional[str] = None,
-            mem_id: Optional[str] = None, meta: Optional[dict] = None) -> dict[str, Any]:
+    def add(self, content: str, status: str = "pending", project: Optional[str] = None,
+            mem_id: Optional[str] = None) -> dict[str, Any]:
         """Add a task entry. Returns {mem_id, content, status, project}."""
         if status not in STATUSES:
-            status = "current"
+            status = "pending"
         proj = project_name(project) or "default"
-        m = dict(meta or {})
+        m = {}
         m.update({"status": status, "project": proj, "updated": _now()})
         if "created" not in m:
             m["created"] = _now()
@@ -130,28 +130,36 @@ class TaskManager:
 
     def done(self, mem_id: str, to_fact: bool = True) -> dict[str, Any]:
         """Graduate a task to a durable kind=fact memory (same mem_id),
-        tombstoning the task entry. Returns {found, graduated, mem_id, content}."""
+        tombstoning the task entry. Returns {found, graduated, mem_id, content}.
+
+        Q2: rejects cross-project ids — a task from another project is an
+        honest miss, never graduated."""
         res0 = self._rack.get_by_mem_id(mem_id, cartridges=["tasks"])
         st = self._store()
+        if res0 is None:
+            return {"found": False, "graduated": False, "mem_id": mem_id, "content": ""}
+        task_e = res0[1]
+        if _project(task_e) != project_name():
+            return {"found": False, "graduated": False, "mem_id": mem_id, "content": ""}
         idx = st.delete_entry_by_mem_id(mem_id)
         if res0 is None and idx is None:
             return {"found": False, "graduated": False, "mem_id": mem_id, "content": ""}
-        content = (st._entries[idx]["content"] if idx is not None
-                   and idx < len(st._entries)
-                   and not st._entries[idx].get("deleted")
-                   else (res0[1]["content"] if res0 else ""))
+        content = task_e["content"]
         graduated = False
         fact_mid = ""
         if to_fact:
             try:
+                facts_st = self._rack._stores.get("facts")
+                if facts_st is None:
+                    facts_st = self._rack.create("facts")._require("facts")
+                # Graduation moves the id: the facts store takes ownership.
+                facts_st.claim_mem_id(mem_id)
                 self._rack.add_with_mem_id(
                     "facts", content,
-                    key=(st._entries[idx].get("key_norm") if idx is not None and idx < len(st._entries)
-                         and not st._entries[idx].get("deleted") else content),
+                    key=task_e.get("key_norm") or content,
                     source="tasks", kind="fact",
                     meta={"status": "done",
-                          "project": _project(st._entries[idx]) if (idx is not None and idx < len(st._entries)
-                                                                   and not st._entries[idx].get("deleted")) else "default",
+                          "project": _project(task_e),
                           "from_task": True},
                     mem_id=mem_id)
                 graduated = True
@@ -168,17 +176,3 @@ class TaskManager:
         return {"found": found, "graduated": graduated, "mem_id": fact_mid or mem_id,
                 "content": content}
 
-    def update(self, mem_id: str, status: Optional[str] = None,
-               content: Optional[str] = None) -> dict[str, Any]:
-        st = self._store()
-        idx = next((i for i, x in enumerate(st._entries)
-                    if x["meta"].get("mem_id") == mem_id and not x.get("deleted")), None)
-        if idx is None:
-            return {"found": False, "updated": False}
-        if status:
-            st._entries[idx]["meta"]["status"] = status
-        if content is not None:
-            st._entries[idx]["content"] = content
-        st._entries[idx]["meta"]["updated"] = _now()
-        self._rack.save()
-        return {"found": True, "updated": True}

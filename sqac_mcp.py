@@ -177,23 +177,15 @@ def _hit_json(h) -> dict[str, Any]:
         "latency_ms": h.meta.get("latency_ms"),
         "kind": h.meta.get("kind"),
     }
-    mid = getattr(h, "mem_id", "") or (h.meta.get("mem_id", "") if isinstance(getattr(h, "meta", None), dict) else "")
-    if mid:
-        d["mem_id"] = mid
+    if h.mem_id:
+        d["mem_id"] = h.mem_id
     return d
 
 
 def _project_name(project: Optional[str]) -> str:
-    """Resolve the project key: explicit arg > env > cwd basename > default."""
-    if project and project.strip():
-        return project.strip()
-    env = os.environ.get("SQAC_PROJECT")
-    if env and env.strip():
-        return env.strip()
-    try:
-        return os.getcwd().split("/")[-1] or "default"
-    except OSError:
-        return "default"
+    """Resolve the project key (delegates to sqac.tasks.project_name)."""
+    from sqac.tasks import project_name
+    return project_name(project)
 
 
 def _recent_exchanges(st, project: str, n: int = 5) -> list[dict[str, Any]]:
@@ -220,12 +212,13 @@ def _attention_block(st) -> str:
     from sqac.tasks import TaskManager
     try:
         tm = TaskManager(st.rack)
-        cur = [(t["content"], t["mem_id"]) for t in tm.list(status="current")]
-        pnd = [(t["content"], t["mem_id"]) for t in tm.list(status="pending")]
+        proj = _project_name(None)
+        cur = [(t["content"], t["mem_id"]) for t in tm.list(status="current", project=proj)]
+        pnd = [(t["content"], t["mem_id"]) for t in tm.list(status="pending", project=proj)]
     except Exception:
         return ""
     return render_block_with_fallback(
-        st.session._turn_count, cur, pnd,
+        st.session.turn_count, cur, pnd,
         offloader=st.session, continuity=st.continuity,
         project=_project_name(None))
 
@@ -318,6 +311,10 @@ def mem_checkpoint(
         host_name = detect_host(host)
         rec = st.continuity.checkpoint(proj, host=host_name, goal=goal, summary=summary)
         st.continuity.save()
+        # C5: record the checkpoint turn marker (persisted via save()) so the
+        # attention fallback only shows turns AFTER this handoff.
+        st.session.record_checkpoint()
+        st.session.save()
         events.emit("mem_checkpoint", project=proj, goal=goal, host=host_name,
                     source="mcp")
         return _ok(
@@ -361,6 +358,11 @@ def mem_sparsify(
         st = _state()
         demoted = st.session.sparsify(top_k=top_k)
         st.session.save()
+        if demoted == 0 and not st.session.stats().get("kinds"):
+            # empty session bucket: nothing to sparsify; return an honest
+            # JSON packet instead of a bare/empty body
+            return _ok({"demoted": 0, "session_entries": 0, "kinds": {},
+                        "note": "Nothing eligible; no DMS policy, or nothing cold enough."})
         return _ok(
             {
                 "demoted": demoted,
@@ -527,7 +529,7 @@ def task_add(
     try:
         tm = TaskManager(_state().rack)
         r = tm.add(content, status=status, project=project)
-        return _ok({**r, "ok": True})
+        return _ok({**r, "ok": True, "attention": _attention_block(_state())})
     except Exception as e:
         return _err(e)
 
@@ -557,7 +559,7 @@ def task_done(mem_id: Annotated[str, Field(min_length=1, max_length=64, descript
         if r.get("graduated"):
             events.emit("mem_graduate", target="facts",
                         source_entry=r.get("mem_id", ""), source="mcp", task=True)
-        return _ok(r)
+        return _ok({**r, "ok": True, "attention": _attention_block(st)})
     except Exception as e:
         return _err(e)
 
@@ -574,17 +576,19 @@ def task_done(mem_id: Annotated[str, Field(min_length=1, max_length=64, descript
 )
 @_serialized
 def task_list(
-    project: Annotated[Optional[str], Field(description="Project filter (default: all)")] = None,
+    project: Annotated[Optional[str], Field(description="Project filter (default: active project)")] = None,
     status: Annotated[Optional[str], Field(description="current or pending (default: all)")] = None,
 ) -> str:
     """List task entries (v1.4.0). current first, then pending.
+
+    Q2: filters by the active project when `project` is omitted.
 
     Returns:
         JSON: {"tasks": [{mem_id, content, status, project, updated}]}.
     """
     try:
         tm = TaskManager(_state().rack)
-        return _ok({"tasks": tm.list(status=status, project=project)})
+        return _ok({"tasks": tm.list(status=status, project=project or _project_name(None))})
     except Exception as e:
         return _err(e)
 

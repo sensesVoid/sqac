@@ -234,6 +234,7 @@ class SqacStore:
         self._alive = 0
         self._kind_counts: dict[str, int] = {}
         self._id_index: dict[str, int] = {}
+        self._id_tombstones: set[str] = set()  # retired ids stay honest misses
         self._rebuild_id_index()
     def _invalidate_cache(self) -> None:
         """Increment write version to invalidate stale cache entries.
@@ -280,11 +281,24 @@ class SqacStore:
         m = dict(kwargs.pop("meta", None) or {})
         if mem_id:
             m["mem_id"] = mem_id
-        kwargs.pop("mem_id", None)
         idx = self.add(content, meta=m, **kwargs)
         if mem_id:
             self._id_index[mem_id] = idx
+            self._id_tombstones.discard(mem_id)
         return idx
+
+    def claim_mem_id(self, mem_id: str) -> None:
+        """Transfer a retired mem_id into this store (task graduation moves
+        the id from the tasks store to the facts store).
+
+        The id leaves the retirement set and resolves to the next entry
+        added here. Old cartridge readers simply see the facts-store entry
+        for the id — the honest-miss rule is preserved within a store.
+        """
+        if not mem_id:
+            return
+        self._id_tombstones.discard(mem_id)
+        self._id_index.pop(mem_id, None)
 
     def add(
         self,
@@ -325,11 +339,23 @@ class SqacStore:
         norm = self._norm(key_text)
         self._invalidate_cache()
 
+        # S5: upsert — writing the same key appends a new entry with a NEW
+        # id and tombstones the old one, so the old id becomes an honest
+        # miss (the id identifies an immutable entry).
+        prior = self._exact.get(norm)
+        if prior is not None and 0 <= prior < len(self._entries) and not self._entries[prior].get("deleted"):
+            self._retire(prior)
+            self._exact.pop(norm, None)
+
         kind_resolved = resolve_kind(kind)
         meta = dict(meta or {})
         if not meta.get("mem_id"):
             meta["mem_id"] = new_mem_id()
         idx = len(self._entries)
+        if meta["mem_id"] in self._id_tombstones:
+            raise ValueError(
+                f"mem_id {meta['mem_id']!r} was retired (upsert); mint a new id"
+            )
         self._entries.append(
             {
                 "content": content,
@@ -356,23 +382,34 @@ class SqacStore:
         """Tombstone an entry (O(1))."""
         if not (0 <= idx < len(self._entries)):
             return False
-        norm = self._entries[idx]["key_norm"]
-        already = bool(self._entries[idx].get("deleted"))
-        self._entries[idx]["deleted"] = True
+        self._retire(idx)
+        return True
+
+    def _retire(self, idx: int) -> None:
+        """Tombstone entry `idx`: mark deleted, decrement counts, drop the
+        exact mapping, and record its mem_id as retired (honest miss)."""
+        e = self._entries[idx]
+        norm = e["key_norm"]
+        already = bool(e.get("deleted"))
+        e["deleted"] = True
         if not already:
-            kname = KIND_NAMES.get(self._entries[idx].get("kind", KIND_GENERIC), "generic")
+            kname = KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic")
             if self._kind_counts.get(kname):
                 self._kind_counts[kname] -= 1
             self._alive -= 1
             if self._alive < 0:
                 self._alive = 0
+        meta = e.get("meta")
+        mid = meta.get("mem_id") if isinstance(meta, dict) else None
+        if mid:
+            self._id_tombstones.add(mid)
+            self._id_index.pop(mid, None)
         # Only drop the exact mapping if it still points at this entry: a
         # later add with the same key may have claimed it, and that sibling
         # must keep its O(1) exact tier.
         if self._exact.get(norm) == idx:
             self._exact.pop(norm, None)
         self._invalidate_cache()
-        return True
 
     def compact(self) -> dict:
         """Remove tombstoned entries and rebuild the index in-place.
@@ -458,8 +495,9 @@ class SqacStore:
         for i, e in enumerate(self._entries):
             meta = e.get("meta") if isinstance(e.get("meta"), dict) else {}
             mid = meta.get("mem_id") if isinstance(meta, dict) else None
-            if mid is not None:
-                self._id_index[mid] = i
+            if mid is None or mid in self._id_tombstones or e.get("deleted"):
+                continue
+            self._id_index[mid] = i
 
     def delete_entry_by_mem_id(self, mem_id: str) -> Optional[int]:
         """Tombstone the entry with the given mem_id. Returns idx or None."""

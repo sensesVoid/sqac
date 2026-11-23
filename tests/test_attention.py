@@ -2,7 +2,7 @@ import os, shutil, sys, tempfile, unittest
 from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqac.attention import render_block, count_tokens, CURRENT_CAP, PENDING_CAP, MAX_TOKENS
-from sqac.offloader import ContextOffloader
+from sqac.offloader import ContextOffloader, Turn
 
 class TestRenderBlock(unittest.TestCase):
     def test_header(self):
@@ -92,6 +92,24 @@ class TestOffloaderCadence(unittest.TestCase):
         o.mark_attention_dirty()
         self.assertTrue(o.take_attention_dirty())
         self.assertFalse(o.take_attention_dirty())
+
+    def test_checkpoint_turn_marker(self):
+        o = self._o()
+        o._turn_count = 7
+        o.record_checkpoint()
+        self.assertEqual(o._checkpoint_turn, 7)
+        # buffer covers turns 4..7; only turns >= the marker (7) are eligible
+        o._buffer = [Turn(role="user", text="u4"), Turn(role="assistant", text="a5"),
+                     Turn(role="user", text="u6"), Turn(role="assistant", text="a7")]
+        self.assertEqual(o.recent(5), ["a7"])
+        # before any marker, the whole buffer is eligible
+        o._checkpoint_turn = 0
+        self.assertEqual(o.recent(5), ["u4", "a5", "u6", "a7"])
+
+    def test_turn_count_property(self):
+        o = self._o()
+        o._turn_count = 3
+        self.assertEqual(o.turn_count, 3)
 
 if __name__ == "__main__":
     unittest.main()

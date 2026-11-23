@@ -20,7 +20,7 @@ import sys
 import time as time_module
 from pathlib import Path
 
-from .store import SqacStore
+from .store import KIND_NAMES, SqacStore
 
 DEFAULT_DB = "memory.sqac"
 DEFAULT_SQAC_DIR = ".sqac"
@@ -824,7 +824,7 @@ def main(argv: list[str] | None = None) -> int:
         if found is None:
             print(_json.dumps({"found": False, "mem_id": args.mem_id}))
             return 1
-        kind_name = {0:"generic",1:"fact",2:"skill",3:"doc",4:"turn"}.get(found.get("kind", 0), "generic")
+        kind_name = KIND_NAMES.get(found.get("kind", 0), "generic")
         out = {"found": True, "mem_id": args.mem_id, "content": found.get("content", ""),
                "kind": kind_name, "source": found.get("source", ""), "cartridge": found_cart,
                "meta": dict(found.get("meta") or {})}

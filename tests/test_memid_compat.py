@@ -58,6 +58,36 @@ class TestBackwardCompat(unittest.TestCase):
         st.add("x2", key="k")
         m2 = st._entries[1]["meta"]["mem_id"]
         self.assertNotEqual(m1, m2)
+        # S5: upsert tombstones the old entry -> old id is an honest miss
+        self.assertIsNone(st.get(m1))
+        self.assertIsNotNone(st.get(m2))
+
+    def test_upsert_tombstone_survives_save_load(self):
+        import tempfile, shutil
+        d = tempfile.mkdtemp()
+        try:
+            path = Path(d) / "upsert.sqac"
+            st = SqacStore()
+            st.add("v1", key="k")
+            m1 = st._entries[0]["meta"]["mem_id"]
+            st.add("v2", key="k")
+            m2 = st._entries[1]["meta"]["mem_id"]
+            st.save(path)
+            loaded = SqacStore.load(path)
+            self.assertIsNone(loaded.get(m1))
+            self.assertIsNotNone(loaded.get(m2))
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+    def test_claim_mem_id_revives_after_tombstone(self):
+        st = SqacStore()
+        st.add("t", kind="task")
+        mid = st._entries[0]["meta"]["mem_id"]
+        st.delete_entry_by_mem_id(mid)
+        self.assertIsNone(st.get(mid))  # retired -> honest miss
+        st.claim_mem_id(mid)            # graduation transfers ownership
+        st.add_with_mem_id("f", mem_id=mid, kind="fact")
+        self.assertIsNotNone(st.get(mid))  # facts store resolves it again
 
 
 if __name__ == "__main__":

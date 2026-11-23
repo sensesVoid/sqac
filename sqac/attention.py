@@ -11,7 +11,9 @@ from typing import Sequence
 
 CURRENT_CAP = 5
 PENDING_CAP = 10
+DEFAULT_PENDING = 5  # fallback pending turns (recent window)
 MAX_TOKENS = 150
+MAX_LINE_CHARS = 100  # per-item char budget (token budget enforcement)
 
 
 def count_tokens(text: str) -> int:
@@ -35,6 +37,8 @@ def render_block(turn: int,
         shown = list(items[:cap])
         for content, mem_id in shown:
             content = (content or "").strip().replace("\n", " ")
+            if len(content) > MAX_LINE_CHARS:
+                content = content[: MAX_LINE_CHARS - 1].rstrip() + "…"
             lines.append(f"- {content} (mem_id {mem_id})")
         if len(items) > cap:
             lines.append(f"- +{len(items) - cap} more")
@@ -57,8 +61,7 @@ def render_block_with_fallback(turn: int,
                                pending: Sequence[tuple[str, str]],
                                offloader=None,
                                continuity=None,
-                               project: str | None = None,
-                               max_pending: int = 5) -> str:
+                               project: str | None = None) -> str:
     """Render the attention block, falling back to derived task state.
 
     When no explicit tasks exist (current and pending both empty):
@@ -76,7 +79,7 @@ def render_block_with_fallback(turn: int,
     pnd: list[tuple[str, str]] = []
     if offloader is not None:
         try:
-            for text in offloader.recent(max_pending):
+            for text in offloader.recent(DEFAULT_PENDING):
                 pnd.append((text[:200], ""))
         except Exception:
             pass

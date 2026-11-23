@@ -37,7 +37,7 @@ _readonly = os.environ.get("SQAC_READONLY", "").lower() in ("1", "true", "yes")
 _scope = [s.strip() for s in os.environ.get("SQAC_SCOPE", "").split(",") if s.strip()]
 AGENT_ENCRYPTED_MAGIC = b"SQAE"
 # Mirror sqac_mcp.DEFAULT_ROUTES (kept local so the HTTP server never imports the MCP layer)
-_RACK_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills"}
+_RACK_ROUTES = {"fact": "facts", "doc": "docs", "skill": "skills", "task": "tasks"}
 
 
 def _make_rack(d):
@@ -366,9 +366,8 @@ def _enriched_hit(h):
         "kind": meta.get("kind"),
         "meta": meta,
     }
-    mid = getattr(h, "mem_id", "") or meta.get("mem_id", "")
-    if mid:
-        d["mem_id"] = mid
+    if h.mem_id:
+        d["mem_id"] = h.mem_id
     return d
 
 
@@ -408,6 +407,15 @@ def session_observe(req: SessionObserveRequest, _=Depends(_verify_key)):
     o = _state.get("offloader")
     if not o: raise HTTPException(400, "no session offloader")
     xid = o.observe(req.role, req.text)
+    # C6: continuity lifecycle — touch + persist on observe (mirrors the MCP
+    # mem_observe continuity pass-through) so cross-CLI state stays fresh.
+    cont = _state.get("continuity")
+    if cont is not None:
+        try:
+            cont.touch(Path(_state["dir"]).name)
+            cont.save()
+        except Exception:
+            pass
     if o.should_flush(SESSION_FLUSH_TURNS, SESSION_FLUSH_SECS):
         o.save()
     out = {"ok": True, "exchange_offloaded": xid, "buffer_size": len(o._buffer)}
@@ -415,12 +423,13 @@ def session_observe(req: SessionObserveRequest, _=Depends(_verify_key)):
         from .attention import render_block_with_fallback
         from .tasks import TaskManager
         tm = TaskManager(_state.get("rack") or CartridgeRack(directory=_state["dir"]))
+        proj = Path(_state["dir"]).name
         out["attention"] = render_block_with_fallback(
-            o._turn_count,
-            [(t["content"], t["mem_id"]) for t in tm.list(status="current")],
-            [(t["content"], t["mem_id"]) for t in tm.list(status="pending")],
-            offloader=o, continuity=_state.get("continuity"),
-            project=Path(_state["dir"]).name)
+            o.turn_count,
+            [(t["content"], t["mem_id"]) for t in tm.list(status="current", project=proj)],
+            [(t["content"], t["mem_id"]) for t in tm.list(status="pending", project=proj)],
+            offloader=o, continuity=cont,
+            project=proj)
     return out
 
 @app.post("/session/recall")
@@ -867,12 +876,12 @@ def attention(_=Depends(_verify_key)):
     from .attention import render_block_with_fallback
     from .tasks import TaskManager
     off = _state.get("offloader")
-    turn = off._turn_count if off else 0
+    turn = off.turn_count if off else 0
     rack = _state.get("rack") or CartridgeRack(directory=_state["dir"])
     tm = TaskManager(rack)
-    cur = [(t["content"], t["mem_id"]) for t in tm.list(status="current")]
-    pnd = [(t["content"], t["mem_id"]) for t in tm.list(status="pending")]
     project = Path(_state["dir"]).name
+    cur = [(t["content"], t["mem_id"]) for t in tm.list(status="current", project=project)]
+    pnd = [(t["content"], t["mem_id"]) for t in tm.list(status="pending", project=project)]
     return {"turn": turn,
             "attention": render_block_with_fallback(turn, cur, pnd,
                                                     offloader=off,
@@ -1204,7 +1213,7 @@ def session_stats(_=Depends(_verify_key)):
     return {
         "entries": len(o._store),
         "offloaded_exchanges": o._xid,
-        "turns": o._turn_count,
+        "turns": o.turn_count,
         "live_buffer": len(o._buffer),
         "window": o.window,
         "kinds": o._store.stats().get("kinds", {}),
