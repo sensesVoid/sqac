@@ -308,16 +308,26 @@ class SqacStore:
         source: str = "user",
         kind: int | str | None = KIND_GENERIC,
         validate: bool = True,
+        enrich_keys: bool = False,
     ) -> int:
         """Teach the store one fact. O(1) amortized, non-destructive.
 
         kind: knowledge kind (KIND_* int or name: "fact"/"skill"/"doc"/
         "turn"). Kinds enable filtered retrieval and kind-aware ranking;
         they do not affect which index tiers an entry participates in.
-        
+
         validate: if True (default), run credential detection and prompt
         injection analysis. Set to False for trusted bulk loads to skip
         these checks for performance.
+
+        enrich_keys: if True, the FUZZY/SEMANTIC tier vectors are built from
+        `key + content anchors` instead of the bare key. The exact tier
+        (`_exact`, `key_norm`) is unchanged, so `sqac get`/O(1) lookups and
+        dedupe semantics are identical; only near-miss recall improves.
+        Motivated by the recall benchmark (experiments/RECALL_BENCHMARK.md):
+        lexical-gap queries ('what database do we run in production' vs key
+        'primary db engine') score ~0.56 on the bare key and ~0.62 when the
+        content anchors are folded into the fuzzy vector.
         """
         content = sanitize_content(content)
         if not content:
@@ -369,10 +379,15 @@ class SqacStore:
         kname = KIND_NAMES.get(kind_resolved, "generic")
         self._kind_counts[kname] = self._kind_counts.get(kname, 0) + 1
         self._alive += 1
-        self._keys.append(self.encoder.encode_bits(key_text))
+        if enrich_keys and key_text != content:
+            # fuzzy-tier key: bare key + content anchors (exact tier untouched)
+            fuzzy_key = f"{key_text} {content}"
+        else:
+            fuzzy_key = key_text
+        self._keys.append(self.encoder.encode_bits(fuzzy_key))
         self._ckeys.append(self.encoder.encode_bits(content))
         if self.semantic:
-            self._sem_keys.append(self._sem_encoder.encode_bits(key_text))
+            self._sem_keys.append(self._sem_encoder.encode_bits(fuzzy_key))
             self._sem_ckeys.append(self._sem_encoder.encode_bits(content))
         self._exact[norm] = idx
         self._id_index[meta["mem_id"]] = idx

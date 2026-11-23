@@ -5,14 +5,23 @@
 | corpus | tier | recall@1 | recall@3 | recall@5 | gate pass/total | conf med |
 |---|---|---|---|---|---|---|
 | en-facts | exact | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
+| en-facts (enriched) | exact | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
 | en-facts | fuzzy | 0.97 | 0.97 | 0.97 | 194/200 | 0.727 |
+| en-facts (enriched) | fuzzy | 0.97 | 0.97 | 0.97 | 194/200 | 0.73 |
 | en-facts | semantic | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
+| en-facts (enriched) | semantic | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
 | es-facts | exact | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
+| es-facts (enriched) | exact | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
 | es-facts | fuzzy | 1.0 | 1.0 | 1.0 | 197/200 | 0.721 |
+| es-facts (enriched) | fuzzy | 1.0 | 1.0 | 1.0 | 197/200 | 0.729 |
 | es-facts | semantic | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
+| es-facts (enriched) | semantic | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
 | code-ids | exact | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
+| code-ids (enriched) | exact | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
 | code-ids | fuzzy | 1.0 | 1.0 | 1.0 | 200/200 | 0.727 |
+| code-ids (enriched) | fuzzy | 1.0 | 1.0 | 1.0 | 200/200 | 0.732 |
 | code-ids | semantic | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
+| code-ids (enriched) | semantic | 0.0 | 0.0 | 0.0 | 0/200 | 0.0 |
 
 ## Triage — misses by query class
 
@@ -26,3 +35,7 @@
 - [HIT] factual: 'qué motor de base de datos usamos'
 - [HIT] code: 'PaymentService retry policy'
 - [MISS] procedural: 'como revertimos un despliegue malo'
+
+## False-positive band (gate threshold evidence)
+
+- wrong-key top-1: 0/218, conf mean 0.631, med 0.609, p90 0.697265625, p99 0.8017578125, max 0.818

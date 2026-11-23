@@ -261,7 +261,8 @@ def _norm(s: str) -> str:
     return " ".join(s.lower().split())
 
 
-def run_corpus(store: SqacStore, corpus: Corpus, threshold: float) -> dict[str, Any]:
+def run_corpus(store: SqacStore, corpus: Corpus, threshold: float,
+               enrich: bool = False) -> dict[str, Any]:
     """Grade one corpus: for every entry, search its paraphrase query and
     check the ground-truth key is in top-k (by key_norm)."""
     tiers = {"exact": TierStats("exact"), "fuzzy": TierStats("fuzzy"),
@@ -317,9 +318,117 @@ def run_corpus(store: SqacStore, corpus: Corpus, threshold: float) -> dict[str, 
         "corpus": corpus.name,
         "language": corpus.language,
         "entries": len(corpus.entries),
+        "enrich_keys": enrich,
         "tiers": {t: s.report() for t, s in tiers.items()},
         "failures": failures,
     }
+
+
+def run_negatives(store: SqacStore, corpora: list[Corpus]) -> dict[str, Any]:
+    """False-positive sweep: for every entry, the top hit against a query that
+    does NOT belong to it. Tells us where the wrong-key confidence band sits,
+    so a gate threshold can be chosen to separate right from wrong."""
+    all_keys = {}
+    for c in corpora:
+        for _content, key, _q, _cl in c.entries:
+            all_keys.setdefault(_norm(key), key)
+    queries = []
+    for c in corpora:
+        for _content, _key, q, _cl in c.entries:
+            queries.append((c.name, q))
+    wrong_confs: list[float] = []
+    wrong_hits = 0
+    for corpus_name, q in queries:
+        hits = store.search(q, top_k=1)
+        if not hits:
+            continue
+        top = hits[0]
+        wrong_confs.append(top.confidence)
+        if top.meta.get("key_norm") not in all_keys:
+            wrong_hits += 1
+    wrong_confs.sort()
+    return {
+        "queries": len(queries),
+        "queries_with_hits": len(wrong_confs),
+        "top1_wrong_key": wrong_hits,
+        "conf_mean": round(statistics.fmean(wrong_confs), 3) if wrong_confs else 0.0,
+        "conf_median": round(statistics.median(wrong_confs), 3) if wrong_confs else 0.0,
+        "conf_min": round(min(wrong_confs), 3) if wrong_confs else 0.0,
+        "conf_max": round(max(wrong_confs), 3) if wrong_confs else 0.0,
+        "p90": wrong_confs[int(len(wrong_confs) * 0.9)] if wrong_confs else 0.0,
+        "p99": wrong_confs[min(len(wrong_confs) - 1, int(len(wrong_confs) * 0.99))] if wrong_confs else 0.0,
+    }
+
+
+def run_margin_probe(store: SqacStore, corpora: list[Corpus], gate: float,
+                     margins: list[float]) -> list[dict[str, Any]]:
+    """Prototype for the tier-rescue follow-up: when the top hit is below the
+    gate, admit the next candidate anyway and accept it if it leads the
+    runner-up by >= margin. Sweeps margin values to find the safe operating
+    point (max correct rescues before any wrong-key acceptance)."""
+    lowered = max(0.0, gate - 0.15)
+    probes: list[dict[str, Any]] = []
+    for margin in margins:
+        recovered = false_accept = below = 0
+        for c in corpora:
+            for _content, key, q, _cl in c.entries:
+                if not key.strip():
+                    continue
+                hits = store.search(q, top_k=2)
+                if hits and hits[0].confidence >= gate:
+                    continue
+                below += 1
+                wide = _search_at(store, q, lowered)
+                if not wide:
+                    continue
+                lead = wide[0][0] - (wide[1][0] if len(wide) > 1 else 0.0)
+                if lead >= margin:
+                    if _norm(wide[0][1]) == _norm(key):
+                        recovered += 1
+                    else:
+                        false_accept += 1
+        probes.append({"min_margin": margin, "below_gate": below,
+                       "recovered": recovered, "false_accept": false_accept})
+    return probes
+
+
+def _search_at(store: SqacStore, query: str, threshold: float) -> list[tuple[float, str]]:
+    """Raw (sim, key_norm) candidates at a given threshold, bypassing the
+    store's configured fuzzy threshold (bench-only helper)."""
+    saved = store.fuzzy_threshold
+    store.fuzzy_threshold = threshold
+    try:
+        hits = store.search(query, top_k=2)
+    finally:
+        store.fuzzy_threshold = saved
+    return [(h.confidence, _norm(h.meta.get("key_norm", ""))) for h in hits]
+
+
+def run_tier_fusion(store: SqacStore, corpora: list[Corpus], gate: float) -> dict[str, Any]:
+    """Measure max-fusion (lexical ∪ semantic): a key is rescued if it is
+    top-1 in ANY tier, with the fused confidence = max over tiers. This is
+    the classic multi-view retrieval fix — report how many gate misses it
+    recovers and what the fused confidence band looks like."""
+    if not store.semantic:
+        return {"skipped": "semantic tier disabled"}
+    recovered = 0
+    below = 0
+    for c in corpora:
+        for _content, key, q, _cl in c.entries:
+            if not key.strip():
+                continue
+            hits = store.search(q, top_k=1)
+            if hits and hits[0].confidence >= gate:
+                continue
+            below += 1
+            lex = _search_at(store, q, max(0.0, gate - 0.15))
+            sem = _search_at(store, q, max(0.0, gate - 0.15))
+            if not lex or not sem:
+                continue
+            fused_top = max(lex[0][0], sem[0][0])
+            if fused_top >= gate and (lex[0][1] == _norm(key) or sem[0][1] == _norm(key)):
+                recovered += 1
+    return {"below_gate": below, "recovered_by_fusion": recovered}
 
 
 def run_maintainer_cases(store: SqacStore, threshold: float) -> list[dict[str, Any]]:
@@ -395,6 +504,17 @@ def main(argv: list[str] | None = None) -> int:
         results.append(run_corpus(store, corpus, args.threshold))
         print(f"  {corpus.name}: {len(corpus.entries)} entries graded", file=sys.stderr)
 
+    # enriched-key variant: same corpora, fuzzy-tier vectors fold in content
+    # anchors (SqacStore.add(enrich_keys=True)); exact tier unchanged.
+    results_enriched = []
+    for corpus in corpora:
+        store = SqacStore(semantic=args.semantic)
+        for content, key, _q, _c in corpus.entries:
+            store.add(content, key=key, kind="fact" if corpus.language != "code" else "skill",
+                      enrich_keys=True)
+        results_enriched.append(run_corpus(store, corpus, args.threshold, enrich=True))
+        print(f"  {corpus.name} (enriched): graded", file=sys.stderr)
+
     # maintainer cases run against a combined store (curated entries only)
     mstore = SqacStore(semantic=args.semantic)
     for corpus in corpora:
@@ -402,6 +522,9 @@ def main(argv: list[str] | None = None) -> int:
             if corpus.name in ("en-facts", "es-facts", "code-ids") and _c != "synthetic":
                 mstore.add(content, key=key, kind="fact" if corpus.language != "code" else "skill")
     maintainer = run_maintainer_cases(mstore, args.threshold)
+    negatives = run_negatives(mstore, corpora)
+    margin = run_margin_probe(mstore, corpora, args.threshold, [0.02, 0.05, 0.08, 0.12])
+    fusion = run_tier_fusion(mstore, corpora, args.threshold)
 
     report = {
         "meta": {
@@ -412,18 +535,28 @@ def main(argv: list[str] | None = None) -> int:
             "sqac_version": __import__("sqac").__version__,
         },
         "results": results,
+        "results_enriched": results_enriched,
         "triage": triage(results, maintainer),
+        "triage_enriched": triage(results_enriched, maintainer),
+        "negatives": negatives,
+        "margin_probe": margin,
+        "tier_fusion": fusion,
     }
 
     # ── console report ──
     print("\n=== Per-tier recall (top-5 hits, graded by ground-truth key) ===")
     print("note: 'exact' stays 0 by design — bench queries are paraphrases, not keys")
-    for res in results:
+    print("columns: baseline vs enrich_keys=True (fuzzy vectors + content anchors)")
+    for res, res_en in zip(results, results_enriched):
         print(f"\n[{res['corpus']}] {res['language']} — {res['entries']} entries")
         for t, s in res["tiers"].items():
-            print(f"  {t:8s} recall@1 {s['recall@1']:.3f}  @3 {s['recall@3']:.3f}  "
-                  f"@5 {s['recall@5']:.3f}  gate {s['gate_pass'].split('/')[0]}/{s['gate_total']}  "
-                  f"conf med {s['conf_median']}")
+            s_en = res_en["tiers"][t]
+            print(f"  {t:8s} recall@1 {s['recall@1']:.3f} -> {s_en['recall@1']:.3f}  "
+                  f"@3 {s['recall@3']:.3f} -> {s_en['recall@3']:.3f}  "
+                  f"@5 {s['recall@5']:.3f} -> {s_en['recall@5']:.3f}  "
+                  f"gate {s['gate_pass'].split('/')[0]}/{s['gate_total']} -> "
+                  f"{s_en['gate_pass'].split('/')[0]}/{s_en['gate_total']}  "
+                  f"conf med {s['conf_median']} -> {s_en['conf_median']}")
     print("\n=== Triage: misses by query class (which tier fails which query class) ===")
     for row in report["triage"]["by_query_class"]:
         print(f"  {row['query_class']:12s} misses={row['misses']:3d}  "
@@ -438,6 +571,19 @@ def main(argv: list[str] | None = None) -> int:
         for m in maintainer:
             print(f"  [{'HIT ' if m['hit'] else 'MISS'}] {m['class']:10s} {m['query']!r} "
                   f"(top={m['top_key']!r} conf={m['top_conf']} gated={m['gated']})")
+    print("\n=== False-positive band (top-1 against all entries, incl. wrong keys) ===")
+    print(f"  wrong-key top-1: {negatives['top1_wrong_key']}/{negatives['queries_with_hits']} "
+          f"conf mean {negatives['conf_mean']} med {negatives['conf_median']} "
+          f"p90 {negatives['p90']} p99 {negatives['p99']} max {negatives['conf_max']}")
+    print("\n=== Margin-rescue sweep (below-gate queries, runner-up admitted) ===")
+    for m in margin:
+        print(f"  min_margin {m['min_margin']}: {m['recovered']}/{m['below_gate']} "
+              f"recovered, {m['false_accept']} false accepts")
+    print("\n=== Tier fusion (lexical + semantic, max-fused) ===")
+    if fusion.get("skipped"):
+        print(f"  skipped: {fusion['skipped']} (pass --semantic to measure)")
+    else:
+        print(f"  {fusion['recovered_by_fusion']}/{fusion['below_gate']} gate misses recovered")
 
     if args.json:
         Path(args.json).write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -448,11 +594,16 @@ def main(argv: list[str] | None = None) -> int:
               f"gate threshold {args.threshold}", ""]
         md.append("| corpus | tier | recall@1 | recall@3 | recall@5 | gate pass/total | conf med |")
         md.append("|---|---|---|---|---|---|---|")
-        for res in results:
+        for res, res_en in zip(results, results_enriched):
             for t, s in res["tiers"].items():
+                s_en = res_en["tiers"][t]
                 gp = s["gate_pass"].split("/")[0]
+                gp_en = s_en["gate_pass"].split("/")[0]
                 md.append(f"| {res['corpus']} | {t} | {s['recall@1']} | {s['recall@3']} | "
                           f"{s['recall@5']} | {gp}/{s['gate_total']} | {s['conf_median']} |")
+                md.append(f"| {res['corpus']} (enriched) | {t} | {s_en['recall@1']} | "
+                          f"{s_en['recall@3']} | {s_en['recall@5']} | {gp_en}/{s_en['gate_total']} | "
+                          f"{s_en['conf_median']} |")
         md.append("")
         md.append("## Triage — misses by query class")
         md.append("")
@@ -465,6 +616,12 @@ def main(argv: list[str] | None = None) -> int:
             md.append("## Maintainer real-query cases")
             for m in maintainer:
                 md.append(f"- [{'HIT' if m['hit'] else 'MISS'}] {m['class']}: {m['query']!r}")
+        md.append("")
+        md.append("## False-positive band (gate threshold evidence)")
+        md.append("")
+        md.append(f"- wrong-key top-1: {negatives['top1_wrong_key']}/{negatives['queries_with_hits']}, "
+                  f"conf mean {negatives['conf_mean']}, med {negatives['conf_median']}, "
+                  f"p90 {negatives['p90']}, p99 {negatives['p99']}, max {negatives['conf_max']}")
         Path(args.md).write_text("\n".join(md) + "\n", encoding="utf-8")
         print(f"wrote {args.md}")
     return 0
