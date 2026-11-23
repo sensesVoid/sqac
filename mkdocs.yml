@@ -18,6 +18,11 @@ nav:
   - Cloud: CLOUD.md
   - Format: FORMAT.md
   - MCP: MCP.md
+  - Attention: ATTENTION.md
+  - Integrations: INTEGRATIONS.md
+  - DMS: DMS.md
+  - Normalize: NORMALIZE.md
+  - Use cases: USE_CASES_DEEP.md
   - Release: RELEASE.md
   - Security: SECURITY.md
   - Research: RESEARCH-unlimited-context.md

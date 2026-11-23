@@ -69,11 +69,21 @@ Flag bits:
 | 0x0002 | `FLAG_BINVEC` | raw binary auxiliary-vector block present (v2+) |
 | 0x0004 | `FLAG_COMPRESSED` | payload/binvec is lz4-compressed (v4+) |
 | 0x0008 | `FLAG_ENCRYPTED` | payload is ciphertext (v5 vault+) |
-| bits 4–11 | kind | knowledge kind, uint8 (v3+): 0=generic, then fact/skill/doc/turn |
+| bits 4–11 | kind | knowledge kind, uint8 (v3+): 0=generic, 1=fact, 2=skill, 3=doc, 4=turn, 5=task (v1.4.0) |
 
 Payloads are JSON (UTF-8). At 1024 dims a binvec block is 384 bytes
 (128 key + 128 sem_key + 128 sem_ckeys); lz4 typically reduces that 40–80%
 depending on data.
+
+### Entry `meta` (v1.4.0)
+
+Every entry carries `meta["mem_id"]` — a 26-char Crockford-base32 ULID
+(`sqac/memid.py`: 48-bit ms timestamp + 80 bits `os.urandom`, stdlib only).
+The id is stored in the payload (no format bump): old readers ignore the key,
+old cartridges backfill ids on load, and the store-level id index gives O(1)
+`get(mem_id)` on every surface (MCP `mem_get`, CLI `sqac get`, HTTP
+`GET /entries/{mem_id}`). Upserts (same key) tombstone the old entry, so the
+old id is an honest miss.
 
 ## Read-side limits (v1.0.0 hardening)
 

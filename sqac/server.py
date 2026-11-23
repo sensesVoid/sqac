@@ -551,7 +551,7 @@ def graph_endpoint(req: GraphRequest, _=Depends(_verify_key)):
 
     # --- Build node list ---
     nodes = []
-    kind_colors = {"fact": "#58a6ff", "skill": "#f0883e", "doc": "#3fb950", "turn": "#bc8cff", "generic": "#8b949e"}
+    kind_colors = {"fact": "#58a6ff", "skill": "#f0883e", "doc": "#3fb950", "turn": "#bc8cff", "task": "#39c5cf", "generic": "#8b949e"}
     cartridge_name = getattr(store, "_name", None) or req.cartridge or "memory"
     for i, idx in enumerate(alive):
         entry = store._entries[idx]

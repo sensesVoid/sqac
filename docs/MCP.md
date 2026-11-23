@@ -35,6 +35,7 @@ that auto-read resources.
 | `mem_checkpoint` | Persist task handoff (goal + summary) at task boundaries |
 | `mem_observe` | Record a meaningful conversation turn |
 | `mem_search` | Search the long-term rack (fuzzy/semantic recall with confidence) |
+| `mem_get` | O(1) exact lookup of one entry by its `mem_id` (every search/recall hit carries one) |
 | `mem_write` | Teach a fact/skill/doc entry (auto-routes by kind) |
 | `mem_recall` / `mem_recall_detailed` | Recent working-memory context |
 | `mem_graduate` | Promote stable session memories into durable facts |
@@ -43,6 +44,14 @@ that auto-read resources.
 | `mem_swap` | Hot-swap the active cartridge |
 | `mem_cartridge_create` / `mem_cartridge_list` | Manage cartridges in the rack |
 | `mem_save` | Persist all cartridges + the working session to disk |
+
+### Task tools (v1.4.0)
+
+| Tool | Purpose |
+|------|---------|
+| `task_add` | Add a current/pending task to the per-project `tasks.sqac` cartridge (excluded from ordinary search; response carries the refreshed attention block) |
+| `task_done` | Graduate a task to a durable `kind=fact` memory, preserving its mem_id (rejects cross-project ids) |
+| `task_list` | List tasks for the active project, current first then pending |
 
 ### Session saves (debounced)
 
@@ -187,4 +196,7 @@ args = ["--dir", "~/.sqacm"]
 3. Call `mem_checkpoint` at task boundaries (goal reached, blocker, context
    switch).
 4. Use `mem_search` for durable knowledge and `mem_recall` for recent context.
-5. Never fabricate: if memory has nothing on a topic, say so.
+5. Use `task_add` / `task_done` / `task_list` for working task state; the
+   attention block (re-injected every `SQAC_ATTENTION_TURNS`, default 5) keeps
+   current/pending tasks in front of you.
+6. Never fabricate: if memory has nothing on a topic, say so.
