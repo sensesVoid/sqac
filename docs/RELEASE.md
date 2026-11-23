@@ -14,6 +14,13 @@ This document describes how SQAC versions are cut and published.
    `pyproject.toml` reads it dynamically).
 4. Commit and push.
 
+> **Order matters:** the version bump (step 3) must land on the branch
+> **before** the tag is created. A tag pointing at a tree with an older
+> `_version.py` builds wheels under the OLD version — PyPI then rejects them
+> as duplicates (`400 File already exists`). If this happens: bump
+> `_version.py`, commit, `git tag -f vX.Y.Z`, `git push --force origin vX.Y.Z`
+> (moving an already-published tag is safe; the workflow re-runs).
+
 ## 2. Tag and publish
 
 Releases are driven by tags and PyPI **Trusted Publishing** (OIDC; no API token
