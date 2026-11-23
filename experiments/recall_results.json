@@ -1,0 +1,367 @@
+{
+  "meta": {
+    "seed": 20261123,
+    "entries_per_corpus": 200,
+    "semantic": false,
+    "threshold": 0.6,
+    "sqac_version": "1.4.1"
+  },
+  "results": [
+    {
+      "corpus": "en-facts",
+      "language": "en",
+      "entries": 200,
+      "tiers": {
+        "exact": {
+          "tier": "exact",
+          "graded": 200,
+          "gate_total": 200,
+          "queries": 200,
+          "hits": 0,
+          "recall@1": 0.0,
+          "recall@3": 0.0,
+          "recall@5": 0.0,
+          "gate_pass": "0/200",
+          "gate_rate": 0.0,
+          "conf_mean": 0.0,
+          "conf_median": 0.0,
+          "conf_min": 0.0,
+          "conf_max": 0.0
+        },
+        "fuzzy": {
+          "tier": "fuzzy",
+          "graded": 200,
+          "gate_total": 200,
+          "queries": 200,
+          "hits": 194,
+          "recall@1": 0.97,
+          "recall@3": 0.97,
+          "recall@5": 0.97,
+          "gate_pass": "194/200",
+          "gate_rate": 0.97,
+          "conf_mean": 0.717,
+          "conf_median": 0.727,
+          "conf_min": 0.604,
+          "conf_max": 0.797
+        },
+        "semantic": {
+          "tier": "semantic",
+          "graded": 200,
+          "gate_total": 200,
+          "queries": 200,
+          "hits": 0,
+          "recall@1": 0.0,
+          "recall@3": 0.0,
+          "recall@5": 0.0,
+          "gate_pass": "0/200",
+          "gate_rate": 0.0,
+          "conf_mean": 0.0,
+          "conf_median": 0.0,
+          "conf_min": 0.0,
+          "conf_max": 0.0
+        }
+      },
+      "failures": [
+        {
+          "case": "miss",
+          "query": "what database do we run in production",
+          "class": "factual",
+          "expected_key": "primary db engine",
+          "got": []
+        },
+        {
+          "case": "miss",
+          "query": "where does continuous integration run",
+          "class": "factual",
+          "expected_key": "ci provider",
+          "got": []
+        },
+        {
+          "case": "miss",
+          "query": "what tools do we use for metrics and logs",
+          "class": "factual",
+          "expected_key": "observability stack",
+          "got": []
+        },
+        {
+          "case": "miss",
+          "query": "where are application secrets stored",
+          "class": "factual",
+          "expected_key": "secrets backend",
+          "got": []
+        },
+        {
+          "case": "miss",
+          "query": "how do we roll back a bad deploy",
+          "class": "procedural",
+          "expected_key": "rollback procedure",
+          "got": []
+        },
+        {
+          "case": "miss",
+          "query": "how often do we test disaster recovery",
+          "class": "procedural",
+          "expected_key": "dr drill",
+          "got": []
+        }
+      ]
+    },
+    {
+      "corpus": "es-facts",
+      "language": "es",
+      "entries": 200,
+      "tiers": {
+        "exact": {
+          "tier": "exact",
+          "graded": 200,
+          "gate_total": 200,
+          "queries": 200,
+          "hits": 0,
+          "recall@1": 0.0,
+          "recall@3": 0.0,
+          "recall@5": 0.0,
+          "gate_pass": "0/200",
+          "gate_rate": 0.0,
+          "conf_mean": 0.0,
+          "conf_median": 0.0,
+          "conf_min": 0.0,
+          "conf_max": 0.0
+        },
+        "fuzzy": {
+          "tier": "fuzzy",
+          "graded": 200,
+          "gate_total": 200,
+          "queries": 200,
+          "hits": 200,
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "gate_pass": "197/200",
+          "gate_rate": 0.985,
+          "conf_mean": 0.717,
+          "conf_median": 0.721,
+          "conf_min": 0.613,
+          "conf_max": 0.758
+        },
+        "semantic": {
+          "tier": "semantic",
+          "graded": 200,
+          "gate_total": 200,
+          "queries": 200,
+          "hits": 0,
+          "recall@1": 0.0,
+          "recall@3": 0.0,
+          "recall@5": 0.0,
+          "gate_pass": "0/200",
+          "gate_rate": 0.0,
+          "conf_mean": 0.0,
+          "conf_median": 0.0,
+          "conf_min": 0.0,
+          "conf_max": 0.0
+        }
+      },
+      "failures": [
+        {
+          "case": "miss",
+          "query": "donde corre la integracion continua",
+          "class": "factual",
+          "expected_key": "proveedor ci",
+          "got": [
+            "ventana congelacion"
+          ]
+        },
+        {
+          "case": "miss",
+          "query": "como revertimos un despliegue defectuoso",
+          "class": "procedural",
+          "expected_key": "rollback procedimiento",
+          "got": [
+            "arquitectura despliegue"
+          ]
+        }
+      ]
+    },
+    {
+      "corpus": "code-ids",
+      "language": "code",
+      "entries": 200,
+      "tiers": {
+        "exact": {
+          "tier": "exact",
+          "graded": 200,
+          "gate_total": 200,
+          "queries": 200,
+          "hits": 0,
+          "recall@1": 0.0,
+          "recall@3": 0.0,
+          "recall@5": 0.0,
+          "gate_pass": "0/200",
+          "gate_rate": 0.0,
+          "conf_mean": 0.0,
+          "conf_median": 0.0,
+          "conf_min": 0.0,
+          "conf_max": 0.0
+        },
+        "fuzzy": {
+          "tier": "fuzzy",
+          "graded": 200,
+          "gate_total": 200,
+          "queries": 200,
+          "hits": 200,
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "gate_pass": "200/200",
+          "gate_rate": 1.0,
+          "conf_mean": 0.725,
+          "conf_median": 0.727,
+          "conf_min": 0.679,
+          "conf_max": 0.818
+        },
+        "semantic": {
+          "tier": "semantic",
+          "graded": 200,
+          "gate_total": 200,
+          "queries": 200,
+          "hits": 0,
+          "recall@1": 0.0,
+          "recall@3": 0.0,
+          "recall@5": 0.0,
+          "gate_pass": "0/200",
+          "gate_rate": 0.0,
+          "conf_mean": 0.0,
+          "conf_median": 0.0,
+          "conf_min": 0.0,
+          "conf_max": 0.0
+        }
+      },
+      "failures": []
+    }
+  ],
+  "triage": {
+    "by_query_class": [
+      {
+        "query_class": "factual",
+        "misses": 5,
+        "fails_by_tier": {
+          "exact": 5,
+          "fuzzy": 5,
+          "semantic": 5
+        }
+      },
+      {
+        "query_class": "procedural",
+        "misses": 3,
+        "fails_by_tier": {
+          "exact": 3,
+          "fuzzy": 3,
+          "semantic": 3
+        }
+      }
+    ],
+    "missed_queries": [
+      {
+        "case": "miss",
+        "query": "what database do we run in production",
+        "class": "factual",
+        "expected_key": "primary db engine",
+        "got": []
+      },
+      {
+        "case": "miss",
+        "query": "where does continuous integration run",
+        "class": "factual",
+        "expected_key": "ci provider",
+        "got": []
+      },
+      {
+        "case": "miss",
+        "query": "what tools do we use for metrics and logs",
+        "class": "factual",
+        "expected_key": "observability stack",
+        "got": []
+      },
+      {
+        "case": "miss",
+        "query": "where are application secrets stored",
+        "class": "factual",
+        "expected_key": "secrets backend",
+        "got": []
+      },
+      {
+        "case": "miss",
+        "query": "how do we roll back a bad deploy",
+        "class": "procedural",
+        "expected_key": "rollback procedure",
+        "got": []
+      },
+      {
+        "case": "miss",
+        "query": "how often do we test disaster recovery",
+        "class": "procedural",
+        "expected_key": "dr drill",
+        "got": []
+      },
+      {
+        "case": "miss",
+        "query": "donde corre la integracion continua",
+        "class": "factual",
+        "expected_key": "proveedor ci",
+        "got": [
+          "ventana congelacion"
+        ]
+      },
+      {
+        "case": "miss",
+        "query": "como revertimos un despliegue defectuoso",
+        "class": "procedural",
+        "expected_key": "rollback procedimiento",
+        "got": [
+          "arquitectura despliegue"
+        ]
+      }
+    ],
+    "maintainer_cases": [
+      {
+        "case": "maintainer",
+        "query": "who maintains the billing service",
+        "class": "factual",
+        "expected_key": "payments ownership",
+        "hit": true,
+        "top_key": "payments ownership",
+        "top_conf": 0.705,
+        "gated": true
+      },
+      {
+        "case": "maintainer",
+        "query": "qu\u00e9 motor de base de datos usamos",
+        "class": "factual",
+        "expected_key": "motor base de datos",
+        "hit": true,
+        "top_key": "motor base de datos",
+        "top_conf": 0.768,
+        "gated": true
+      },
+      {
+        "case": "maintainer",
+        "query": "PaymentService retry policy",
+        "class": "code",
+        "expected_key": "PaymentService",
+        "hit": true,
+        "top_key": "paymentservice",
+        "top_conf": 0.753,
+        "gated": true
+      },
+      {
+        "case": "maintainer",
+        "query": "como revertimos un despliegue malo",
+        "class": "procedural",
+        "expected_key": "rollback procedimiento",
+        "hit": false,
+        "top_key": "arquitectura despliegue",
+        "top_conf": 0.618,
+        "gated": true
+      }
+    ]
+  }
+}
