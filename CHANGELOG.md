@@ -1,6 +1,24 @@
 # Changelog
 
-## [1.4.0] — Unreleased (tagged on release)
+## [1.4.1] — Unreleased (tagged on release)
+
+### Spec compliance (PR A2)
+- **S5 upsert tombstoning**: `SqacStore.add()` tombstones the old same-key entry so the old `mem_id` is an honest miss; id tombstones persist via a `checkpoint_turn`-style header token and `claim_mem_id()` transfers id ownership on graduation/demotion.
+- **Q2 cross-project rejection**: `task_done` rejects ids from other projects (honest miss, never graduated).
+- **Q2 active-project filtering**: the attention block and `task_list` filter by the active project (`SQAC_PROJECT`/cwd basename).
+- **S3 immediate re-injection**: `task_add`/`task_done` responses carry the refreshed attention block.
+- **C5 checkpoint turn marker**: `mem_checkpoint` records the turn; the attention fallback (`recent()`) only shows session turns after the latest checkpoint; persisted across save/restart.
+- **C6 continuity lifecycle**: server `/session/observe` touches + saves `ContinuityStore`; middleware loads `continuity.json` so the attention fallback shows the goal; `GET /attention` filters by project.
+- **D**: `TaskManager.add` defaults to `status=pending` (spec tool signature).
+
+### Cleanup (PR A)
+- Removed dead `TaskManager.update`, dead params (`add(meta=)`, `max_pending=`), redundant `recent()` wrapping.
+- `_project_name` delegates to `tasks.project_name` — **fixes a Windows portability bug** (`os.getcwd().split("/")` returned the whole path on Windows).
+- Memory-dir consolidation (`integrations._memory_dir` → `tasks_dir`); route tables gain `task → tasks` (server, integrations); CLI `sqac get` uses `KIND_NAMES` (task entries no longer print as "generic").
+- Attention block: 100-char per-item line cap — the ≤150-token budget is now honestly enforced.
+- Graph endpoint colors `task` entries (teal).
+
+## [1.4.0] — 2026-11-22
 
 ### Canonical mem_id & mem_get
 - **`sqac/memid.py`**: 26-char Crockford base32 ULID (48-bit ms timestamp + 80 bits `os.urandom`, stdlib only).
