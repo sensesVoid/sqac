@@ -25,7 +25,7 @@ from typing import Any, Optional
 
 from .encoder import BSCEncoder, MiniLMSimHashEncoder
 from .static_encoder import StaticSimHashEncoder
-from .memid import new_mem_id
+from .memid import MonotonicMemId, decode_mem_id_ms
 # Bundled Rust SIMD acceleration — 100-300x faster for fuzzy scan
 from .simd import HAS_SIMD as _HAS_SIMD
 from .simd import backend as _simd
@@ -189,6 +189,11 @@ class SqacStore:
         self.semantic = False
         self._sem_encoder = None
         self.cartridge_type = "memory"
+        # Header fields captured at load() so a save() with empty args keeps
+        # the cartridge's original name/description/type instead of wiping them.
+        self._header_name = ""
+        self._header_description = ""
+        self._header_extra: dict = {}
         # Query cache: maps (query_hash, tier) -> (packed_bits, write_version)
         self._cache_size = cache_size
         self._query_cache: collections.OrderedDict[tuple[str, str], tuple[bytes, int]] = (
@@ -235,6 +240,9 @@ class SqacStore:
         self._kind_counts: dict[str, int] = {}
         self._id_index: dict[str, int] = {}
         self._id_tombstones: set[str] = set()  # retired ids stay honest misses
+        # Single per-store monotonic ULID generator; seeded on load() so new
+        # ids always sort after every existing one (future-dated backups too).
+        self._memid_gen = MonotonicMemId()
         self._rebuild_id_index()
     def _invalidate_cache(self) -> None:
         """Increment write version to invalidate stale cache entries.
@@ -360,7 +368,7 @@ class SqacStore:
         kind_resolved = resolve_kind(kind)
         meta = dict(meta or {})
         if not meta.get("mem_id"):
-            meta["mem_id"] = new_mem_id()
+            meta["mem_id"] = self._memid_gen.mint()
         idx = len(self._entries)
         if meta["mem_id"] in self._id_tombstones:
             raise ValueError(
@@ -454,7 +462,7 @@ class SqacStore:
                 meta = {}
                 e["meta"] = meta
             if not meta.get("mem_id"):
-                meta["mem_id"] = new_mem_id()
+                meta["mem_id"] = self._memid_gen.mint()
             self._entries.append(e)
             norm = e["key_norm"]
             idx = len(self._entries) - 1
@@ -530,14 +538,47 @@ class SqacStore:
         ok = self.delete(idx)
         return idx if ok else None
 
-    def _backfill_mem_ids(self) -> None:
+    def _backfill_mem_ids(self) -> int:
+        """Mint mem_ids for entries missing one; return the count minted.
+
+        Uses the store's monotonic generator so backfilled ids keep global
+        ordering. Returns 0 when nothing needed minting.
+        """
+        minted = 0
         for e in self._entries:
             meta = e.get("meta")
             if not isinstance(meta, dict):
                 meta = {}
                 e["meta"] = meta
             if not meta.get("mem_id"):
-                meta["mem_id"] = new_mem_id()
+                meta["mem_id"] = self._memid_gen.mint()
+                minted += 1
+        return minted
+
+    def list_by_recency(self, limit: int | None = None) -> list[dict]:
+        """List live, non-task entries newest-first by mem_id.
+
+        Returns dicts with keys ``mem_id``, ``created_ms``, ``key_norm`` and
+        ``kind``. Entries without a mem_id are skipped. Sliced to *limit*
+        (newest first) when given; ``limit=None`` returns all.
+        """
+        rows = []
+        for e in self._entries:
+            if e.get("deleted"):
+                continue
+            if e.get("kind", KIND_GENERIC) == KIND_TASK:  # tasks are working memory
+                continue
+            mid = (e.get("meta") or {}).get("mem_id")
+            if not mid:
+                continue
+            rows.append({
+                "mem_id": mid,
+                "created_ms": decode_mem_id_ms(mid),
+                "key_norm": e["key_norm"],
+                "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
+            })
+        rows.sort(key=lambda r: r["mem_id"], reverse=True)  # newest first
+        return rows[:limit] if limit else rows
 
     # ── read path ────────────────────────────────────────────────────────
 
@@ -731,19 +772,27 @@ class SqacStore:
         header = CartridgeHeader(
             dims=self.dims,
             encoder_name=enc_name,
-            name=name,
-            description=description,
+            name=name or self._header_name,
+            description=description or self._header_description,
+            extra=dict(self._header_extra),
         )
         write_cartridge(path, header, {}, entries)
 
     @classmethod
     def load(cls, path: str | Path, fuzzy_threshold: float = DEFAULT_FUZZY_THRESHOLD,
-             normalizer=None) -> "SqacStore":
+             normalizer=None, backfill_mem_ids: bool = True) -> "SqacStore":
         """Load a cartridge. Refuses incompatible encoder/fingerprint.
 
         fuzzy_threshold defaults to the same value as the constructor
         (DEFAULT_FUZZY_THRESHOLD) so a cartridge behaves identically
         before and after a save/load roundtrip.
+
+        backfill_mem_ids gates the in-memory mem_id backfill of legacy
+        entries (those that predate the mem_id scheme). It defaults to
+        True, preserving every existing read-path caller. The backfill
+        command passes False so it can mint+count+save authoritatively
+        (counting what is actually missing on disk) instead of inheriting
+        ids that load() would otherwise mint in memory only.
         """
         cart = read_cartridge(path)
         h = cart.header
@@ -759,7 +808,15 @@ class SqacStore:
             semantic="|sem-v1:" in h.encoder_name,
             normalizer=normalizer,
         )
-        store._description = h.description
+        # _description = live field (mutated by agent/offloader);
+        # _header_description = original-header snapshot save() falls back to.
+        desc = h.description
+        store._description = desc
+        # Preserve the original header so a later save() with empty args keeps
+        # the cartridge's name/description/type instead of wiping them.
+        store._header_name = h.name
+        store._header_description = desc
+        store._header_extra = dict(h.extra)
         store.cartridge_type = h.cartridge_type
         if store.semantic:
             store._sem_encoder = _make_sem_encoder(
@@ -812,7 +869,8 @@ class SqacStore:
             if norm and not e.deleted:
                 store._exact[norm] = idx
         # Backfill mem_id for entries that predate it (old cartridges).
-        store._backfill_mem_ids()
+        if backfill_mem_ids:
+            store._backfill_mem_ids()
         for e in store._entries:
             if e.get("deleted"):
                 continue
@@ -820,6 +878,20 @@ class SqacStore:
             store._kind_counts[kname] = store._kind_counts.get(kname, 0) + 1
             store._alive += 1
         store._rebuild_id_index()
+        # Seed the monotonic generator above the highest existing live id so
+        # every future mint sorts after current entries (Crockford base32 is
+        # fixed-width, so plain string compare == numeric order). This keeps
+        # newest-first ordering correct even for future-dated/restored ids.
+        max_id = ""
+        for e in store._entries:
+            if e.get("deleted"):
+                continue
+            meta = e.get("meta")
+            mid = meta.get("mem_id") if isinstance(meta, dict) else None
+            if mid and mid > max_id:
+                max_id = mid
+        if max_id:
+            store._memid_gen.seed_from(max_id)
         if store.semantic:
             store._backfill_semantic()
         return store
