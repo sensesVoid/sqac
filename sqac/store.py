@@ -776,11 +776,14 @@ class SqacStore:
             semantic="|sem-v1:" in h.encoder_name,
             normalizer=normalizer,
         )
-        store._description = h.description
+        # _description = live field (mutated by agent/offloader);
+        # _header_description = original-header snapshot save() falls back to.
+        desc = h.description
+        store._description = desc
         # Preserve the original header so a later save() with empty args keeps
         # the cartridge's name/description/type instead of wiping them.
         store._header_name = h.name
-        store._header_description = h.description
+        store._header_description = desc
         store._header_extra = dict(h.extra)
         store.cartridge_type = h.cartridge_type
         if store.semantic:
