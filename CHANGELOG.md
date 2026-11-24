@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.2] — 2026-11-24
+
+### mem_id backfill & chronological ordering
+- **Monotonic ULIDs** (`sqac/memid.py`): `MonotonicMemId` mints strictly-increasing ids even within one millisecond (same-ms increments the random suffix instead of re-drawing); `decode_mem_id`/`decode_mem_id_ms` decode via the Crockford alphabet (never `int(x, 32)`, which rejects 'Z').
+- **Store wiring** (`sqac/store.py`): all three mint sites (`add`/`compact`/`_backfill_mem_ids`) route through the per-store monotonic generator; `load()` seeds the generator from the max existing id so a future-dated/restored id can't break newest-first ordering; `_backfill_mem_ids()` returns the count minted; new `load(backfill_mem_ids=True)` opt-out.
+- **Header preservation** (`sqac/store.py`): `save()` no longer wipes the cartridge `name`/`description`/`cartridge_type` on a load→save roundtrip (fixes a latent bug affecting every save).
+- **`list_by_recency` + `sqac backfill` + `sqac ids`** (`sqac/cli.py`): read-only newest-first listing (excludes tombstoned + task entries); `sqac backfill [--db]` persists legacy ids save-if-changed, skipping vault/agent/secret/session/archives/checkpoint cartridges (path + header type + try/except); bare `sqac backfill` enumerates the memory dir (`SQAC_MEM_DIR` / `~/.sqacm` / cwd).
+- **`mem_backfill` MCP tool** (`sqac_mcp.py`): same operation for agents that can't shell out.
+
+### Fixed
+- `sqac backfill` / `mem_backfill` now actually persist legacy mem_ids: `load()` already backfills in memory, so the commands detect missing ids on disk (`load(backfill_mem_ids=False)` → `_backfill_mem_ids()` → save-if-changed) — legacy ids are now stable across restarts.
+
+### Compatibility
+- No `.sqac` format or version bump. `mem_id` stays in entry `meta`; older readers ignore the key; backfill-on-load already tolerated missing ids. Additive and downgrade-safe.
+
 ## [1.4.1] — Unreleased (tagged on release)
 
 ### Spec compliance (PR A2)
