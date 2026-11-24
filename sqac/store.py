@@ -25,7 +25,7 @@ from typing import Any, Optional
 
 from .encoder import BSCEncoder, MiniLMSimHashEncoder
 from .static_encoder import StaticSimHashEncoder
-from .memid import new_mem_id
+from .memid import MonotonicMemId
 # Bundled Rust SIMD acceleration — 100-300x faster for fuzzy scan
 from .simd import HAS_SIMD as _HAS_SIMD
 from .simd import backend as _simd
@@ -235,6 +235,9 @@ class SqacStore:
         self._kind_counts: dict[str, int] = {}
         self._id_index: dict[str, int] = {}
         self._id_tombstones: set[str] = set()  # retired ids stay honest misses
+        # Single per-store monotonic ULID generator; seeded on load() so new
+        # ids always sort after every existing one (future-dated backups too).
+        self._memid_gen = MonotonicMemId()
         self._rebuild_id_index()
     def _invalidate_cache(self) -> None:
         """Increment write version to invalidate stale cache entries.
@@ -360,7 +363,7 @@ class SqacStore:
         kind_resolved = resolve_kind(kind)
         meta = dict(meta or {})
         if not meta.get("mem_id"):
-            meta["mem_id"] = new_mem_id()
+            meta["mem_id"] = self._memid_gen.mint()
         idx = len(self._entries)
         if meta["mem_id"] in self._id_tombstones:
             raise ValueError(
@@ -454,7 +457,7 @@ class SqacStore:
                 meta = {}
                 e["meta"] = meta
             if not meta.get("mem_id"):
-                meta["mem_id"] = new_mem_id()
+                meta["mem_id"] = self._memid_gen.mint()
             self._entries.append(e)
             norm = e["key_norm"]
             idx = len(self._entries) - 1
@@ -530,14 +533,22 @@ class SqacStore:
         ok = self.delete(idx)
         return idx if ok else None
 
-    def _backfill_mem_ids(self) -> None:
+    def _backfill_mem_ids(self) -> int:
+        """Mint mem_ids for entries missing one; return the count minted.
+
+        Uses the store's monotonic generator so backfilled ids keep global
+        ordering. Returns 0 when nothing needed minting.
+        """
+        minted = 0
         for e in self._entries:
             meta = e.get("meta")
             if not isinstance(meta, dict):
                 meta = {}
                 e["meta"] = meta
             if not meta.get("mem_id"):
-                meta["mem_id"] = new_mem_id()
+                meta["mem_id"] = self._memid_gen.mint()
+                minted += 1
+        return minted
 
     # ── read path ────────────────────────────────────────────────────────
 
@@ -820,6 +831,20 @@ class SqacStore:
             store._kind_counts[kname] = store._kind_counts.get(kname, 0) + 1
             store._alive += 1
         store._rebuild_id_index()
+        # Seed the monotonic generator above the highest existing live id so
+        # every future mint sorts after current entries (Crockford base32 is
+        # fixed-width, so plain string compare == numeric order). This keeps
+        # newest-first ordering correct even for future-dated/restored ids.
+        max_id = ""
+        for e in store._entries:
+            if e.get("deleted"):
+                continue
+            meta = e.get("meta")
+            mid = meta.get("mem_id") if isinstance(meta, dict) else None
+            if mid and mid > max_id:
+                max_id = mid
+        if max_id:
+            store._memid_gen.seed_from(max_id)
         if store.semantic:
             store._backfill_semantic()
         return store
