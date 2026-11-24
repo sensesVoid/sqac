@@ -1,3 +1,6 @@
+import contextlib
+import io
+import json
 import os
 import tempfile
 import time
@@ -94,3 +97,28 @@ def test_backfill_skips_cartridges_under_skipped_segment():
             os.environ["SQAC_MEM_DIR"] = prev
     assert rc == 0
     assert os.path.getmtime(p) == m1  # under archives/ -> skipped, not rewritten
+
+
+def test_ids_lists_newest_first_and_skips_tasks():
+    d = tempfile.mkdtemp()
+    p = os.path.join(d, "c.sqac")
+    st = SqacStore(semantic=False)
+    st.add("one", key="k1", validate=False)
+    st.add("two", key="k2", validate=False)
+    st.add("taskrow", key="kt", kind=KIND_TASK, validate=False)
+    st.save(p)
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = main(["ids", "--db", p, "--limit", "10"])
+    assert rc == 0
+
+    rows = json.loads(buf.getvalue())
+    keys = [r["key_norm"] for r in rows]
+
+    # task entries are working memory — excluded from the listing
+    assert "kt" not in keys
+    # both normal entries are present
+    assert "k1" in keys and "k2" in keys
+    # newest-first by mem_id (descending): last-added (k2) appears first
+    assert keys == ["k2", "k1"]
