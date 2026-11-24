@@ -7,6 +7,24 @@ import time
 
 from sqac.store import SqacStore, KIND_TASK
 from sqac.cli import main
+from sqac.format import read_cartridge
+
+
+def _disk_mem_ids(path):
+    """Read mem_ids straight off the cartridge FILE (not the in-memory store).
+
+    Returns the mem_id of every live entry in file order, None where missing.
+    This is the assertion that proves the backfill command actually persisted
+    ids to disk rather than only minting them in memory.
+    """
+    cart = read_cartridge(path)
+    out = []
+    for e in cart.entries:
+        if e.deleted:
+            continue
+        meta = e.payload.get("meta") if isinstance(e.payload, dict) else None
+        out.append(meta.get("mem_id") if isinstance(meta, dict) else None)
+    return out
 
 
 def _legacy(path):  # cartridge with NO mem_ids, appended A,B,C
@@ -22,11 +40,19 @@ def test_backfill_recovers_file_order_newest_first():
     d = tempfile.mkdtemp()
     p = os.path.join(d, "c.sqac")
     _legacy(p)
+    # sanity: the file genuinely has no ids before the run
+    assert all(m is None for m in _disk_mem_ids(p))
     rc = main(["backfill", "--db", p])
     assert rc == 0
+    # ids must be present ON DISK, not just in memory
+    disk_ids = _disk_mem_ids(p)
+    assert all(m is not None for m in disk_ids)
     st = SqacStore.load(p)
     order = [e["key_norm"] for e in st.list_by_recency()]
     assert order == ["c", "b", "a"]  # newest (last appended) first
+    # a fresh load resolves the newest id to a real entry
+    st2 = SqacStore.load(p)
+    assert st2.get(_disk_mem_ids(p)[0]) is not None
 
 
 def test_backfill_is_idempotent_noop():
@@ -34,11 +60,25 @@ def test_backfill_is_idempotent_noop():
     p = os.path.join(d, "c.sqac")
     _legacy(p)
     main(["backfill", "--db", p])
+    # run 1 actually wrote ids to disk
+    assert all(m is not None for m in _disk_mem_ids(p))
     m1 = os.path.getmtime(p)
     time.sleep(0.01)
     main(["backfill", "--db", p])
     m2 = os.path.getmtime(p)
     assert m1 == m2  # second run rewrote nothing (save-if-changed)
+
+
+def test_backfill_bare_enumerates_memory_dir(monkeypatch):
+    """Bare `sqac backfill` (no --db) enumerates SQAC_MEM_DIR and persists."""
+    d = tempfile.mkdtemp()
+    p = os.path.join(d, "c.sqac")
+    _legacy(p)
+    monkeypatch.setenv("SQAC_MEM_DIR", d)
+    rc = main(["backfill"])
+    assert rc == 0
+    # the cartridge under the memory dir got its ids written to disk
+    assert all(m is not None for m in _disk_mem_ids(p))
 
 
 def test_backfill_skips_non_memory_cartridges():

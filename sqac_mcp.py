@@ -995,12 +995,25 @@ def mem_backfill() -> str:
         JSON: {"cartridges": [...], "minted": total}.
     """
     try:
+        from sqac.store import SqacStore
+
         st = _state()
         minted = 0
         cartridges: list[str] = []
         for name in st.rack.names():
             store = st.rack[name]
-            n = store._backfill_mem_ids()
+            if getattr(store, "cartridge_type", "memory") != "memory":
+                continue
+            path = st.rack._paths.get(name)
+            if path is None:
+                continue
+            try:
+                disk = SqacStore.load(path, backfill_mem_ids=False)
+            except Exception:
+                continue
+            # Count entries lacking ids ON DISK; the in-memory store already
+            # holds the ids the server has been handing out, so persist THOSE.
+            n = disk._backfill_mem_ids()
             if n:
                 st.rack.save([name])
                 minted += n

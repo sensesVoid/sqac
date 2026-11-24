@@ -780,12 +780,19 @@ class SqacStore:
 
     @classmethod
     def load(cls, path: str | Path, fuzzy_threshold: float = DEFAULT_FUZZY_THRESHOLD,
-             normalizer=None) -> "SqacStore":
+             normalizer=None, backfill_mem_ids: bool = True) -> "SqacStore":
         """Load a cartridge. Refuses incompatible encoder/fingerprint.
 
         fuzzy_threshold defaults to the same value as the constructor
         (DEFAULT_FUZZY_THRESHOLD) so a cartridge behaves identically
         before and after a save/load roundtrip.
+
+        backfill_mem_ids gates the in-memory mem_id backfill of legacy
+        entries (those that predate the mem_id scheme). It defaults to
+        True, preserving every existing read-path caller. The backfill
+        command passes False so it can mint+count+save authoritatively
+        (counting what is actually missing on disk) instead of inheriting
+        ids that load() would otherwise mint in memory only.
         """
         cart = read_cartridge(path)
         h = cart.header
@@ -862,7 +869,8 @@ class SqacStore:
             if norm and not e.deleted:
                 store._exact[norm] = idx
         # Backfill mem_id for entries that predate it (old cartridges).
-        store._backfill_mem_ids()
+        if backfill_mem_ids:
+            store._backfill_mem_ids()
         for e in store._entries:
             if e.get("deleted"):
                 continue

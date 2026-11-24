@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     add_db(p_get)
 
     p_backfill = sub.add_parser("backfill", help="backfill mem_ids onto legacy entries and save")
-    add_db(p_backfill)
+    p_backfill.add_argument("--db", default=None, help="cartridge path; omit to backfill every memory cartridge in the memory dir (SQAC_MEM_DIR / ~/.sqacm / cwd)")
 
     p_ids = sub.add_parser("ids", help="list entries newest-first by mem_id")
     add_db(p_ids)
@@ -850,9 +850,8 @@ def main(argv: list[str] | None = None) -> int:
 
         # Resolve candidate paths: an existing --db file, else enumerate the
         # shared memory dir (SQAC_MEM_DIR, ~/.sqacm, or cwd) recursively.
-        target = Path(args.db)
-        if target.exists():
-            candidates = [target]
+        if args.db is not None and Path(args.db).exists():
+            candidates = [Path(args.db)]
         else:
             env_dir = os.environ.get("SQAC_MEM_DIR")
             if env_dir:
@@ -876,7 +875,7 @@ def main(argv: list[str] | None = None) -> int:
             if hdr.cartridge_type != "memory":
                 continue
             try:
-                st = SqacStore.load(p)
+                st = SqacStore.load(p, backfill_mem_ids=False)
             except Exception:
                 continue
             n = st._backfill_mem_ids()
