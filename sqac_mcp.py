@@ -972,6 +972,44 @@ def mem_save() -> str:
         return _err(e)
 
 
+@mcp.tool(
+    name="mem_backfill",
+    annotations={
+        "title": "Backfill Legacy mem_ids",
+        "read_only_hint": False,
+        "destructive_hint": False,
+        "idempotent_hint": True,
+        "open_world_hint": False,
+    },
+)
+@_serialized
+def mem_backfill() -> str:
+    """Mint mem_ids for any entries that predate the mem_id scheme.
+
+    Thin wrapper over the same operation `sqac backfill` performs: for each
+    mounted memory cartridge, entries missing a mem_id get one minted and the
+    cartridge is re-saved (only when something changed). The MCP rack holds
+    only memory cartridges, so every store is eligible.
+
+    Returns:
+        JSON: {"cartridges": [...], "minted": total}.
+    """
+    try:
+        st = _state()
+        minted = 0
+        cartridges: list[str] = []
+        for name in st.rack.names():
+            store = st.rack[name]
+            n = store._backfill_mem_ids()
+            if n:
+                st.rack.save([name])
+                minted += n
+                cartridges.append(name)
+        return _ok({"cartridges": cartridges, "minted": minted})
+    except Exception as e:
+        return _err(e)
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     """Console entry point (sqac-mcp). Parses CLI flags and runs the stdio
     server; a fresh SQAC_MEM_DIR is created on first call."""
