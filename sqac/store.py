@@ -189,6 +189,11 @@ class SqacStore:
         self.semantic = False
         self._sem_encoder = None
         self.cartridge_type = "memory"
+        # Header fields captured at load() so a save() with empty args keeps
+        # the cartridge's original name/description/type instead of wiping them.
+        self._header_name = ""
+        self._header_description = ""
+        self._header_extra: dict = {}
         # Query cache: maps (query_hash, tier) -> (packed_bits, write_version)
         self._cache_size = cache_size
         self._query_cache: collections.OrderedDict[tuple[str, str], tuple[bytes, int]] = (
@@ -742,8 +747,9 @@ class SqacStore:
         header = CartridgeHeader(
             dims=self.dims,
             encoder_name=enc_name,
-            name=name,
-            description=description,
+            name=name or self._header_name,
+            description=description or self._header_description,
+            extra=dict(self._header_extra),
         )
         write_cartridge(path, header, {}, entries)
 
@@ -771,6 +777,11 @@ class SqacStore:
             normalizer=normalizer,
         )
         store._description = h.description
+        # Preserve the original header so a later save() with empty args keeps
+        # the cartridge's name/description/type instead of wiping them.
+        store._header_name = h.name
+        store._header_description = h.description
+        store._header_extra = dict(h.extra)
         store.cartridge_type = h.cartridge_type
         if store.semantic:
             store._sem_encoder = _make_sem_encoder(
