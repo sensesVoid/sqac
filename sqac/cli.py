@@ -63,6 +63,13 @@ def main(argv: list[str] | None = None) -> int:
     p_get.add_argument("mem_id")
     add_db(p_get)
 
+    p_backfill = sub.add_parser("backfill", help="backfill mem_ids onto legacy entries and save")
+    add_db(p_backfill)
+
+    p_ids = sub.add_parser("ids", help="list entries newest-first by mem_id")
+    add_db(p_ids)
+    p_ids.add_argument("--limit", type=int, default=None)
+
     p_pack = sub.add_parser("pack", help="build a cartridge from a text file (one fact per line)")
     p_pack.add_argument("input")
     p_pack.add_argument("-o", "--out", required=True)
@@ -829,6 +836,56 @@ def main(argv: list[str] | None = None) -> int:
                "kind": kind_name, "source": found.get("source", ""), "cartridge": found_cart,
                "meta": dict(found.get("meta") or {})}
         print(_json.dumps(out, ensure_ascii=False))
+
+    elif args.cmd == "ids":
+        import json as _json
+        st = _open(args.db)
+        rows = st.list_by_recency(limit=args.limit)
+        print(_json.dumps(rows, ensure_ascii=False))
+        return 0
+
+    elif args.cmd == "backfill":
+        import json as _json
+        from .format import read_cartridge as _read_cartridge
+
+        # Resolve candidate paths: an existing --db file, else enumerate the
+        # shared memory dir (SQAC_MEM_DIR, ~/.sqacm, or cwd) recursively.
+        target = Path(args.db)
+        if target.exists():
+            candidates = [target]
+        else:
+            env_dir = os.environ.get("SQAC_MEM_DIR")
+            if env_dir:
+                base = Path(env_dir).expanduser()
+            else:
+                home_dir = Path.home() / ".sqacm"
+                base = home_dir if home_dir.exists() else Path.cwd()
+            candidates = sorted(base.rglob("*.sqac"))
+
+        skip_segments = {"vault", "agent", "secret", "session", "archives", "checkpoint"}
+        cartridges: list[str] = []
+        minted = 0
+        for p in candidates:
+            if any(part.lower() in skip_segments for part in p.parts):
+                continue
+            # Cheap header read — a v5 encrypted vault has no readable header.
+            try:
+                hdr = _read_cartridge(p).header
+            except Exception:
+                continue
+            if hdr.cartridge_type != "memory":
+                continue
+            try:
+                st = SqacStore.load(p)
+            except Exception:
+                continue
+            n = st._backfill_mem_ids()
+            if n:
+                st.save(p)
+                minted += n
+                cartridges.append(p.name)
+        print(_json.dumps({"cartridges": cartridges, "minted": minted}, ensure_ascii=False))
+        return 0
 
     elif args.cmd == "pack":
         lines = [

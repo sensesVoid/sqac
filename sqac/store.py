@@ -25,7 +25,7 @@ from typing import Any, Optional
 
 from .encoder import BSCEncoder, MiniLMSimHashEncoder
 from .static_encoder import StaticSimHashEncoder
-from .memid import MonotonicMemId
+from .memid import MonotonicMemId, decode_mem_id_ms
 # Bundled Rust SIMD acceleration — 100-300x faster for fuzzy scan
 from .simd import HAS_SIMD as _HAS_SIMD
 from .simd import backend as _simd
@@ -554,6 +554,31 @@ class SqacStore:
                 meta["mem_id"] = self._memid_gen.mint()
                 minted += 1
         return minted
+
+    def list_by_recency(self, limit: int | None = None) -> list[dict]:
+        """List live, non-task entries newest-first by mem_id.
+
+        Returns dicts with keys ``mem_id``, ``created_ms``, ``key_norm`` and
+        ``kind``. Entries without a mem_id are skipped. Sliced to *limit*
+        (newest first) when given; ``limit=None`` returns all.
+        """
+        rows = []
+        for e in self._entries:
+            if e.get("deleted"):
+                continue
+            if e.get("kind", KIND_GENERIC) == KIND_TASK:  # tasks are working memory
+                continue
+            mid = (e.get("meta") or {}).get("mem_id")
+            if not mid:
+                continue
+            rows.append({
+                "mem_id": mid,
+                "created_ms": decode_mem_id_ms(mid),
+                "key_norm": e["key_norm"],
+                "kind": KIND_NAMES.get(e.get("kind", KIND_GENERIC), "generic"),
+            })
+        rows.sort(key=lambda r: r["mem_id"], reverse=True)  # newest first
+        return rows[:limit] if limit else rows
 
     # ── read path ────────────────────────────────────────────────────────
 
