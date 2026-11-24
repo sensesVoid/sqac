@@ -28,3 +28,19 @@ def test_crockford_letters_decode_without_crash():
     mid = new_mem_id()
     ms, _ = decode_mem_id(mid)
     assert ms > 0
+
+
+def test_randomness_roundtrips():
+    # Proves the full 128-bit split (ms << 80 | rand) roundtrips through
+    # decode + re-encode; a broken rand mask would fail here.
+    mid = new_mem_id()
+    ms, rand = decode_mem_id(mid)
+    assert MonotonicMemId._encode(ms, rand) == mid
+
+
+def test_all_z_decodes_to_all_ones():
+    # 'Z' -> 31 in Crockford; all-26 'Z' => 32**26 - 1, i.e. max rand and
+    # max ms. Pin the Z->31 mapping deterministically.
+    expected_ms, expected_rand = (32**26 - 1) >> 80, (1 << 80) - 1
+    assert decode_mem_id("Z" * 26) == (expected_ms, expected_rand)
+    assert decode_mem_id_ms("Z" * 26) == expected_ms
