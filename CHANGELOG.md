@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.3] — 2026-11-25
+
+### Open-source readiness (no code changes)
+- **Relicensed to Apache License 2.0** (from BUSL-1.1). The BUSL already named Apache 2.0 as its change license; this makes SQAC OSI-approved now and adds an explicit patent grant alongside the existing copyright grant. Sole copyright holder, so no contributor consent was required. `pyproject.toml` uses the PEP 639 SPDX expression `license = "Apache-2.0"`; the redundant `License ::` classifier was removed (setuptools ≥77 rejects both together).
+- **Discoverability metadata**: expanded PyPI keywords (mcp, agent-memory, hyperdimensional-computing, claude-code, cursor, opencode, …); added Development Status / Intended Audience / OS classifiers; added Documentation + Changelog project URLs; new `CITATION.cff` for citation.
+- **Community files**: Contributor Covenant v2.1 `CODE_OF_CONDUCT.md`, GitHub issue forms (bug + feature) and a pull request template.
+- **Docs**: mkdocs `social` plugin now generates Open Graph / Twitter cards so shared doc links unfurl with a preview image.
+
 ## [1.4.2] — 2026-11-24
 
 ### mem_id backfill & chronological ordering
