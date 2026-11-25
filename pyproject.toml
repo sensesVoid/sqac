@@ -6,18 +6,40 @@ build-backend = "setuptools.build_meta"
 name = "sqac"
 dynamic = ["version"]
 description = "Symbolic Query Addressable Cartridge — hot-swappable VSA memory for LLMs"
-license = "BUSL-1.1"
+license = "Apache-2.0"
 license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.10"
-keywords = ["memory", "vector-symbolic-architecture", "llm", "rag", "in-context-learning"]
+keywords = [
+    "memory",
+    "vector-symbolic-architecture",
+    "hyperdimensional-computing",
+    "llm",
+    "llm-memory",
+    "agent-memory",
+    "ai-agents",
+    "mcp",
+    "model-context-protocol",
+    "rag",
+    "in-context-learning",
+    "claude-code",
+    "cursor",
+    "opencode",
+    "vector-database-alternative",
+]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
 ]
 dependencies = [
     "numpy>=1.24",
@@ -29,6 +51,8 @@ dependencies = [
 Homepage = "https://github.com/sensesVoid/sqac"
 Repository = "https://github.com/sensesVoid/sqac"
 Issues = "https://github.com/sensesVoid/sqac/issues"
+Documentation = "https://sensesvoid.github.io/sqac/"
+Changelog = "https://github.com/sensesVoid/sqac/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 mcp = ["mcp>=2.0,<3"]
