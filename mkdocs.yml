@@ -10,6 +10,8 @@ theme:
     - navigation.top
     - search.suggest
     - content.code.copy
+plugins:
+  - social
 nav:
   - Home: index.md
   - Vault: VAULT.md
