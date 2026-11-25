@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://sensesvoid.github.io/sqac/
+    about: Guides and reference for the CLI, MCP, vault, cloud, and file format.
+  - name: Security vulnerability
+    url: https://github.com/sensesVoid/sqac/security
+    about: Report security issues privately — do NOT open a public issue.
+  - name: Questions & discussions
+    url: https://github.com/sensesVoid/sqac/discussions
+    about: Ask questions and share how you're using SQAC.

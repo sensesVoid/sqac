@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a bug or unexpected behavior in SQAC
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill out the fields
+        below so we can reproduce it quickly.
+
+        > Tip: running `sqac report "short title" -d "what happened"` collects
+        > diagnostics (version, platform, component) and files an issue for you.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+      placeholder: "When I run `sqac search ...` I get X, but I expected Y."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps, commands, or a small cartridge that triggers it.
+      placeholder: |
+        1. `sqac teach "..." --key k`
+        2. `sqac search "..."`
+        3. See error
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SQAC version
+      description: Output of `sqac --version` (or `pip show sqac`).
+      placeholder: "1.4.2"
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - CLI
+        - MCP server
+        - HTTP server (sqac-server)
+        - Vault / Secret
+        - Cloud sync
+        - Code graph
+        - Memory core / retrieval
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, and install method (pip/wheel/sdist).
+      placeholder: "Windows 11, Python 3.12, pip wheel"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / traceback
+      description: Paste any error output. Redact secrets first.
+      render: shell

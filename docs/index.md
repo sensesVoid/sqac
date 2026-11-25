@@ -44,4 +44,4 @@ sqac cloud init --provider r2 --bucket my-memory
 - [FORMAT.md](FORMAT.md) — the `.sqac` binary format
 - [SECURITY.md](SECURITY.md) — security model
 
-License: BUSL-1.1 (converts to Apache 2.0 in 2030).
+License: Apache License 2.0.

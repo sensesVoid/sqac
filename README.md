@@ -7,7 +7,7 @@
 [![PyPI](https://img.shields.io/pypi/v/sqac)](https://pypi.org/project/sqac/)
 [![Python](https://img.shields.io/pypi/pyversions/sqac)](https://pypi.org/project/sqac/)
 [![CI](https://github.com/sensesVoid/sqac/actions/workflows/ci.yml/badge.svg)](https://github.com/sensesVoid/sqac/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-BUSL--1.1-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 Your agent already reads `AGENTS.md`, `CLAUDE.md`, skill files, and handoff notes on every session — the same files, rewritten by hand, re-read in full, and never queried. SQAC swaps them for structured memory your model can *search* instead of *reread*.
 
@@ -244,7 +244,7 @@ sqac mcp setup --host <cli>         # wire memory into your agent
 
 ## Status
 
-- **Version:** 1.4.0 — 586 tests passing
+- **Version:** 1.4.2 — 602 tests passing
 - **Repository:** https://github.com/sensesVoid/sqac
 - **Issues:** https://github.com/sensesVoid/sqac/issues
 
@@ -254,7 +254,7 @@ PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports: `sqac repor
 
 ## License
 
-BUSL-1.1 (free to use, modify, distribute — no competing SaaS). Converts to Apache 2.0 in 2030. See [LICENSE](LICENSE).
+Apache License 2.0 — free to use, modify, and distribute, including commercially, with an explicit patent grant. See [LICENSE](LICENSE).
 
 ---
 

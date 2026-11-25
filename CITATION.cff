@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use SQAC in your research or software, please cite it as below."
+title: "SQAC: Symbolic Query Addressable Cartridge"
+abstract: >-
+  SQAC turns facts, skills, session context, agent personas, and secrets into
+  portable, queryable .sqac cartridges that any LLM can search at runtime with
+  exact, lexical/fuzzy, and optional semantic tiers — no retraining, no vector
+  database, and no GPU required.
+type: software
+authors:
+  - family-names: Aton
+    given-names: Gerald
+    alias: sensesVoid
+version: 1.4.2
+date-released: "2026-11-24"
+license: Apache-2.0
+repository-code: "https://github.com/sensesVoid/sqac"
+url: "https://sensesvoid.github.io/sqac/"
+keywords:
+  - memory
+  - vector-symbolic-architecture
+  - hyperdimensional-computing
+  - llm
+  - agent-memory
+  - model-context-protocol
+  - rag
+  - in-context-learning
